@@ -154,7 +154,7 @@ irm https://www.garycli.com/install.ps1 | iex
 ```bash
 # 1. 克隆仓库
 git clone https://github.com/PrettyMyGirlZyy4Embedded/garycli.git
-cd gary
+cd garycli
 
 # 2. 安装 Python 依赖
 pip install -r requirements.txt
