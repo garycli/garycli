@@ -629,6 +629,55 @@ def _download_cmsis_core():
         ok(f"  ARM CMSIS Core ({len(CMSIS_CORE_FILES)} 个头文件)")
 
 # ─────────────────────────────────────────────────────────────────────────────
+# STEP 5b: FreeRTOS Kernel 下载（RTOS 开发可选）
+# ─────────────────────────────────────────────────────────────────────────────
+FREERTOS_KERNEL_URL = "https://github.com/FreeRTOS/FreeRTOS-Kernel/archive/refs/heads/main.zip"
+RTOS_DIR = WORKSPACE / "rtos"
+
+
+def download_freertos(auto: bool):
+    header("Step 5b  FreeRTOS Kernel（RTOS 开发可选，约 2 MB）")
+    # 检测是否已下载（有任意包含 tasks.c 的子目录即认为就绪）
+    rtos_kernel_dir = RTOS_DIR / "FreeRTOS-Kernel"
+    already_ok = rtos_kernel_dir.exists() and (rtos_kernel_dir / "tasks.c").exists()
+    if not already_ok:
+        # 兼容旧命名（如 FreeRTOS-Kernel-main）
+        for d in RTOS_DIR.iterdir() if RTOS_DIR.exists() else []:
+            if d.is_dir() and (d / "tasks.c").exists():
+                already_ok = True
+                rtos_kernel_dir = d
+                break
+    if already_ok:
+        ok(f"FreeRTOS Kernel 已就绪: {rtos_kernel_dir}")
+        return
+
+    if not (auto or ask("下载 FreeRTOS Kernel（RTOS 多任务开发必需，裸机项目可跳过）？", default="n")):
+        info("已跳过，裸机（无 RTOS）模式不受影响")
+        return
+
+    import tempfile, zipfile as _zf
+    tmp = Path(tempfile.mkdtemp(prefix="freertos_"))
+    try:
+        zip_path = tmp / "freertos_kernel.zip"
+        if not _download(FREERTOS_KERNEL_URL, zip_path, "FreeRTOS-Kernel"):
+            return
+        info("解压 FreeRTOS Kernel...")
+        RTOS_DIR.mkdir(parents=True, exist_ok=True)
+        with _zf.ZipFile(zip_path, "r") as zf:
+            prefix = zf.namelist()[0].split("/")[0] if zf.namelist() else ""
+            zf.extractall(RTOS_DIR)
+        extracted = RTOS_DIR / prefix
+        if extracted.exists() and not rtos_kernel_dir.exists():
+            extracted.rename(rtos_kernel_dir)
+        if (rtos_kernel_dir / "tasks.c").exists():
+            ok(f"FreeRTOS Kernel 已就绪: {rtos_kernel_dir}")
+        else:
+            warn("解压完成但未找到 tasks.c，请检查目录结构")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # STEP 6: Linux udev 规则
 # ─────────────────────────────────────────────────────────────────────────────
 _UDEV_RULES = """\
@@ -692,12 +741,12 @@ def setup_pyocd(auto: bool):
     if r.returncode == 0 and "stm32f103" in r.stdout.lower():
         ok("STM32F1 支持包已安装")
         return
-    if auto or ask("安装 pyocd STM32F1/F4 支持包（约 30 MB）？"):
+    if auto or ask("安装 pyocd STM32F1/F4/F411 支持包（约 30 MB）？"):
         info("更新 pack 索引...")
         _run([sys.executable, "-m", "pyocd", "pack", "update"], capture=False)
-        info("安装 STM32F103x8 / STM32F407xx 支持包...")
+        info("安装 STM32F103x8 / STM32F407xx / STM32F411CE 支持包...")
         _run([sys.executable, "-m", "pyocd", "pack", "install",
-              "STM32F103x8", "STM32F407xx"], capture=False)
+              "STM32F103x8", "STM32F407xx", "STM32F411CE"], capture=False)
         ok("pyocd 支持包安装完成")
     else:
         info("已跳过，pyocd 仍可通过通用 Cortex-M 模式识别大部分芯片")
@@ -925,7 +974,7 @@ def verify():
     else:
         print(_c("1;33", "  !! 部分组件缺失："))
         if not status["ai"]:
-            print(_c("33", "    - AI 接口未配置 -> 运行 python setup.py 配置 API Key"))
+            print(_c("33", "    - AI 接口未配置 -> 运行 gary config 配置 API Key"))
         if not status["gcc"]:
             print(_c("33", "    - arm-none-eabi-gcc 未安装 -> 无法编译固件"))
         if not status["python"]:
@@ -946,6 +995,7 @@ def main():
     parser.add_argument("--auto",  action="store_true", help="全自动，不询问")
     parser.add_argument("--check", action="store_true", help="仅检查环境")
     parser.add_argument("--hal",   nargs="*",           help="仅下载 HAL（可选: f0 f1 f3 f4）")
+    parser.add_argument("--rtos",  action="store_true", help="仅下载 FreeRTOS Kernel")
     args = parser.parse_args()
 
     print(_c("1;35", """
@@ -972,12 +1022,18 @@ def main():
             download_hal(auto=True, families=fams)
             return
 
+        if args.rtos:
+            create_workspace()
+            download_freertos(auto=True)
+            return
+
         check_python()
         configure_ai(auto=args.auto)
         install_arm_gcc(auto=args.auto)
         install_python_packages(auto=args.auto)
         create_workspace()
         download_hal(auto=args.auto)
+        download_freertos(auto=args.auto)
         setup_udev(auto=args.auto)
         setup_pyocd(auto=args.auto)
         install_gary_command(auto=args.auto)
