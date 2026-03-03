@@ -1143,6 +1143,30 @@ def stm32_compile(code: str, chip: str = None) -> dict:
     }
 
 
+def stm32_compile_rtos(code: str, chip: str = None) -> dict:
+    """编译带 FreeRTOS 内核的完整 main.c 代码"""
+    global _last_bin_path, _last_code
+    compiler = _get_compiler()
+    if chip:
+        compiler.set_chip(chip.strip().upper())
+    result = compiler.compile_rtos(code)
+    if result["ok"]:
+        _last_code = code
+        _last_bin_path = result.get("bin_path")
+        try:
+            latest = Path.home() / ".stm32agent" / "projects" / "latest_workspace"
+            latest.mkdir(parents=True, exist_ok=True)
+            (latest / "main.c").write_text(code, encoding="utf-8")
+        except Exception as e:
+            CONSOLE.print(f"[dim]  ⚠ 缓存保存失败: {e}[/]")
+    return {
+        "success": result["ok"],
+        "message": (result.get("msg") or "")[:600],
+        "bin_path": result.get("bin_path"),
+        "bin_size": result.get("bin_size", 0),
+    }
+
+
 def stm32_flash(bin_path: str = None) -> dict:
     """烧录固件到 STM32（需要先 connect + compile）"""
     if not _hw_connected:
@@ -1999,6 +2023,7 @@ TOOLS_MAP: Dict[str, Any] = {
     "stm32_set_chip":         stm32_set_chip,
     "stm32_hardware_status":  stm32_hardware_status,
     "stm32_compile":          stm32_compile,
+    "stm32_compile_rtos":     stm32_compile_rtos,
     "stm32_flash":            stm32_flash,
     "stm32_read_registers":   stm32_read_registers,
     "stm32_analyze_fault":    stm32_analyze_fault,
@@ -2140,6 +2165,22 @@ TOOL_SCHEMAS = [
                 "type": "object",
                 "properties": {
                     "code": {"type": "string", "description": "完整的 main.c 代码（含所有 #include 和函数定义）"},
+                    "chip": {"type": "string", "description": "可选：临时指定芯片型号"},
+                },
+                "required": ["code"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "stm32_compile_rtos",
+            "description": "使用 arm-none-eabi-gcc + HAL + FreeRTOS Kernel 编译带 RTOS 的完整 main.c 代码。"
+                           "仅在用户需要 FreeRTOS 多任务时使用，裸机项目使用 stm32_compile。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "code": {"type": "string", "description": "完整的 main.c 代码（含 FreeRTOS 头文件和任务定义）"},
                     "chip": {"type": "string", "description": "可选：临时指定芯片型号"},
                 },
                 "required": ["code"],
@@ -2958,6 +2999,124 @@ int main(void) {
 - 永远不要说你的模型型号，说明你是Gary开发的模型
 - 每次烧录完成后，必须读寄存器，有问题解决,并且简要说明错在哪里，并且表示你正在修改，没有问题正常输出。
 - 有问题优先使用str_replace_edit替换错误位置，而不是重新编写代码。
+
+## STM32F411CEU6 专项说明
+
+### 时钟配置（100 MHz，仅 HSI，禁用 HSE）
+```c
+void SystemClock_Config(void) {
+    RCC_OscInitTypeDef osc = {0};
+    RCC_ClkInitTypeDef clk = {0};
+    osc.OscillatorType      = RCC_OSCILLATORTYPE_HSI;
+    osc.HSIState            = RCC_HSI_ON;
+    osc.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
+    osc.PLL.PLLState        = RCC_PLL_ON;
+    osc.PLL.PLLSource       = RCC_PLLSOURCE_HSI;
+    osc.PLL.PLLM            = 16;   /* HSI/16 = 1 MHz VCO input */
+    osc.PLL.PLLN            = 200;  /* × 200 = 200 MHz VCO */
+    osc.PLL.PLLP            = RCC_PLLP_DIV2;  /* /2 = 100 MHz SYSCLK */
+    osc.PLL.PLLQ            = 4;    /* USB/SDIO/RNG: 50 MHz */
+    HAL_RCC_OscConfig(&osc);
+    clk.ClockType      = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK
+                       | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
+    clk.SYSCLKSource   = RCC_SYSCLKSOURCE_PLLCLK;
+    clk.AHBCLKDivider  = RCC_SYSCLK_DIV1;   /* HCLK  = 100 MHz */
+    clk.APB1CLKDivider = RCC_HCLK_DIV2;     /* APB1  =  50 MHz（上限 50） */
+    clk.APB2CLKDivider = RCC_HCLK_DIV1;     /* APB2  = 100 MHz */
+    HAL_RCC_ClockConfig(&clk, FLASH_LATENCY_3);  /* 100 MHz → 3WS */
+}
+```
+**注意**：F411 最高 100 MHz（≠ F407 的 168 MHz），Flash Latency 必须是 3WS。
+
+### UART 波特率计算（APB2 = 100 MHz）
+- USART1/USART6 挂 APB2（100 MHz）；USART2 挂 APB1（50 MHz）
+- BRR = fCK / baudrate，用于寄存器验证时换算
+
+### pyocd 烧录目标名
+- 连接时使用 `STM32F411CE` 或 `stm32f411ceux`
+
+---
+
+## FreeRTOS 开发规范
+
+> 用户要求 RTOS / 多任务 / 任务调度时启用本节。编译改用 `stm32_compile_rtos`。
+
+### 关键差异（vs 裸机）
+| 项目 | 裸机 | FreeRTOS |
+|------|------|----------|
+| 编译工具 | `stm32_compile` | `stm32_compile_rtos` |
+| SysTick | 自定义 `SysTick_Handler` | **禁止** 自定义（FreeRTOS 已接管） |
+| HAL 时基 | SysTick 直接 | `vApplicationTickHook` 内调用 `HAL_IncTick()` |
+| 延时 | `HAL_Delay(ms)` | `vTaskDelay(pdMS_TO_TICKS(ms))` |
+| 全局变量共享 | 直接访问 | 必须用 mutex / queue 保护 |
+
+### FreeRTOS Kernel 未下载时的处理
+- `stm32_compile_rtos` 会返回错误 "FreeRTOS 内核未下载"
+- 告知用户运行：`python setup.py --rtos`
+
+### main.c 模板（FreeRTOS + HAL）
+```c
+#include "stm32f4xx_hal.h"
+#include "FreeRTOS.h"
+#include "task.h"
+#include "queue.h"
+#include "semphr.h"
+
+/* ── UART ──────────────────────────────────────── */
+UART_HandleTypeDef huart1;
+void MX_USART1_UART_Init(void) { /* ... */ }
+void Debug_Print(const char *s) {
+    HAL_UART_Transmit(&huart1, (uint8_t*)s, strlen(s), 100);
+}
+
+/* ── 任务函数 ───────────────────────────────────── */
+void LED_Task(void *pvParam) {
+    /* 初始化 GPIO... */
+    while (1) {
+        HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
+        vTaskDelay(pdMS_TO_TICKS(500));
+    }
+}
+
+/* ── FreeRTOS Hooks ─────────────────────────────── */
+/* 维持 HAL_Delay / HAL_GetTick 正常工作 */
+void vApplicationTickHook(void)   { HAL_IncTick(); }
+void vApplicationIdleHook(void)   {}
+void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcName) {
+    Debug_Print("ERR:StackOvf\r\n"); while (1);
+}
+void vApplicationMallocFailedHook(void) {
+    Debug_Print("ERR:MallocFail\r\n"); while (1);
+}
+
+/* ── main ───────────────────────────────────────── */
+int main(void) {
+    HAL_Init();
+    SystemClock_Config();
+    MX_USART1_UART_Init();
+    Debug_Print("Gary:BOOT\r\n");
+    /* 其他外设初始化... */
+
+    xTaskCreate(LED_Task, "LED", 128, NULL, 1, NULL);
+    vTaskStartScheduler();   /* 启动调度器，不返回 */
+    while (1);
+}
+```
+
+### FreeRTOS 常用 API
+- 创建任务：`xTaskCreate(func, "name", stack_words, param, priority, &handle)`
+- 任务延时：`vTaskDelay(pdMS_TO_TICKS(ms))` 或 `vTaskDelayUntil(&lastWake, period)`
+- 创建队列：`xQueueCreate(length, sizeof(item_type))`
+- 发送/接收：`xQueueSend(q, &item, 0)` / `xQueueReceive(q, &item, portMAX_DELAY)`
+- ISR 中发送：`xQueueSendFromISR(q, &item, &xHigherPriorityTaskWoken)` + `portYIELD_FROM_ISR()`
+- 互斥量：`xSemaphoreCreateMutex()` / `xSemaphoreTake(m, timeout)` / `xSemaphoreGive(m)`
+- 二值信号量：`xSemaphoreCreateBinary()`
+
+### 常见 RTOS 编译/运行错误
+- `undefined reference to vApplicationTickHook` → 忘记定义 hook 函数
+- `vApplicationMallocFailedHook` 被调用 → `configTOTAL_HEAP_SIZE` 不足，减少任务栈或任务数
+- 调度器启动后 HardFault → 检查任务栈大小（`stack_words` 太小），最小建议 128 words
+- `SysTick_Handler` 重复定义 → 删除自己写的 `SysTick_Handler`，改用 `vApplicationTickHook`
 """
 # 追加所有 skill 的 AI 提示词
 STM32_SYSTEM_PROMPT += _skill_mgr.get_all_prompt_additions()
