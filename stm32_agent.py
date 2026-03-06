@@ -61,7 +61,8 @@ from config import (
     SERIAL_PORT, SERIAL_BAUD,
     POST_FLASH_DELAY, REGISTER_READ_DELAY,
 )
-from compiler import Compiler
+import compiler as _compiler_module
+Compiler = _compiler_module.Compiler
 
 # ─────────────────────────────────────────────────────────────
 # AI 接口管理（动态读写 config.py，支持运行时切换）
@@ -823,6 +824,7 @@ _serial_connected = False
 _current_chip = DEFAULT_CHIP
 _last_bin_path: Optional[str] = None
 _last_code: Optional[str] = None
+_compiler_mtime: float = 0.0   # compiler.py 上次加载时的 mtime
 
 # 调试闭环计数器（每次新任务由 AI 调用 stm32_reset_debug_attempts 重置）
 _debug_attempt = 0
@@ -830,10 +832,22 @@ MAX_DEBUG_ATTEMPTS = 8  # 提高上限，一个任务最多 8 轮（含修改迭
 
 
 def _get_compiler() -> Compiler:
-    global _compiler
+    """返回 Compiler 单例；若 compiler.py 磁盘文件已更新则自动热重载。"""
+    global _compiler, _compiler_mtime
+    import importlib
+    compiler_path = _HERE / "compiler.py"
+    try:
+        mtime = compiler_path.stat().st_mtime
+    except OSError:
+        mtime = 0.0
+    if mtime > _compiler_mtime:
+        importlib.reload(_compiler_module)
+        globals()["Compiler"] = _compiler_module.Compiler
+        _compiler = None          # 旧实例作废，下方重新创建
+        _compiler_mtime = mtime
     if _compiler is None:
-        _compiler = Compiler()
-        _compiler.set_chip(_current_chip)
+        _compiler = _compiler_module.Compiler()
+        _compiler.check(_current_chip)   # 探测 GCC/HAL，设置 has_gcc/has_hal
     return _compiler
 
 
@@ -1130,7 +1144,7 @@ def stm32_compile(code: str, chip: str = None) -> dict:
         _last_bin_path = result.get("bin_path")
         # 自动保存到 latest_workspace
         try:
-            latest = Path.home() / ".stm32agent" / "projects" / "latest_workspace"
+            latest = Path.home() / ".stm32_agent" / "workspace" / "projects" / "latest_workspace"
             latest.mkdir(parents=True, exist_ok=True)
             (latest / "main.c").write_text(code, encoding="utf-8")
         except Exception as e:
@@ -1154,7 +1168,7 @@ def stm32_compile_rtos(code: str, chip: str = None) -> dict:
         _last_code = code
         _last_bin_path = result.get("bin_path")
         try:
-            latest = Path.home() / ".stm32agent" / "projects" / "latest_workspace"
+            latest = Path.home() / ".stm32_agent" / "workspace" / "projects" / "latest_workspace"
             latest.mkdir(parents=True, exist_ok=True)
             (latest / "main.c").write_text(code, encoding="utf-8")
         except Exception as e:
@@ -1164,6 +1178,789 @@ def stm32_compile_rtos(code: str, chip: str = None) -> dict:
         "message": (result.get("msg") or "")[:600],
         "bin_path": result.get("bin_path"),
         "bin_size": result.get("bin_size", 0),
+    }
+
+
+def stm32_recompile(mode: str = "auto") -> dict:
+    """从 latest_workspace/main.c 直接重编译，无需 Gary 传递代码字符串。
+    str_replace_edit 修改文件后调用此函数代替 read_file + stm32_compile。
+    mode: "bare"(裸机) | "rtos"(FreeRTOS) | "auto"(自动检测，默认)
+    """
+    latest = Path.home() / ".stm32_agent" / "workspace" / "projects" / "latest_workspace"
+    main_c = latest / "main.c"
+    if not main_c.exists():
+        return {"success": False, "message": "latest_workspace/main.c 不存在，请先编译一次完整代码"}
+    code = main_c.read_text(encoding="utf-8")
+    if mode == "auto":
+        mode = "rtos" if ("FreeRTOS.h" in code or "task.h" in code or "xTaskCreate" in code) else "bare"
+    if mode == "rtos":
+        return stm32_compile_rtos(code)
+    return stm32_compile(code)
+
+
+def stm32_regen_bsp(chip: str = None) -> dict:
+    """强制重新生成 startup.s / link.ld / FreeRTOSConfig.h。
+    每次修改 compiler.py 或切换芯片后调用一次，确保构建文件是最新版本。
+    自动检查 startup.s 是否包含 FPU 使能代码（Cortex-M4 必须）。
+    """
+    import importlib
+    # 强制重载 compiler 模块，绕过进程内缓存
+    importlib.reload(_compiler_module)
+    globals()["Compiler"] = _compiler_module.Compiler
+    global _compiler, _compiler_mtime
+    _compiler = None
+    try:
+        compiler_path = _HERE / "compiler.py"
+        _compiler_mtime = compiler_path.stat().st_mtime
+    except OSError:
+        _compiler_mtime = 0.0
+
+    compiler = _get_compiler()
+    if chip:
+        compiler.set_chip(chip.strip().upper())
+
+    # 调用 set_chip 触发 startup.s / link.ld 重新生成
+    chip_name = chip.strip().upper() if chip else _current_chip
+    ci = compiler.set_chip(chip_name)
+    if ci is None:
+        return {"success": False, "message": f"未知芯片: {chip_name}"}
+
+    # 验证 startup.s 包含 FPU 使能
+    from config import BUILD_DIR
+    startup_path = BUILD_DIR / "startup.s"
+    has_fpu_enable = False
+    if startup_path.exists():
+        content = startup_path.read_text()
+        has_fpu_enable = "Enable FPU" in content or "CPACR" in content
+
+    cpu = ci.get("cpu", "?")
+    fpu = ci.get("fpu", False)
+    ram_k = ci.get("ram_k", 0)
+    flash_k = ci.get("flash_k", 0)
+
+    warnings = []
+    if fpu and not has_fpu_enable:
+        warnings.append("⚠ startup.s 缺少 FPU 使能代码——请更新 compiler.py")
+    if ram_k < 32 and ci.get("family") in ("f4",):
+        warnings.append(f"⚠ RAM 仅 {ram_k}KB，FreeRTOS heap 可能不够")
+
+    return {
+        "success": True,
+        "chip": chip_name,
+        "cpu": cpu,
+        "fpu_supported": fpu,
+        "startup_fpu_enabled": has_fpu_enable,
+        "flash_k": flash_k,
+        "ram_k": ram_k,
+        "files_regenerated": ["startup.s", "link.ld"],
+        "warnings": warnings,
+        "message": f"BSP 文件已重新生成 ({cpu}, {'有 FPU' if fpu else '无 FPU'}，{flash_k}K Flash / {ram_k}K RAM)"
+                   + (("；" + "；".join(warnings)) if warnings else ""),
+    }
+
+
+def stm32_analyze_fault_rtos() -> dict:
+    """读取并分析 FreeRTOS 程序的 HardFault 寄存器。
+    在普通 stm32_analyze_fault 基础上增加 FreeRTOS 专项诊断：
+    - 识别 FPU 未使能导致的 PRECISERR
+    - 识别 SysTick_Handler 冲突
+    - 识别任务栈溢出引发的故障
+    - 检查 startup.s 是否包含 FPU 初始化
+    返回明确的根本原因和修复建议。
+    """
+    if not _hw_connected:
+        return {"success": False, "message": "硬件未连接"}
+
+    bridge = _get_bridge()
+    regs = bridge.read_registers(["SCB_CFSR", "SCB_HFSR", "SCB_BFAR", "PC",
+                                   "SCB_MMFAR", "SCB_CPACR_FIELD"])
+    if not regs:
+        regs = bridge.read_registers(["SCB_CFSR", "SCB_HFSR", "SCB_BFAR", "PC"])
+    if not regs:
+        return {"success": False, "message": "寄存器读取失败，请确认硬件已连接并已暂停"}
+
+    cfsr = regs.get("SCB_CFSR", "0x0")
+    hfsr = regs.get("SCB_HFSR", "0x0")
+    bfar = regs.get("SCB_BFAR", "0x0")
+    pc   = regs.get("PC", "0x0")
+
+    try:
+        cfsr_v = int(cfsr, 16)
+        hfsr_v = int(hfsr, 16)
+        bfar_v = int(bfar, 16)
+        pc_v   = int(pc,   16)
+    except (ValueError, TypeError):
+        cfsr_v = hfsr_v = bfar_v = pc_v = 0
+
+    # 检查 startup.s 的 FPU 使能
+    from config import BUILD_DIR
+    startup_path = BUILD_DIR / "startup.s"
+    has_fpu_in_startup = False
+    if startup_path.exists():
+        txt = startup_path.read_text()
+        has_fpu_in_startup = "CPACR" in txt or "Enable FPU" in txt
+
+    # 检查 CPACR 硬件状态（读 0xE000ED88 的 bit[23:20]）
+    fpu_hw_enabled = False
+    try:
+        cpacr = bridge._target.read32(0xE000ED88)
+        fpu_hw_enabled = ((cpacr >> 20) & 0xF) == 0xF
+    except Exception:
+        pass
+
+    # ── 诊断逻辑 ──────────────────────────────────────────
+    root_cause = "未知"
+    fix = "请读取 SCB_CFSR 后手动分析"
+    severity = "unknown"
+
+    preciserr = bool(cfsr_v & (1 << 9))
+    bfarvalid = bool(cfsr_v & (1 << 15))
+    iaccviol  = bool(cfsr_v & (1 << 0))
+    undefinstr= bool(cfsr_v & (1 << 16))
+    stkovf    = bool(cfsr_v & (1 << 12))   # STKOVF: 栈下溢
+    unstkovf  = bool(cfsr_v & (1 << 11))   # UNSTKOVF: 不稳定栈下溢
+
+    # 判断 BFAR 是否"合理"（STM32 合法地址范围）
+    bfar_valid_range = (0x08000000 <= bfar_v < 0x08200000 or
+                        0x20000000 <= bfar_v < 0x20030000 or
+                        0x40000000 <= bfar_v < 0x60000000 or
+                        0xE0000000 <= bfar_v)
+    bfar_garbage = bfarvalid and not bfar_valid_range
+
+    if preciserr and bfar_garbage and not fpu_hw_enabled:
+        root_cause = "FPU 未使能：ARM_CM4F port.c 的 PendSV_Handler 执行 vpush/vpop 时触发 PRECISERR"
+        fix = ("修复方法（已在 compiler.py 修复，重新编译即可）：\n"
+               "  1. 调用 stm32_regen_bsp() 重新生成 startup.s（含 CPACR 初始化）\n"
+               "  2. 重新编译：stm32_compile_rtos(code)\n"
+               "  不需要在代码里手动写 SCB->CPACR")
+        severity = "critical"
+    elif undefinstr and not fpu_hw_enabled:
+        root_cause = "FPU 指令在 FPU 禁用状态下执行（UNDEFINSTR）"
+        fix = "同上，重新生成 startup.s 后重新编译"
+        severity = "critical"
+    elif stkovf or unstkovf:
+        root_cause = "任务栈溢出（FreeRTOS 检测到栈越界）"
+        fix = "增大任务的 stack_words 参数：普通任务 ≥128，FPU 任务 ≥256，含 printf 的任务 ≥384"
+        severity = "high"
+    elif preciserr and bfarvalid:
+        root_cause = f"总线错误：精确地址 BFAR={bfar} 非法（可能是外设时钟未开启或访问了无效内存）"
+        fix = "检查 PC 指向的函数，确认相关外设 RCC 时钟已 __HAL_RCC_xxx_CLK_ENABLE()"
+        severity = "medium"
+    elif hfsr_v & (1 << 1):
+        root_cause = "向量表读取失败（VECTTBL）：中断向量地址无效"
+        fix = "检查链接脚本 FLASH 地址和向量表对齐"
+        severity = "critical"
+    elif cfsr_v == 0 and hfsr_v == 0:
+        root_cause = "无 HardFault（程序正常运行）"
+        fix = "无需修复"
+        severity = "none"
+
+    # 补充 startup 检查信息
+    startup_note = ""
+    if not has_fpu_in_startup:
+        startup_note = "⚠ 当前 startup.s 不含 FPU 使能代码，调用 stm32_regen_bsp() 后重新编译"
+    elif not fpu_hw_enabled:
+        startup_note = "⚠ startup.s 含 FPU 使能但硬件 CPACR 当前为 0（可能是旧固件未重新编译）"
+
+    return {
+        "success": True,
+        "registers": regs,
+        "fpu_hw_enabled": fpu_hw_enabled,
+        "startup_has_fpu_enable": has_fpu_in_startup,
+        "root_cause": root_cause,
+        "severity": severity,
+        "fix": fix,
+        "startup_note": startup_note,
+        "cfsr_bits": {
+            "PRECISERR": preciserr, "BFARVALID": bfarvalid,
+            "IACCVIOL": iaccviol, "UNDEFINSTR": undefinstr,
+            "STKOVF": stkovf,
+        },
+    }
+
+
+def stm32_rtos_check_code(code: str) -> dict:
+    """FreeRTOS 代码静态检查 —— 编译前捕获常见 RTOS 编程错误。
+    检查 SysTick 冲突、HAL_Delay 陷阱、缺少 hook 函数、栈大小、ISR 安全等。
+    """
+    import re
+    errors = []
+    warnings = []
+    suggestions = []
+
+    # 1. SysTick_Handler 冲突
+    if re.search(r'\bvoid\s+SysTick_Handler\b', code):
+        errors.append("❌ 禁止自定义 SysTick_Handler —— FreeRTOS 已通过 xPortSysTickHandler 接管 SysTick。"
+                       "删除 SysTick_Handler，改用 vApplicationTickHook() 维持 HAL_IncTick()")
+
+    # 2. HAL_Delay 在 xTaskCreate 之前
+    hal_delay_pos = code.find("HAL_Delay")
+    xtask_pos = code.find("xTaskCreate")
+    if hal_delay_pos >= 0 and xtask_pos >= 0 and hal_delay_pos < xtask_pos:
+        # 排除注释中的情况（简单排除）
+        line_with_delay = code[:hal_delay_pos].rfind('\n')
+        delay_line = code[line_with_delay:hal_delay_pos]
+        if '//' not in delay_line and '/*' not in delay_line:
+            errors.append("❌ HAL_Delay() 在 xTaskCreate() 之前调用 —— SysTick 会触发 FreeRTOS tick handler，"
+                          "访问未初始化的任务列表导致 HardFault。"
+                          "把含 HAL_Delay 的初始化移到任务函数内部")
+
+    # 3. 必需 hook 函数
+    required_hooks = {
+        "vApplicationTickHook":          "void vApplicationTickHook(void) { HAL_IncTick(); }",
+        "vApplicationMallocFailedHook":  "void vApplicationMallocFailedHook(void) { while(1); }",
+        "vApplicationStackOverflowHook": "void vApplicationStackOverflowHook(TaskHandle_t t, char *n) { while(1); }",
+        "vApplicationIdleHook":          "void vApplicationIdleHook(void) {}",
+    }
+    for hook, template in required_hooks.items():
+        if hook not in code:
+            errors.append(f"❌ 缺少 {hook} —— 请添加: {template}")
+
+    # 4. 任务栈大小检查
+    task_creates = re.findall(
+        r'xTaskCreate\s*\(\s*(\w+)\s*,\s*"[^"]*"\s*,\s*(\d+)', code)
+    for func_name, stack_str in task_creates:
+        stack = int(stack_str)
+        # 查找任务函数体
+        func_pattern = rf'void\s+{re.escape(func_name)}\s*\('
+        func_match = re.search(func_pattern, code)
+        if func_match:
+            # 提取函数体（简单：从匹配位置到后续 2000 字符）
+            func_body = code[func_match.start():func_match.start() + 2000]
+            has_float = any(kw in func_body for kw in
+                           ['float ', 'double ', 'sinf(', 'cosf(', 'sqrtf(', 'tanf(',
+                            'arm_', '.0f', 'fabsf(', 'powf(', 'logf(', 'expf('])
+            has_printf = any(kw in func_body for kw in
+                            ['snprintf(', 'sprintf(', 'printf('])
+            if has_printf and stack < 384:
+                warnings.append(f"⚠ 任务 {func_name} 使用 snprintf 但栈仅 {stack} words，建议 ≥384")
+            elif has_float and stack < 256:
+                warnings.append(f"⚠ 任务 {func_name} 使用浮点运算但栈仅 {stack} words，建议 ≥256")
+            elif stack < 128:
+                warnings.append(f"⚠ 任务 {func_name} 栈仅 {stack} words，建议 ≥128")
+
+    # 5. ISR 安全检查 —— 在 IRQHandler 中使用非 FromISR 的 API
+    irq_funcs = re.findall(r'void\s+(\w+_IRQHandler)\s*\(void\)\s*\{', code)
+    for irq_name in irq_funcs:
+        # 提取 IRQ 函数体
+        irq_start = code.find(f'void {irq_name}')
+        if irq_start >= 0:
+            irq_body = code[irq_start:irq_start + 1500]
+            # 检查危险 API（非 FromISR 版本）
+            unsafe_apis = ['xQueueSend(', 'xQueueReceive(', 'xSemaphoreTake(',
+                           'xSemaphoreGive(', 'vTaskDelay(', 'vTaskDelayUntil(',
+                           'xTaskCreate(', 'vTaskDelete(', 'printf(']
+            for api in unsafe_apis:
+                if api in irq_body and api.replace('(', 'FromISR(') not in irq_body:
+                    safe_api = api.replace('(', 'FromISR(')
+                    warnings.append(f"⚠ {irq_name} 中使用了 {api} —— ISR 中必须用 {safe_api}")
+
+    # 6. 缺少头文件
+    if 'strlen(' in code or 'memset(' in code or 'memcpy(' in code:
+        if '#include <string.h>' not in code and '#include<string.h>' not in code:
+            warnings.append("⚠ 使用了 strlen/memset/memcpy 但未 #include <string.h>")
+    if 'sinf(' in code or 'cosf(' in code or 'sqrtf(' in code:
+        if '#include <math.h>' not in code and '#include<math.h>' not in code:
+            warnings.append("⚠ 使用了 sinf/cosf/sqrtf 但未 #include <math.h>")
+    if 'snprintf(' in code:
+        if '#include <stdio.h>' not in code and '#include<stdio.h>' not in code:
+            warnings.append("⚠ 使用了 snprintf 但未 #include <stdio.h>")
+
+    # 7. 建议
+    if 'xSemaphoreCreateBinary' in code and 'vTaskNotifyGive' not in code:
+        suggestions.append("💡 考虑用任务通知 (vTaskNotifyGive/ulTaskNotifyTake) 替代二值信号量，速度更快且更省内存")
+    if 'xEventGroupCreate' not in code and re.findall(r'xSemaphoreCreateBinary', code).__len__() >= 3:
+        suggestions.append("💡 多个二值信号量可能适合用事件组 (xEventGroupCreate) 替代")
+    if 'vTaskDelayUntil' not in code and 'vTaskDelay' in code:
+        suggestions.append("💡 需要精确周期执行时用 vTaskDelayUntil 替代 vTaskDelay（避免累积漂移）")
+
+    return {
+        "success": True,
+        "errors": errors,
+        "warnings": warnings,
+        "suggestions": suggestions,
+        "error_count": len(errors),
+        "warning_count": len(warnings),
+        "message": (f"检查完成: {len(errors)} 个错误, {len(warnings)} 个警告, {len(suggestions)} 个建议"
+                    + ("\n" + "\n".join(errors + warnings + suggestions) if errors or warnings or suggestions
+                       else "\n✅ 代码通过所有 RTOS 检查")),
+    }
+
+
+def stm32_rtos_task_stats() -> dict:
+    """通过 pyocd 读取 FreeRTOS 运行时任务统计信息。
+    从 ELF 符号表解析全局变量地址，读取任务数、堆使用、当前任务等。
+    需要先编译（有 ELF 文件）并连接硬件。
+    """
+    if not _hw_connected:
+        return {"success": False, "message": "硬件未连接"}
+
+    from config import BUILD_DIR
+    elf_path = BUILD_DIR / "firmware.elf"
+    if not elf_path.exists():
+        return {"success": False, "message": "ELF 文件不存在，请先编译"}
+
+    bridge = _get_bridge()
+
+    # 通过 nm 解析 ELF 符号表获取变量地址
+    import subprocess
+    symbols_to_find = {
+        "uxCurrentNumberOfTasks": None,     # uint32_t 任务数
+        "xFreeBytesRemaining": None,        # size_t heap_4 剩余
+        "xMinimumEverFreeBytesRemaining": None,  # size_t 历史最低
+        "pxCurrentTCB": None,               # TCB* 当前任务
+    }
+
+    try:
+        r = subprocess.run(
+            ["arm-none-eabi-nm", "-g", str(elf_path)],
+            capture_output=True, text=True, timeout=5)
+        if r.returncode != 0:
+            return {"success": False, "message": "nm 解析 ELF 失败"}
+
+        for line in r.stdout.split('\n'):
+            parts = line.strip().split()
+            if len(parts) >= 3:
+                addr_str, _typ, name = parts[0], parts[1], parts[2]
+                if name in symbols_to_find:
+                    symbols_to_find[name] = int(addr_str, 16)
+    except Exception as e:
+        return {"success": False, "message": f"符号解析异常: {e}"}
+
+    result = {"success": True}
+
+    # 读取各变量值
+    try:
+        addr = symbols_to_find["uxCurrentNumberOfTasks"]
+        if addr:
+            result["task_count"] = bridge._target.read32(addr)
+
+        addr = symbols_to_find["xFreeBytesRemaining"]
+        if addr:
+            result["heap_free_bytes"] = bridge._target.read32(addr)
+
+        addr = symbols_to_find["xMinimumEverFreeBytesRemaining"]
+        if addr:
+            result["heap_min_ever_free"] = bridge._target.read32(addr)
+
+        addr = symbols_to_find["pxCurrentTCB"]
+        if addr:
+            tcb_ptr = bridge._target.read32(addr)
+            result["current_tcb_addr"] = f"0x{tcb_ptr:08X}"
+
+            # 尝试读取当前任务名（TCB 偏移量 52 处是 pcTaskName，长度 configMAX_TASK_NAME_LEN=16）
+            try:
+                name_offset = 52  # 标准 FreeRTOS TCB pcTaskName 偏移
+                name_bytes = bytearray()
+                for i in range(16):
+                    b = bridge._target.read8(tcb_ptr + name_offset + i)
+                    if b == 0:
+                        break
+                    name_bytes.append(b)
+                result["current_task_name"] = name_bytes.decode('ascii', errors='replace')
+            except Exception:
+                pass
+
+    except Exception as e:
+        result["read_error"] = str(e)
+
+    # 构造摘要消息
+    parts = []
+    if "task_count" in result:
+        parts.append(f"任务数: {result['task_count']}")
+    if "heap_free_bytes" in result:
+        parts.append(f"堆剩余: {result['heap_free_bytes']}B")
+    if "heap_min_ever_free" in result:
+        parts.append(f"堆历史最低: {result['heap_min_ever_free']}B")
+    if "current_task_name" in result:
+        parts.append(f"当前任务: {result['current_task_name']}")
+    result["message"] = " | ".join(parts) if parts else "读取完成（部分符号未找到）"
+
+    return result
+
+
+def stm32_rtos_suggest_config(task_count: int, use_fpu: bool = False,
+                               use_printf: bool = False, ram_k: int = 0) -> dict:
+    """根据用户的任务需求，计算推荐的 FreeRTOS 配置参数。
+    估算堆大小、栈大小、优先级数，并检查 RAM 是否足够。
+    """
+    compiler = _get_compiler()
+    ci = compiler._chip_info
+    if ci is None:
+        return {"success": False, "message": "芯片未设置，请先 stm32_set_chip"}
+
+    actual_ram_k = ram_k if ram_k > 0 else ci.get("ram_k", 64)
+    has_fpu = ci.get("fpu", False)
+
+    # 栈大小推荐
+    if use_printf:
+        recommended_stack = 384
+        stack_reason = "含 snprintf/printf，需要 384+ words"
+    elif use_fpu or has_fpu:
+        recommended_stack = 256
+        stack_reason = "FPU 上下文保存需要 256+ words"
+    else:
+        recommended_stack = 128
+        stack_reason = "普通任务最小 128 words"
+
+    # 堆大小估算
+    tcb_size = 92       # TCB 约 92 字节
+    stack_bytes = recommended_stack * 4  # words → bytes
+    per_task = tcb_size + stack_bytes
+    idle_task = per_task  # Idle 任务
+    timer_task = tcb_size + (recommended_stack * 2 * 4)  # Timer 任务栈更大
+
+    total_task_mem = per_task * task_count + idle_task + timer_task
+    # 额外开销：队列/信号量/事件组 约 20%
+    recommended_heap = int(total_task_mem * 1.3)
+    # 对齐到 256B
+    recommended_heap = ((recommended_heap + 255) // 256) * 256
+
+    max_heap = actual_ram_k * 1024 // 2  # 最多用一半 RAM
+    if recommended_heap > max_heap:
+        recommended_heap = max_heap
+
+    # RAM 使用估算
+    static_overhead = 4096  # .data + .bss + ISR 栈 约 4KB
+    total_ram_usage = static_overhead + recommended_heap
+    ram_pct = total_ram_usage * 100 // (actual_ram_k * 1024)
+
+    warnings = []
+    if ram_pct > 85:
+        warnings.append(f"⚠ RAM 使用率预估 {ram_pct}%，建议减少任务数或栈大小")
+    if task_count > 7:
+        warnings.append("⚠ 任务数较多，注意优先级分配避免优先级反转")
+    if actual_ram_k < 16 and task_count > 2:
+        warnings.append(f"⚠ RAM 仅 {actual_ram_k}KB，建议最多 2 个任务")
+
+    config = {
+        "success": True,
+        "recommended_stack_words": recommended_stack,
+        "stack_reason": stack_reason,
+        "recommended_heap_bytes": recommended_heap,
+        "recommended_priorities": min(task_count + 2, 7),
+        "estimated_ram_usage_bytes": total_ram_usage,
+        "estimated_ram_percent": ram_pct,
+        "ram_total_kb": actual_ram_k,
+        "per_task_overhead_bytes": per_task,
+        "warnings": warnings,
+        "message": (f"推荐配置: 栈={recommended_stack}words, 堆={recommended_heap}B, "
+                    f"优先级={min(task_count + 2, 7)}, RAM预估使用{ram_pct}%"
+                    + (("  " + "; ".join(warnings)) if warnings else "")),
+    }
+    return config
+
+
+def stm32_rtos_plan_project(description: str, peripherals: list = None,
+                             task_hints: list = None) -> dict:
+    """FreeRTOS 项目规划工具 —— 复杂 RTOS 项目的架构规划。
+
+    根据用户需求描述，生成结构化的项目规划：
+    - 任务分解（任务名、职责、栈大小、优先级）
+    - 通信拓扑（任务间用什么机制通信：Queue/Semaphore/Notification/EventGroup）
+    - 中断处理策略（哪些中断需要处理，如何通知任务）
+    - 外设分配（哪个任务负责哪些外设）
+    - 时序约束（哪些操作有实时性要求）
+    - 资源估算（总堆/栈/RAM 使用）
+
+    AI 在规划复杂 RTOS 项目时必须先调用此工具，待用户确认后再写代码。
+    """
+    import re
+
+    compiler = _get_compiler()
+    ci = compiler._chip_info
+    if ci is None:
+        return {"success": False, "message": "芯片未设置，请先 stm32_set_chip"}
+
+    has_fpu = ci.get("fpu", False)
+    ram_k = ci.get("ram_k", 64)
+    flash_k = ci.get("flash_k", 256)
+    cpu = ci.get("cpu", "cortex-m3")
+
+    # ── 分析需求 ──────────────────────────────────────────
+    desc_lower = description.lower()
+
+    # 检测是否涉及浮点
+    uses_float = any(kw in desc_lower for kw in
+                     ['浮点', 'float', 'sin', 'cos', 'pid', '温度计算', 'dsp',
+                      'adc采样', '滤波', 'fft', '角度', '加速度', '陀螺仪'])
+
+    # 检测是否需要 printf/snprintf
+    uses_printf = any(kw in desc_lower for kw in
+                      ['printf', 'snprintf', '格式化', '打印浮点', '调试输出'])
+
+    # 检测外设
+    detected_peripherals = []
+    periph_map = {
+        'uart': ['串口', 'uart', 'usart', '通信', '打印', '日志'],
+        'i2c': ['i2c', 'oled', '传感器', 'bmp', 'sht', 'mpu', '加速度', '陀螺仪', '屏幕'],
+        'spi': ['spi', 'sd卡', 'flash', 'w25q', 'tft', 'lcd'],
+        'adc': ['adc', '模拟', '采样', '电压', '温度', '光照'],
+        'tim_pwm': ['pwm', '舵机', '电机', '蜂鸣器', '呼吸灯', '调光'],
+        'tim_basic': ['定时器', 'timer', '周期', '计时'],
+        'gpio_out': ['led', '继电器', '数码管', '指示灯', '开关输出'],
+        'gpio_in': ['按键', '按钮', '开关输入', '限位', '光电'],
+        'exti': ['外部中断', '中断触发', '边沿检测'],
+        'dma': ['dma', '高速传输'],
+    }
+    for periph, keywords in periph_map.items():
+        if any(kw in desc_lower for kw in keywords):
+            detected_peripherals.append(periph)
+
+    if peripherals:
+        for p in peripherals:
+            if p.lower() not in detected_peripherals:
+                detected_peripherals.append(p.lower())
+
+    # ── 任务规划 ──────────────────────────────────────────
+    planned_tasks = []
+
+    # 根据需求自动推荐任务结构
+    task_templates = {
+        'sensor': {
+            'triggers': ['传感器', 'adc', '采样', '温度', '湿度', '加速度', '陀螺仪', '光照', '压力'],
+            'name': 'SensorTask',
+            'purpose': '传感器数据采集与处理',
+            'priority': 3,
+            'stack': 256 if uses_float else 128,
+            'comm_out': 'Queue（发送处理后的数据）',
+        },
+        'display': {
+            'triggers': ['显示', 'oled', 'lcd', 'tft', '数码管', '屏幕'],
+            'name': 'DisplayTask',
+            'purpose': '显示刷新（从队列接收数据更新显示）',
+            'priority': 1,
+            'stack': 256,
+            'comm_in': 'Queue（接收要显示的数据）',
+        },
+        'control': {
+            'triggers': ['控制', '电机', '舵机', 'pid', '调节', '反馈'],
+            'name': 'ControlTask',
+            'purpose': '控制算法执行（PID 等）',
+            'priority': 4,
+            'stack': 384 if uses_float else 256,
+            'comm_in': 'Queue（接收传感器数据）',
+            'comm_out': 'Queue/直接GPIO（输出控制信号）',
+        },
+        'comm': {
+            'triggers': ['通信', '上位机', '蓝牙', 'wifi', '发送', '协议'],
+            'name': 'CommTask',
+            'purpose': '通信处理（串口/蓝牙数据收发）',
+            'priority': 2,
+            'stack': 384 if uses_printf else 256,
+            'comm_in': 'Queue（待发送的数据）',
+        },
+        'led': {
+            'triggers': ['led', '指示灯', '呼吸灯', '闪烁'],
+            'name': 'LEDTask',
+            'purpose': 'LED 状态指示',
+            'priority': 1,
+            'stack': 128,
+        },
+        'button': {
+            'triggers': ['按键', '按钮', '输入', '用户交互'],
+            'name': 'ButtonTask',
+            'purpose': '按键扫描与事件分发',
+            'priority': 2,
+            'stack': 128,
+            'comm_out': 'TaskNotify/EventGroup（按键事件通知其他任务）',
+        },
+        'alarm': {
+            'triggers': ['报警', '蜂鸣器', '警报', '阈值'],
+            'name': 'AlarmTask',
+            'purpose': '报警判断与执行',
+            'priority': 3,
+            'stack': 128,
+            'comm_in': 'TaskNotify（由传感器任务触发）',
+        },
+        'log': {
+            'triggers': ['日志', '记录', 'sd卡', '存储'],
+            'name': 'LogTask',
+            'purpose': '数据记录与存储',
+            'priority': 1,
+            'stack': 384,
+            'comm_in': 'Queue（待记录的数据）',
+        },
+    }
+
+    if task_hints:
+        # 用户提供了任务提示，直接使用
+        for hint in task_hints:
+            if isinstance(hint, dict):
+                planned_tasks.append(hint)
+            elif isinstance(hint, str):
+                planned_tasks.append({
+                    'name': hint,
+                    'purpose': f'用户指定任务: {hint}',
+                    'priority': 2,
+                    'stack': 256 if uses_float else 128,
+                })
+    else:
+        # 自动推荐
+        for tmpl_name, tmpl in task_templates.items():
+            if any(kw in desc_lower for kw in tmpl['triggers']):
+                task = {k: v for k, v in tmpl.items() if k != 'triggers'}
+                planned_tasks.append(task)
+
+    # 如果没有匹配到任何任务，给一个默认的
+    if not planned_tasks:
+        planned_tasks.append({
+            'name': 'MainTask',
+            'purpose': '主要业务逻辑',
+            'priority': 2,
+            'stack': 256 if uses_float else 128,
+        })
+
+    # ── 中断规划 ──────────────────────────────────────────
+    interrupt_plan = []
+    if 'exti' in detected_peripherals or '中断' in desc_lower:
+        interrupt_plan.append({
+            'irq': 'EXTIx_IRQHandler',
+            'strategy': 'vTaskNotifyGiveFromISR → 唤醒处理任务',
+            'note': 'ISR 中仅做通知，数据处理在任务中完成',
+        })
+    if 'uart' in detected_peripherals:
+        interrupt_plan.append({
+            'irq': 'USARTx_IRQHandler',
+            'strategy': '接收中断 → xQueueSendFromISR → CommTask 处理',
+            'note': '使用 HAL_UART_Receive_IT 触发中断回调',
+        })
+    if 'tim_basic' in detected_peripherals or 'tim_pwm' in detected_peripherals:
+        interrupt_plan.append({
+            'irq': 'TIMx_IRQHandler',
+            'strategy': '定时器中断回调 → 设置标志或通知任务',
+            'note': '周期性采样可用 vTaskDelayUntil 替代定时器中断',
+        })
+
+    # ── 通信拓扑推荐 ──────────────────────────────────────
+    comm_topology = []
+    task_names = [t['name'] for t in planned_tasks]
+
+    if 'SensorTask' in task_names and 'DisplayTask' in task_names:
+        comm_topology.append({
+            'from': 'SensorTask', 'to': 'DisplayTask',
+            'mechanism': 'xQueueSend/xQueueReceive',
+            'data': '传感器数据结构体',
+        })
+    if 'SensorTask' in task_names and 'ControlTask' in task_names:
+        comm_topology.append({
+            'from': 'SensorTask', 'to': 'ControlTask',
+            'mechanism': 'xQueueSend/xQueueReceive',
+            'data': '传感器原始值',
+        })
+    if 'SensorTask' in task_names and 'AlarmTask' in task_names:
+        comm_topology.append({
+            'from': 'SensorTask', 'to': 'AlarmTask',
+            'mechanism': 'xTaskNotifyGive（阈值触发时通知）',
+            'data': '无（AlarmTask 自行读取共享数据）',
+        })
+    if 'ButtonTask' in task_names:
+        for t in task_names:
+            if t != 'ButtonTask' and t != 'LEDTask':
+                comm_topology.append({
+                    'from': 'ButtonTask', 'to': t,
+                    'mechanism': 'xEventGroupSetBits',
+                    'data': '按键事件位',
+                })
+                break  # 只连接一个示例
+
+    if 'CommTask' in task_names:
+        data_sources = [t for t in task_names if t in ('SensorTask', 'ControlTask', 'LogTask')]
+        for src in data_sources[:1]:
+            comm_topology.append({
+                'from': src, 'to': 'CommTask',
+                'mechanism': 'xQueueSend',
+                'data': '待发送的数据包',
+            })
+
+    # ── 资源估算 ──────────────────────────────────────────
+    total_stack_bytes = sum(t.get('stack', 128) * 4 for t in planned_tasks)
+    tcb_overhead = len(planned_tasks) * 92
+    idle_timer_overhead = 92 + 256*4 + 92 + 512*4  # Idle + Timer 任务
+    queue_overhead = len(comm_topology) * 120  # 每个队列约 120B
+    recommended_heap = int((total_stack_bytes + tcb_overhead + idle_timer_overhead +
+                            queue_overhead) * 1.3)
+    recommended_heap = ((recommended_heap + 255) // 256) * 256
+
+    total_ram_est = recommended_heap + 4096  # heap + static
+    ram_pct = total_ram_est * 100 // (ram_k * 1024)
+
+    resource_check = {
+        'total_tasks': len(planned_tasks) + 2,  # +Idle +Timer
+        'total_stack_bytes': total_stack_bytes,
+        'recommended_heap': recommended_heap,
+        'estimated_ram_usage': total_ram_est,
+        'ram_percent': ram_pct,
+        'flash_k': flash_k,
+        'ram_k': ram_k,
+    }
+
+    warnings = []
+    if ram_pct > 85:
+        warnings.append(f"⚠ RAM 使用率预估 {ram_pct}%（{total_ram_est}B / {ram_k*1024}B），考虑减少任务数或栈大小")
+    if ram_k < 16 and len(planned_tasks) > 2:
+        warnings.append(f"⚠ RAM 仅 {ram_k}KB，{len(planned_tasks)} 个任务可能不够用")
+    if not has_fpu and uses_float:
+        warnings.append("⚠ 当前芯片无 FPU，浮点运算将使用软件模拟（较慢）")
+
+    # ── 构造规划文档 ──────────────────────────────────────
+    plan_text = f"📋 FreeRTOS 项目规划\n"
+    plan_text += f"芯片: {ci.get('define','')} ({cpu}, {flash_k}K Flash, {ram_k}K RAM, {'FPU' if has_fpu else '无FPU'})\n"
+    plan_text += f"需求: {description}\n\n"
+
+    plan_text += "━━━ 任务规划 ━━━\n"
+    for i, t in enumerate(planned_tasks, 1):
+        plan_text += (f"  {i}. {t['name']} (优先级={t.get('priority',2)}, "
+                      f"栈={t.get('stack',128)}words)\n"
+                      f"     职责: {t.get('purpose','')}\n")
+        if 'comm_in' in t:
+            plan_text += f"     输入: {t['comm_in']}\n"
+        if 'comm_out' in t:
+            plan_text += f"     输出: {t['comm_out']}\n"
+    plan_text += f"  + Idle任务 + Timer任务 (系统自动创建)\n\n"
+
+    if comm_topology:
+        plan_text += "━━━ 通信拓扑 ━━━\n"
+        for c in comm_topology:
+            plan_text += f"  {c['from']} → {c['to']}: {c['mechanism']} ({c.get('data','')})\n"
+        plan_text += "\n"
+
+    if interrupt_plan:
+        plan_text += "━━━ 中断策略 ━━━\n"
+        for ip in interrupt_plan:
+            plan_text += f"  {ip['irq']}: {ip['strategy']}\n"
+            if ip.get('note'):
+                plan_text += f"    💡 {ip['note']}\n"
+        plan_text += "\n"
+
+    plan_text += "━━━ 资源估算 ━━━\n"
+    plan_text += f"  任务总数: {resource_check['total_tasks']} (含 Idle + Timer)\n"
+    plan_text += f"  栈总量: {total_stack_bytes}B\n"
+    plan_text += f"  推荐堆: {recommended_heap}B\n"
+    plan_text += f"  RAM 预估: {total_ram_est}B / {ram_k*1024}B ({ram_pct}%)\n"
+
+    if detected_peripherals:
+        plan_text += f"\n━━━ 使用外设 ━━━\n"
+        plan_text += f"  {', '.join(detected_peripherals)}\n"
+
+    if warnings:
+        plan_text += f"\n━━━ 警告 ━━━\n"
+        for w in warnings:
+            plan_text += f"  {w}\n"
+
+    return {
+        "success": True,
+        "plan": {
+            "tasks": planned_tasks,
+            "communication": comm_topology,
+            "interrupts": interrupt_plan,
+            "peripherals": detected_peripherals,
+            "resources": resource_check,
+        },
+        "warnings": warnings,
+        "uses_fpu": uses_float and has_fpu,
+        "uses_printf": uses_printf,
+        "message": plan_text,
     }
 
 
@@ -1420,6 +2217,13 @@ def _stm32_save_project(code: str, comp: dict, request: str) -> Path:
         "timestamp": ts,
     }, ensure_ascii=False, indent=2))
     _last_code = code
+    # 同步更新 latest_workspace，保证 stm32_recompile 始终能找到最新代码
+    try:
+        latest = Path.home() / ".stm32_agent" / "workspace" / "projects" / "latest_workspace"
+        latest.mkdir(parents=True, exist_ok=True)
+        (latest / "main.c").write_text(code, encoding="utf-8")
+    except Exception:
+        pass
     CONSOLE.print(f"[dim]  已保存: {d}[/]")
     return d
 
@@ -1460,7 +2264,7 @@ def stm32_read_project(project_name: str) -> dict:
 
 def read_file(file_path: str) -> dict:
     try:
-        p = Path(file_path).resolve()
+        p = Path(file_path).expanduser().resolve()
         if not p.exists():
             return {"error": f"文件不存在: {file_path}"}
         content = p.read_text(encoding="utf-8", errors="ignore")
@@ -1476,7 +2280,7 @@ def read_file(file_path: str) -> dict:
 
 def create_or_overwrite_file(file_path: str, content: str) -> dict:
     try:
-        p = Path(file_path).resolve()
+        p = Path(file_path).expanduser().resolve()
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(content, encoding="utf-8")
         return {"success": True, "path": str(p), "lines": len(content.splitlines())}
@@ -1486,7 +2290,7 @@ def create_or_overwrite_file(file_path: str, content: str) -> dict:
 
 def str_replace_edit(file_path: str, old_str: str, new_str: str) -> dict:
     try:
-        p = Path(file_path).resolve()
+        p = Path(file_path).expanduser().resolve()
         if not p.exists():
             return {"error": f"文件不存在: {file_path}"}
         content = p.read_text(encoding="utf-8", errors="ignore")
@@ -1504,7 +2308,7 @@ def str_replace_edit(file_path: str, old_str: str, new_str: str) -> dict:
 
 def list_directory(path: str = ".") -> dict:
     try:
-        p = Path(path).resolve()
+        p = Path(path).expanduser().resolve()
         items = [{"name": x.name, "type": "dir" if x.is_dir() else "file"} for x in p.iterdir()]
         return {"success": True, "path": str(p), "items": sorted(items, key=lambda x: (x["type"], x["name"]))}
     except Exception as e:
@@ -1531,7 +2335,7 @@ def execute_command(command: str) -> dict:
 def search_files(query: str, path: str = ".", file_type: str = None) -> dict:
     try:
         results = []
-        for fp in Path(path).resolve().rglob("*"):
+        for fp in Path(path).expanduser().resolve().rglob("*"):
             if not fp.is_file():
                 continue
             if query.lower() not in fp.name.lower():
@@ -1568,7 +2372,7 @@ def web_search(query: str) -> dict:
 def append_file_content(file_path: str, content: str) -> dict:
     """向文件末尾追加内容"""
     try:
-        p = Path(file_path).resolve()
+        p = Path(file_path).expanduser().resolve()
         mode = 'a' if p.exists() else 'w'
         prefix = ""
         if mode == 'a' and p.stat().st_size > 0:
@@ -1586,7 +2390,7 @@ def append_file_content(file_path: str, content: str) -> dict:
 def grep_search(pattern: str, path: str = ".", include_extension: str = None, recursive: bool = True) -> dict:
     """使用正则搜索文件内容（递归）"""
     try:
-        search_path = Path(path).resolve()
+        search_path = Path(path).expanduser().resolve()
         results = []
         count = 0
         max_results = 20
@@ -1703,7 +2507,7 @@ def edit_file_lines(file_path: str, operation: str, start_line: int,
                     end_line: int = None, new_content: str = None) -> dict:
     """基于行号编辑文件（replace/insert/delete）"""
     try:
-        p = Path(file_path).resolve()
+        p = Path(file_path).expanduser().resolve()
         if not p.exists():
             return {"error": f"文件不存在: {file_path}"}
         with open(p, 'r', encoding='utf-8', errors='ignore') as f:
@@ -1742,7 +2546,7 @@ def edit_file_lines(file_path: str, operation: str, start_line: int,
 def insert_content_by_regex(file_path: str, regex_pattern: str, content: str) -> dict:
     """在文件第一个正则匹配位置之后插入内容"""
     try:
-        p = Path(file_path).resolve()
+        p = Path(file_path).expanduser().resolve()
         if not p.exists():
             return {"error": f"文件不存在: {file_path}"}
         with open(p, 'r', encoding='utf-8', errors='ignore') as f:
@@ -1762,7 +2566,7 @@ def check_python_code(file_path: str) -> dict:
     """检查 Python 文件语法和风格（flake8 / ast）"""
     import ast
     try:
-        p = Path(file_path).resolve()
+        p = Path(file_path).expanduser().resolve()
         if not p.exists():
             return {"error": f"文件不存在: {file_path}"}
         try:
@@ -2024,6 +2828,13 @@ TOOLS_MAP: Dict[str, Any] = {
     "stm32_hardware_status":  stm32_hardware_status,
     "stm32_compile":          stm32_compile,
     "stm32_compile_rtos":     stm32_compile_rtos,
+    "stm32_recompile":        stm32_recompile,
+    "stm32_regen_bsp":        stm32_regen_bsp,
+    "stm32_analyze_fault_rtos": stm32_analyze_fault_rtos,
+    "stm32_rtos_check_code":  stm32_rtos_check_code,
+    "stm32_rtos_task_stats":  stm32_rtos_task_stats,
+    "stm32_rtos_suggest_config": stm32_rtos_suggest_config,
+    "stm32_rtos_plan_project": stm32_rtos_plan_project,
     "stm32_flash":            stm32_flash,
     "stm32_read_registers":   stm32_read_registers,
     "stm32_analyze_fault":    stm32_analyze_fault,
@@ -2184,6 +2995,141 @@ TOOL_SCHEMAS = [
                     "chip": {"type": "string", "description": "可选：临时指定芯片型号"},
                 },
                 "required": ["code"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "stm32_recompile",
+            "description": (
+                "直接从 latest_workspace/main.c 重新编译，无需传递代码字符串。"
+                "str_replace_edit 修改文件后使用此工具代替 read_file + stm32_compile，"
+                "节省 token，避免代码传输中的幻觉。"
+                "mode='auto' 自动检测裸机或 RTOS；mode='bare' 强制裸机；mode='rtos' 强制 FreeRTOS。"
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "mode": {
+                        "type": "string",
+                        "enum": ["auto", "bare", "rtos"],
+                        "description": "编译模式：auto(自动检测)、bare(裸机)、rtos(FreeRTOS)。默认 auto。",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "stm32_regen_bsp",
+            "description": (
+                "强制重新生成 BSP 文件（startup.s、link.ld、FreeRTOSConfig.h）并验证 FPU 使能代码。"
+                "在切换芯片型号后、FreeRTOS 编译前、或怀疑 startup.s 不含 CPACR 初始化时调用。"
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "chip": {"type": "string", "description": "可选：指定芯片型号（如 STM32F411CE）"},
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "stm32_analyze_fault_rtos",
+            "description": (
+                "FreeRTOS 专用 HardFault 分析。读取 SCB_CFSR/HFSR/BFAR/PC，"
+                "检查 startup.s FPU 使能状态，给出 FPU 未使能、栈溢出、非法地址等具体诊断。"
+                "FreeRTOS 程序 HardFault 时优先调用此工具而非 stm32_analyze_fault。"
+            ),
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "stm32_rtos_check_code",
+            "description": (
+                "FreeRTOS 代码静态检查 —— 编译前自动检测常见 RTOS 编程错误。"
+                "检查项：SysTick_Handler 冲突、HAL_Delay 陷阱、缺少 hook 函数、"
+                "任务栈大小不足、ISR 中使用非 FromISR API、缺少头文件等。"
+                "编写 RTOS 代码后、调用 stm32_compile_rtos 前使用。"
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "code": {"type": "string", "description": "完整的 main.c 代码"},
+                },
+                "required": ["code"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "stm32_rtos_task_stats",
+            "description": (
+                "读取 FreeRTOS 运行时任务统计：任务数、堆剩余/历史最低、当前任务名。"
+                "通过 ELF 符号表定位内存地址，用 pyocd 读取。"
+                "需要已编译（有 ELF）且硬件已连接。用于性能分析和堆使用诊断。"
+            ),
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "stm32_rtos_suggest_config",
+            "description": (
+                "根据任务需求计算推荐的 FreeRTOS 配置：栈大小、堆大小、优先级数。"
+                "评估 RAM 使用率并给出警告。在规划 RTOS 程序前调用。"
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "task_count": {"type": "integer", "description": "计划创建的任务数量（不含 Idle 和 Timer）"},
+                    "use_fpu": {"type": "boolean", "description": "任务是否使用浮点运算（默认 false）"},
+                    "use_printf": {"type": "boolean", "description": "任务是否使用 snprintf（默认 false）"},
+                    "ram_k": {"type": "integer", "description": "可选：指定 RAM 大小(KB)，不填用当前芯片参数"},
+                },
+                "required": ["task_count"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "stm32_rtos_plan_project",
+            "description": (
+                "FreeRTOS 项目架构规划 —— 复杂 RTOS 项目的必备第一步。"
+                "根据需求描述自动生成：任务分解、通信拓扑、中断策略、外设分配、资源估算。"
+                "满足以下任一条件时必须调用：①任务数≥3 ②涉及中断+任务通信 ③涉及多个外设协同 ④涉及控制算法。"
+                "规划结果需向用户展示并确认后再写代码。"
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "description": {
+                        "type": "string",
+                        "description": "用户需求的完整描述（中文），包含功能要求、外设需求、性能要求等",
+                    },
+                    "peripherals": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "可选：明确指定的外设列表，如 [\"uart\", \"i2c\", \"adc\", \"pwm\"]",
+                    },
+                    "task_hints": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "可选：用户指定的任务名称提示，如 [\"SensorTask\", \"MotorTask\"]",
+                    },
+                },
+                "required": ["description"],
             },
         },
     },
@@ -2886,10 +3832,11 @@ int main(void) {
 - 将返回的 `c_code` 原样粘贴进代码，**禁止手写或修改字模数据**
 - 出现乱码 = 字模数据错误，重新调用 `stm32_generate_font` 生成，不要猜
 
-### 严格禁止（链接必然失败）
+### 严格禁止（裸机模式，链接必然失败）
 - `sprintf / printf / snprintf / sscanf` — 触发 `_sbrk` / `end` 未定义链接错误
 - `malloc / calloc / free` — 无堆管理，链接报 `sbrk`
 - `float` 格式化输出 — 用整数×10 替代（253 = 25.3°C）
+- **例外**：FreeRTOS 模式下 nano.specs 已链接，**允许使用 snprintf**，但任务栈必须 ≥384 words
 
 ### 引脚复用注意
 - PA13/PA14 = SWD，PA15/PB3/PB4 = JTAG
@@ -2926,10 +3873,11 @@ int main(void) {
 - `undefined reference to HAL_xxx` → 缺 HAL 源文件或 #include
 
 ### HardFault（读 SCB_CFSR 分析）
-- `PRECISERR (bit9)` → 访问了未使能时钟的外设，补 `__HAL_RCC_xxx_CLK_ENABLE()`
+- `PRECISERR (bit9) + BFAR 非法地址` → ① 访问未使能时钟的外设，补 CLK_ENABLE；② **FreeRTOS 程序** 多为 FPU 未使能（startup.s 已修复，通常不再出现）
 - `IACCVIOL (bit0)` → 函数指针/跳转地址非法
-- `UNDEFINSTR (bit16)` → Thumb/ARM 模式混乱
+- `UNDEFINSTR (bit16)` → Thumb/ARM 模式混乱；或 FPU 硬件不可用但代码使用了浮点指令
 - 配合 `PC` 寄存器定位出错位置
+- **FreeRTOS 专项**：若 CFSR=0x8200 BFAR=随机大数 → 先确认代码未定义 `SysTick_Handler`；startup.s 已自动使能 FPU，此类故障已修复
 
 ### 程序卡死（无 HardFault）
 - **首要怀疑**：缺少 `SysTick_Handler`，`HAL_Delay()` 永远不返回
@@ -2947,17 +3895,16 @@ int main(void) {
 - 通过上一轮埋入的 `Debug_Print`/`Debug_PrintInt` 精准定位逻辑 bug
 
 ### 代码缓存与精准增量修改（极其重要）
-每次你调用 `stm32_compile` 后，客户端都会自动将代码缓存到本地文件：`~/.stm32agent/workspace/projects下面`。
+每次你调用 `stm32_compile` / `stm32_compile_rtos` 后，代码都会自动缓存到：`~/.stm32_agent/workspace/projects/latest_workspace/main.c`。
 当用户要求在已有代码基础上修改（如修改引脚、增加逻辑）时，**绝对禁止重写全部代码**！必须按以下闭环操作：
 1. 思考要替换的代码片段。
 2. 调用 `str_replace_edit` 工具：
-   - `file_path` 固定为 `latest = Path.home() / ".stm32agent" / "projects" / "latest_workspace"
-            latest.mkdir(parents=True, exist_ok=True)
-            (latest / "main.c").write_text(code, encoding="utf-8")这段代码保存`
-   - `old_str` 填原代码片段（必须完全匹配）
+   - `file_path` 固定为 `~/.stm32_agent/workspace/projects/latest_workspace/main.c`
+   - `old_str` 填原代码片段（必须完全匹配，含3-5行上下文）
    - `new_str` 填修改后的片段
-3. 替换成功后，**必须**调用 `read_file` 读取该文件的最新内容（提取返回值中的 `raw_content`）。
-4. 将读出的最新完整源码传给 `stm32_compile` 进行编译。
+3. 替换成功后，**直接调用 `stm32_recompile()`**（无需 read_file，无需传代码字符串）。
+   - `stm32_recompile` 自动从文件读取并编译，节省 token，避免幻觉。
+   - 禁止在此步骤调用 `read_file` 再传给 `stm32_compile`——那样会浪费大量 token 且引入幻觉风险。
 
 ## PID 自动调参工作流
 
@@ -3061,6 +4008,9 @@ void SystemClock_Config(void) {
 #include "task.h"
 #include "queue.h"
 #include "semphr.h"
+#include "timers.h"
+#include "event_groups.h"
+#include <string.h>
 
 /* ── UART ──────────────────────────────────────── */
 UART_HandleTypeDef huart1;
@@ -3078,12 +4028,11 @@ void LED_Task(void *pvParam) {
     }
 }
 
-/* ── FreeRTOS Hooks ─────────────────────────────── */
-/* 维持 HAL_Delay / HAL_GetTick 正常工作 */
+/* ── FreeRTOS Hooks（全部4个必须定义）──────────── */
 void vApplicationTickHook(void)   { HAL_IncTick(); }
-void vApplicationIdleHook(void)   {}
+void vApplicationIdleHook(void)   { /* 可选：__WFI() 低功耗 */ }
 void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcName) {
-    Debug_Print("ERR:StackOvf\r\n"); while (1);
+    Debug_Print("ERR:StackOvf:"); Debug_Print(pcName); Debug_Print("\r\n"); while (1);
 }
 void vApplicationMallocFailedHook(void) {
     Debug_Print("ERR:MallocFail\r\n"); while (1);
@@ -3095,10 +4044,10 @@ int main(void) {
     SystemClock_Config();
     MX_USART1_UART_Init();
     Debug_Print("Gary:BOOT\r\n");
-    /* 其他外设初始化... */
+    /* 不含 HAL_Delay 的外设初始化可以放这里 */
 
-    xTaskCreate(LED_Task, "LED", 128, NULL, 1, NULL);
-    vTaskStartScheduler();   /* 启动调度器，不返回 */
+    xTaskCreate(LED_Task, "LED", 256, NULL, 1, NULL);  /* FPU 芯片栈 ≥256 */
+    vTaskStartScheduler();
     while (1);
 }
 ```
@@ -3111,12 +4060,210 @@ int main(void) {
 - ISR 中发送：`xQueueSendFromISR(q, &item, &xHigherPriorityTaskWoken)` + `portYIELD_FROM_ISR()`
 - 互斥量：`xSemaphoreCreateMutex()` / `xSemaphoreTake(m, timeout)` / `xSemaphoreGive(m)`
 - 二值信号量：`xSemaphoreCreateBinary()`
+- 任务通知：`xTaskNotifyGive(handle)` / `ulTaskNotifyTake(pdTRUE, timeout)` — 比信号量更快更省内存
+- 软件定时器：`xTimerCreate("name", pdMS_TO_TICKS(ms), pdTRUE/pdFALSE, NULL, callback)` + `xTimerStart(timer, 0)`
+- 事件组：`xEventGroupCreate()` / `xEventGroupSetBits(eg, bits)` / `xEventGroupWaitBits(eg, bits, clear, waitAll, timeout)`
+- 栈水位检查：`uxTaskGetStackHighWaterMark(handle)` — 返回剩余栈 words，< 50 时危险
+- 堆剩余：`xPortGetFreeHeapSize()` / `xPortGetMinimumEverFreeHeapSize()`
+
+### ISR 安全规则（严格遵守）
+ISR 中**只能**使用 `FromISR` 后缀的 API：
+- `xQueueSendFromISR()` / `xQueueReceiveFromISR()`
+- `xSemaphoreGiveFromISR()`（不能 Take）
+- `vTaskNotifyGiveFromISR()` / `xTaskNotifyFromISR()`
+- `xTimerStartFromISR()` / `xTimerStopFromISR()`
+- 之后必须调用 `portYIELD_FROM_ISR(xHigherPriorityTaskWoken)`
+
+**ISR 中禁止调用**：`vTaskDelay` / `xQueueSend` / `xSemaphoreTake` / `xSemaphoreGive` / `printf`
+
+ISR 中断处理模式：
+```c
+TaskHandle_t xSensorTaskHandle = NULL;
+
+void EXTI0_IRQHandler(void) {
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    vTaskNotifyGiveFromISR(xSensorTaskHandle, &xHigherPriorityTaskWoken);
+    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+    __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_0);
+}
+
+void SensorTask(void *p) {
+    while (1) {
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);  /* 阻塞等待中断通知 */
+        /* 处理传感器数据... */
+    }
+}
+```
+
+### 软件定时器模式
+```c
+void timer_callback(TimerHandle_t xTimer) {
+    /* 定时器回调，在 Timer 任务上下文中执行（非 ISR） */
+    HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
+}
+TimerHandle_t htimer = xTimerCreate("Blink", pdMS_TO_TICKS(1000), pdTRUE, NULL, timer_callback);
+xTimerStart(htimer, 0);
+```
+
+### 事件组模式（多条件同步）
+```c
+#define EVT_SENSOR_READY  (1 << 0)
+#define EVT_BUTTON_PRESS  (1 << 1)
+EventGroupHandle_t xEvents = xEventGroupCreate();
+/* 任务 A 设置事件 */ xEventGroupSetBits(xEvents, EVT_SENSOR_READY);
+/* 任务 B 等待多个事件 */
+xEventGroupWaitBits(xEvents, EVT_SENSOR_READY | EVT_BUTTON_PRESS, pdTRUE, pdTRUE, portMAX_DELAY);
+```
+
+### FreeRTOS snprintf 使用说明（RTOS 模式专属）
+FreeRTOS 编译链接了 nano.specs，**允许使用 snprintf**（裸机模式禁止）：
+- 任务栈必须 ≥ 384 words（snprintf 内部需要约 1KB 栈空间）
+- 使用 `snprintf(buf, sizeof(buf), ...)` 而非 `sprintf`（避免缓冲区溢出）
+- 浮点格式化需要额外链接选项（默认 nano.specs 不支持 %f），改用整数格式化
+- `#include <stdio.h>` 不能省
+
+### FPU 在 FreeRTOS 中的使用（Cortex-M4F / F3 / F4 专属）
+
+**FPU 已由启动代码自动使能**（Reset_Handler 设置 CPACR.CP10/CP11），**无需在代码中手动调用** `SCB->CPACR |= ...`。
+
+FreeRTOS 使用 **ARM_CM4F** 移植版，支持多任务 FPU 上下文切换：
+- 每个任务拥有独立 FPU 寄存器状态（S0-S31 + FPSCR）
+- 任务中直接使用 `float` / `sinf()` / `sqrtf()` 等，调度器自动保存/恢复 FPU 上下文
+- 不需要任何特殊初始化，编译参数已包含 `-mfpu=fpv4-sp-d16 -mfloat-abi=hard`
+- 硬件 lazy FPU stacking 默认启用（FPCCR.LSPEN=1），仅在任务实际使用 FPU 时才保存寄存器
+
+**FPU 栈大小规则：**
+| 场景 | 最小栈 (words) | 说明 |
+|------|---------------|------|
+| 普通任务（无浮点） | 128 | FPU 芯片的 configMINIMAL_STACK_SIZE 已设为 256 |
+| 含 float 运算 | 256 | S0-S31 + FPSCR 保存需要 ~136 字节 |
+| 含 snprintf | 384 | snprintf 内部约需 1KB 栈 |
+| 含 arm_math DSP | 512 | DSP 库函数栈消耗大 |
+
+**FPU 最佳实践：**
+- 避免多个任务共享 float 全局变量 —— 用 mutex 保护或用 queue 传递
+- ISR 中使用浮点是安全的（硬件 lazy stacking 自动处理）
+- 使用 `uxTaskGetStackHighWaterMark(NULL)` 检查运行时栈剩余
+
+**FPU 多任务代码模式：**
+```c
+#include "stm32f4xx_hal.h"
+#include "FreeRTOS.h"
+#include "task.h"
+#include <math.h>
+#include <string.h>
+#include <stdio.h>
+
+void task_fpu(void *arg) {
+    float phase = 0.0f;
+    char buf[64];
+    while (1) {
+        float s = sinf(phase);          /* FPU 指令，自动上下文保护 */
+        phase += 0.1f;
+        snprintf(buf, sizeof(buf), "sin=%.4f\r\n", (double)s);
+        /* uart_write(buf); */
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+}
+/* 创建时栈 ≥384（含 snprintf）: xTaskCreate(task_fpu, "FPU", 384, NULL, 2, NULL); */
+```
 
 ### 常见 RTOS 编译/运行错误
 - `undefined reference to vApplicationTickHook` → 忘记定义 hook 函数
 - `vApplicationMallocFailedHook` 被调用 → `configTOTAL_HEAP_SIZE` 不足，减少任务栈或任务数
-- 调度器启动后 HardFault → 检查任务栈大小（`stack_words` 太小），最小建议 128 words
+- 调度器启动后 HardFault（CFSR=0x8200, BFAR=非法地址）→ **根本原因是 FPU 未使能**，startup.s 已修复此问题；如仍报错检查是否用了裸机程序的 `SysTick_Handler`
 - `SysTick_Handler` 重复定义 → 删除自己写的 `SysTick_Handler`，改用 `vApplicationTickHook`
+- 任务栈不够 → stack_words 最小 128，有 FPU 浮点运算建议 256+，有 printf/snprintf 建议 384+
+
+### ⚠ 严重陷阱：HAL_Delay() 必须在 xTaskCreate() 之后调用
+
+**FreeRTOS 任务列表由第一个 `xTaskCreate()` 初始化（`prvInitialiseTaskLists()`）。**
+若在 `xTaskCreate()` 之前调用 `HAL_Delay()`，SysTick 会触发 FreeRTOS 的 tick handler，
+tick handler 访问未初始化的任务列表（`pxDelayedTaskList = NULL`），
+导致读取 Flash 别名地址写入 RAM，**悄悄破坏 FreeRTOS 内部数据结构**，
+最终在后续 `vTaskDelay()` → `vListInsert()` 时以 PRECISERR HardFault 崩溃。
+
+**症状**：CFSR=0x8200, BFAR=随机垃圾地址（如 0xD34B206C），PC 在 FreeRTOS `prvAddCurrentTaskToDelayedList` 或任务函数内部。
+
+**规则**：
+```c
+// ✗ 错误 — OLED_Init() 含 HAL_Delay(100)，在 xTaskCreate 之前
+MX_I2C1_Init();
+OLED_Init();          // HAL_Delay(100) 破坏 FreeRTOS 数据结构!
+xTaskCreate(...);
+vTaskStartScheduler();
+
+// ✓ 正确 — 把含延迟的初始化移到任务内部
+int main(void) {
+    MX_I2C1_Init();   // 不含 HAL_Delay 的初始化可在这里
+    xTaskCreate(MyTask, ...);
+    vTaskStartScheduler();
+}
+void MyTask(void *p) {
+    OLED_Init();      // HAL_Delay 在这里是安全的（调度器已启动）
+    while(1) { ... }
+}
+```
+
+### FreeRTOS 项目规划（Plan Mode）
+
+**复杂 RTOS 项目必须先规划再编码。** 满足以下任一条件时，必须调用 `stm32_rtos_plan_project`：
+- 任务数 ≥ 3
+- 涉及中断 + 任务间通信
+- 涉及多个外设协同工作
+- 涉及控制算法（PID、滤波等）
+- 用户需求描述较长或涉及多个功能
+
+**规划流程：**
+1. 调用 `stm32_rtos_plan_project(description)` → 生成结构化规划
+2. 向用户展示规划结果（任务、通信、中断、资源估算）
+3. 等待用户确认或修改
+4. 用户确认后才开始写代码
+
+**规划工具输出包含：**
+- 任务分解：任务名、职责、优先级、栈大小
+- 通信拓扑：任务间用 Queue/Semaphore/Notification/EventGroup 通信
+- 中断策略：哪些中断需要处理，如何通知任务
+- 外设分配：哪个任务负责哪些外设
+- 资源估算：总堆/栈/RAM 使用百分比
+
+**简单 RTOS 项目（1-2 个任务、无复杂通信）跳过规划直接编码。**
+
+### FreeRTOS 专用工具
+
+| 工具 | 阶段 | 使用时机 |
+|------|------|---------|
+| `stm32_rtos_plan_project` | **规划** | 复杂项目第一步：生成任务/通信/中断/资源规划，用户确认后再写代码 |
+| `stm32_rtos_suggest_config` | **规划** | 快速计算推荐配置（栈/堆/优先级/RAM使用率） |
+| `stm32_rtos_check_code` | **编译前** | 代码写完后静态检查常见 RTOS 错误 |
+| `stm32_regen_bsp` | **编译前** | 生成/更新 BSP 文件（startup.s/link.ld/FreeRTOSConfig.h） |
+| `stm32_compile_rtos` | **编译** | 编译 FreeRTOS 程序，输出 Flash/RAM 内存使用摘要 |
+| `stm32_analyze_fault_rtos` | **调试** | HardFault 分析，检查 FPU 使能 + RTOS 专项诊断 |
+| `stm32_rtos_task_stats` | **运行时** | 读取任务数、堆使用、当前任务名，性能分析和内存诊断 |
+
+**RTOS 开发标准流程（Cortex-M4 / M7 带 FPU）：**
+1. `stm32_connect` → 连接硬件
+2. 📋 **规划阶段**（复杂项目）：
+   - `stm32_rtos_plan_project(description)` → 生成架构规划
+   - 展示规划给用户，等待确认
+3. `stm32_regen_bsp` → 生成 startup.s（含 CPACR+DWT 使能）、link.ld、FreeRTOSConfig.h
+4. `stm32_rtos_check_code(code)` → 静态检查代码
+5. `stm32_compile_rtos(code)` → 编译（输出内存使用摘要）
+6. `stm32_flash` → 烧录
+7. `stm32_serial_read` → 确认启动（读 Gary:BOOT 标记）
+8. 若 HardFault → `stm32_analyze_fault_rtos` → 按诊断修复
+9. 若需性能分析 → `stm32_rtos_task_stats` → 查看堆/栈/任务状态
+
+### FreeRTOS 运行时统计（DWT 硬件计数器已自动启用）
+- `configGENERATE_RUN_TIME_STATS=1`：每个任务的 CPU 使用率可通过 `vTaskGetRunTimeStats()` 获取
+- `configUSE_TRACE_FACILITY=1`：支持 `uxTaskGetSystemState()` 获取所有任务状态
+- DWT CYCCNT 在 startup.s 中自动启用（Cortex-M3/M4/M7），零额外开销
+- 运行时统计代码示例：
+```c
+char stats_buf[512];
+vTaskGetRunTimeStats(stats_buf);  /* 需要栈 ≥384 */
+Debug_Print(stats_buf);
+```
 """
 # 追加所有 skill 的 AI 提示词
 STM32_SYSTEM_PROMPT += _skill_mgr.get_all_prompt_additions()
@@ -3470,16 +4617,34 @@ class STM32Agent:
 
                     # 工具调用
                     if delta.tool_calls:
-                        for tc in delta.tool_calls:
+                        # 用 model_dump() 获取含 Gemini extra_content 的完整 chunk 数据
+                        try:
+                            _chunk_dict = chunk.model_dump()
+                            _raw_tcs = (_chunk_dict.get("choices") or [{}])[0].get("delta", {}).get("tool_calls") or []
+                        except Exception:
+                            _raw_tcs = []
+                        for i, tc in enumerate(delta.tool_calls):
                             idx = tc.index
                             if idx not in tool_calls_raw:
-                                tool_calls_raw[idx] = {"id": "", "name": "", "args": ""}
+                                tool_calls_raw[idx] = {"id": "", "name": "", "args": "", "thought_signature": ""}
                             if tc.id:
                                 tool_calls_raw[idx]["id"] = tc.id
                             if tc.function and tc.function.name:
                                 tool_calls_raw[idx]["name"] = tc.function.name
                             if tc.function and tc.function.arguments:
                                 tool_calls_raw[idx]["args"] += tc.function.arguments
+                            # Gemini thinking models 将签名放在 extra_content.google.thought_signature
+                            # 必须原样回传到 function.thought_signature，否则下次请求报 400
+                            _raw_tc = _raw_tcs[i] if i < len(_raw_tcs) else {}
+                            sig = (
+                                (_raw_tc.get("extra_content") or {}).get("google", {}).get("thought_signature")
+                                or (_raw_tc.get("function") or {}).get("thought_signature")
+                                or _raw_tc.get("thought_signature")
+                                or getattr(tc, "thought_signature", None)
+                                or (getattr(tc.function, "thought_signature", None) if tc.function else None)
+                            )
+                            if sig:
+                                tool_calls_raw[idx]["thought_signature"] += sig
 
                 if in_think:
                     CONSOLE.print()
@@ -3502,10 +4667,13 @@ class STM32Agent:
             tool_calls_list = []
             for idx in sorted(tool_calls_raw.keys()):
                 tc = tool_calls_raw[idx]
+                func_dict: dict = {"name": tc["name"], "arguments": tc["args"]}
+                if tc.get("thought_signature"):  # Gemini 思考签名，必须原样回传
+                    func_dict["thought_signature"] = tc["thought_signature"]
                 tool_calls_list.append({
                     "id": tc["id"],
                     "type": "function",
-                    "function": {"name": tc["name"], "arguments": tc["args"]},
+                    "function": func_dict,
                 })
             assistant_tool_msg = {
                 "role": "assistant",
@@ -3514,7 +4682,7 @@ class STM32Agent:
             }
             if thinking:  # 关键修复：把之前收集的 thinking 塞进来
                 assistant_tool_msg["reasoning_content"] = thinking
-                
+
             self.messages.append(assistant_tool_msg)
 
             # 执行工具
