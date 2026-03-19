@@ -24,7 +24,7 @@
 **Talk to it in natural language, and let AI directly participate in STM32 development, compilation, flashing, and debugging.**
 
 <p align="center">
-  <a href="./README.md"><b>中文</b></a>
+  <a href="./README_CN.md"><b>中文</b></a>
 </p>
 
 [Quick Start](#-quick-start) · [Core Features](#-core-features) · [Usage Guide](#-usage-guide) · [Command Reference](#-command-reference) · [Skill System](#-skill-system-skills) · [FAQ](#-faq)
