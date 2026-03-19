@@ -3,7 +3,6 @@
 # 🗡️ GARY CLI: The Spear Carrier
 
 **Piercing the Silicon with AI.**
-<br>
 *专为 STM32 打造的 AI 原生命令行开发与调试智能体*
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
@@ -13,7 +12,7 @@
 
 <br>
 
-```
+```text
    ██████╗  █████╗ ██████╗ ██╗   ██╗
   ██╔════╝ ██╔══██╗██╔══██╗╚██╗ ██╔╝
   ██║  ███╗███████║██████╔╝ ╚████╔╝
@@ -22,13 +21,13 @@
    ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝
 ```
 
-**用自然语言对话，让 AI 直接操控你的 STM32 硬件。**
+**用自然语言对话，让 AI 直接参与 STM32 开发、编译、烧录与调试。**
 
 <p align="center">
   <a href="./README.md"><b>English</b></a>
 </p>
 
-[快速开始](#-快速开始) · [功能特性](#-核心功能) · [使用指南](#-使用指南) · [命令参考](#-命令参考) · [技能系统](#-技能系统-skills) · [常见问题](#-常见问题)
+[快速开始](#-快速开始) · [核心功能](#-核心功能) · [使用指南](#-使用指南) · [命令参考](#-命令参考) · [技能系统](#-技能系统-skills) · [常见问题](#-常见问题)
 
 </div>
 
@@ -36,30 +35,38 @@
 
 ## ⚡ 什么是 Gary？
 
-在传统嵌入式开发中，查阅数百页 Reference Manual、配置寄存器、处理玄学接线问题消耗了工程师 80% 的精力。
+传统嵌入式开发里，真正耗时的往往不是“写几段 C 代码”，而是下面这条链路：
 
-**Gary（持矛者）** 不是另一个代码生成器——它是一个能**直接介入你的物理硬件**的 AI 智能体。你只需用自然语言描述需求，Gary 会自动完成从代码生成、交叉编译、物理烧录到错误自愈的**完整闭环**。
+**需求理解 → 外设配置 → 代码生成 → 交叉编译 → 固件烧录 → 串口验证 → 寄存器排查 → 故障修复 → 再次烧录**
 
-```
-你说："帮我做一个 OLED 显示温湿度的程序，传感器用 AHT20"
+**Gary（持矛者）** 不是另一个只会“生成代码”的聊天工具。
+它是一个面向 STM32 的 **AI 开发执行器**：你描述目标，它负责生成代码、调用工具链、连接硬件、收集运行反馈，并在可验证的范围内继续修复问题。
+
+```text
+你说：
+  “帮我做一个 OLED 显示温湿度的程序，传感器用 AHT20”
 
 Gary 自动执行：
-  ✓ 生成完整 main.c（HAL 库 + I2C 驱动 + OLED 显示）
+  ✓ 生成完整 main.c（HAL + I2C + AHT20 + SSD1306）
   ✓ arm-none-eabi-gcc 交叉编译
-  ✓ 通过串口/SWD 烧录到 STM32
-  ✓ 监控串口输出，验证启动
-  ✓ 读取寄存器确认外设状态
-  ✗ 发现 I2C 无应答 → 自动分析原因 → 修复代码 → 重新烧录
-  ✓ 第 2 轮成功，程序正常运行
+  ✓ 通过 SWD 或 UART ISP 烧录到 STM32
+  ✓ 监控串口输出，确认程序是否真正启动
+  ✓ 读取寄存器，判断外设状态
+  ✗ 发现 I2C 无应答 → 分析原因 → 修改代码 → 重新烧录
+  ✓ 第二轮运行成功
 ```
+
+一句话概括：
+
+> **Gary 不是帮你“写一份 STM32 代码”，而是试图帮你完成一次 STM32 开发闭环。**
 
 ---
 
 ## 🎯 核心功能
 
-### 🗣️ 自然语言 → 硬件控制
+### 🗣️ 自然语言 → 可编译 STM32 HAL 工程代码
 
-不再需要翻 Reference Manual。用中文说出你想做什么，Gary 生成完整可编译的 STM32 HAL C 代码。
+你直接描述功能目标，Gary 生成完整、可交叉编译的 STM32 HAL C 代码。
 
 ```bash
 gary do "PA0 接了 LED，帮我做一个呼吸灯，PWM 频率 1kHz"
@@ -67,68 +74,97 @@ gary do "用 I2C1 读取 MPU6050 加速度数据，串口打印"
 gary do "配置 TIM2 编码器模式读取电机转速"
 ```
 
-### 🔄 全自动闭环调试
+适合的典型场景：
 
-Gary 的核心能力不是"生成代码"，而是**自动验证并修复**：
+* GPIO / PWM / ADC / EXTI
+* UART / I2C / SPI / 定时器
+* OLED / 传感器 / 数码管 / 蜂鸣器
+* PID 控制 / 编码器反馈 / 电机控制
+* 裸机项目快速原型验证
 
+### 🔄 自动闭环调试
+
+Gary 的重点不是“第一次就写对”，而是：
+
+```text
+生成代码 → 编译 → 烧录 → 串口验证 → 读寄存器 → 分析问题 → 修改代码 → 再编译再烧录
 ```
-编译 → 烧录 → 读串口 → 读寄存器 → 分析结果
-  ↑                                      ↓
-  └──── 自动修复代码 ←── 发现问题 ←──────┘
-```
 
-- **编译失败** → 读取 GCC 错误信息，自动修复代码
-- **HardFault** → 分析 SCB_CFSR/HFSR 寄存器，定位精确原因
-- **程序卡死** → 检查 SysTick、I2C 总线锁死、时钟配置
-- **传感器不响应** → 检测 I2C NACK/ARLO，判断是硬件未接还是地址错误
-- **最多 8 轮自动修复**，修不好会告诉你具体是什么硬件问题
+它会尽量基于真实反馈继续推进，而不是只停留在“建议你这样改”。
 
-### ⚡ 烧录
-Gary 默认**优先使用SWD烧录**遇到需要读寄存器调试的场景自动切换到 SWD和串口通信。
+支持的典型诊断包括：
+
+* **编译失败**：读取 GCC 错误信息并修复语法/符号/初始化问题
+* **程序无输出**：检查启动路径、SysTick、时钟配置、串口初始化顺序
+* **HardFault**：分析 SCB 相关寄存器，辅助定位故障类型
+* **I2C 异常**：检查设备地址、总线占用、初始化顺序、NACK/ARLO 等情况
+* **最多多轮自动修复**：修不好时，会尽量把问题明确收敛到“代码问题”还是“硬件问题”
+
+### ⚡ 一致的烧录与调试策略
+
+Gary 对硬件操作采用清晰的一致策略：
+
+* **默认优先 SWD**：适合稳定烧录、寄存器读取、Fault 分析、调试闭环
+* **UART ISP 可选**：在没有调试器时可切换到串口烧录
+* **串口监控独立存在**：无论你用 SWD 还是 UART ISP，串口都用于观察程序真实运行状态
+
+也就是说：
+
+* **SWD** 负责“烧录 + 调试”
+* **UART** 负责“日志 + 运行验证”
+
+这比把“烧录”和“运行反馈”混在一起更稳定，也更符合真实开发流程。
 
 ### 🧰 内置工具集
 
-| 工具 | 用途 |
-|---|---|
-| **PID 自动调参** | 分析响应曲线（超调/振荡/稳态误差），自动推荐 Kp/Ki/Kd |
-| **I2C 总线扫描** | 扫描所有设备地址，自动识别 100+ 常见芯片型号 |
-| **引脚冲突检测** | 静态分析代码，发现引脚重复配置、SWD 误占等问题 |
-| **PWM 频率扫描** | 自动计算 PSC/ARR，生成频率扫描表测试电机/蜂鸣器 |
-| **舵机校准** | 生成角度扫描代码，精确映射脉宽到角度 |
-| **信号采集分析** | 分析 ADC/传感器数据的噪声、信噪比、频率特征 |
-| **外设冒烟测试** | 一键生成 GPIO/UART/I2C/SPI/ADC 最小测试代码 |
-| **Flash/RAM 分析** | 显示固件资源占用率，预警 Flash 溢出 |
-| **功耗估算** | 基于使能的外设估算 MCU 电流和功耗 |
-| **字模生成** | 任意中英文 → OLED 点阵 C 数组（系统字体渲染，非手写） |
+| 工具               | 用途                                |
+| ---------------- | --------------------------------- |
+| **PID 自动调参**     | 分析超调、振荡、稳态误差，推荐 Kp/Ki/Kd          |
+| **I2C 总线扫描**     | 扫描设备地址，辅助识别常见芯片                   |
+| **引脚冲突检测**       | 发现 GPIO 复用冲突、SWD 误占等问题            |
+| **PWM 参数计算**     | 自动计算 PSC/ARR，快速验证目标频率             |
+| **舵机校准**         | 生成角度扫描逻辑，映射脉宽与角度                  |
+| **信号采集分析**       | 分析 ADC/传感器数据的波动、噪声和频率特征           |
+| **外设冒烟测试**       | 一键生成 GPIO/UART/I2C/SPI/ADC 最小测试代码 |
+| **Flash/RAM 分析** | 展示资源占用并预警容量问题                     |
+| **功耗估算**         | 基于外设启用状态估算功耗                      |
+| **字模生成**         | 中英文字符 → OLED 点阵数组                 |
 
 ### 🔌 Bring Your Own Key
 
-Gary 不绑定任何 AI 服务商。你的 API Key，你做主：
+Gary 不绑定单一 AI 服务。你可以自由切换后端：
 
-| 服务商 | 模型 | 说明 |
-|---|---|---|
-| DeepSeek | deepseek-chat | 性价比首选 |
-| Kimi / Moonshot | kimi-k2.5 | 中文能力强 |
-| OpenAI | gpt-4o | 综合能力强 |
-| Google Gemini | gemini-2.0-flash | 免费额度大 |
-| 通义千问 | qwen-plus | 阿里云 |
-| 智谱 GLM | glm-4-flash | 免费 |
-| Ollama | qwen2.5-coder:14b | 本地离线，完全私有 |
+| 服务商             | 模型                | 说明        |
+| --------------- | ----------------- | --------- |
+| DeepSeek        | deepseek-chat     | 性价比高      |
+| Kimi / Moonshot | kimi-k2.5         | 中文能力强     |
+| OpenAI          | gpt-4o            | 综合表现强     |
+| Google Gemini   | gemini-2.0-flash  | 响应快       |
+| 通义千问            | qwen-plus         | 阿里云       |
+| 智谱 GLM          | glm-4-flash       | 易接入       |
+| Ollama          | qwen2.5-coder:14b | 本地离线，完全私有 |
 
 ### 🧩 技能系统（Skills）
 
-通过**可插拔的技能包**扩展 Gary 的能力：
+Gary 支持可插拔技能包，用于扩展能力边界。
 
 ```bash
-/skill install pid_tuner.py              # 从 .py 文件安装
-/skill install ~/Downloads/skill.zip     # 从压缩包安装
-/skill install https://github.com/xxx    # 从 Git 仓库安装
-/skill list                               # 查看所有技能
-/skill create my_tool "我的工具"          # 创建新技能模板
-/skill export my_tool                     # 打包分享给别人
+/skill install pid_tuner.py
+/skill install ~/Downloads/skill.zip
+/skill install https://github.com/xxx/skill.git
+/skill list
+/skill create my_tool "我的工具"
+/skill export my_tool
 ```
 
-每个 Skill 包含工具函数 + AI Schema + 提示词，安装后**立即生效**，无需重启。
+每个 Skill 可以包含：
+
+* Python 工具函数
+* OpenAI Function Calling Schema
+* 提示词说明
+* 依赖文件
+
+安装后即可热加载，无需重启。
 
 ---
 
@@ -137,21 +173,25 @@ Gary 不绑定任何 AI 服务商。你的 API Key，你做主：
 ### 一键安装
 
 **Linux / macOS / WSL：**
+
 ```bash
 curl -fsSL https://www.garycli.com/install.sh | bash
 ```
 
-**Windows（PowerShell 管理员）：**
+**Windows（PowerShell）：**
+
 ```powershell
 irm https://www.garycli.com/install.ps1 | iex
 ```
 
-安装脚本会自动完成：
-- Python 环境检测
-- arm-none-eabi-gcc 交叉编译器安装
-- STM32 HAL 库下载
-- Python 依赖安装（openai, rich, pyserial, pyocd 等）
-- 串口烧录工具安装（stm32loader）
+安装脚本会尝试完成：
+
+* Python 环境检查
+* arm-none-eabi-gcc 安装或检测
+* HAL / CMSIS 相关资源准备
+* Python 依赖安装
+* 串口与调试工具安装
+* CLI 启动命令写入
 
 ### 手动安装
 
@@ -164,19 +204,22 @@ cd garycli
 pip install -r requirements.txt
 
 # 3. 安装交叉编译器
-# Ubuntu/Debian:
+# Ubuntu / Debian:
 sudo apt install gcc-arm-none-eabi
+
 # macOS:
 brew install --cask gcc-arm-embedded
-# Windows: 从 ARM 官网下载安装
 
-# 4. 安装串口烧录工具（可选，推荐）
+# Windows:
+# 从 ARM 官方或对应发行源安装 gcc-arm-none-eabi
+
+# 4. 可选：安装 UART ISP 烧录工具
 pip install stm32loader
 
-# 5. 安装调试器驱动（可选）
+# 5. 可选：安装 SWD 调试工具
 pip install pyocd
 
-# 6. 下载 HAL 库
+# 6. 下载 HAL 资源
 python3 setup.py --hal
 
 # 7. 运行环境诊断
@@ -186,11 +229,16 @@ python3 stm32_agent.py --doctor
 ### 首次配置
 
 ```bash
-# 配置 AI 后端（交互式向导）
 gary config
 ```
 
-按提示选择服务商、输入 API Key 即可。推荐 DeepSeek（便宜好用）或 Ollama（完全本地）。
+按提示配置：
+
+* API Key
+* Base URL
+* Model
+* 默认芯片型号
+* 默认串口参数（可选）
 
 ### 环境诊断
 
@@ -199,7 +247,8 @@ gary doctor
 ```
 
 输出示例：
-```
+
+```text
 ■ AI 接口
   ✓ API Key   sk-abc...xyz
   ✓ Base URL  https://api.deepseek.com/v1
@@ -207,87 +256,81 @@ gary doctor
   ✓ API 连通性  测试通过
 
 ■ 编译工具链
-  ✓ arm-none-eabi-gcc  arm-none-eabi-gcc (15.1.0) 15.1.0
-  ✓ HAL 库      STM32F0xx, STM32F1xx, STM32F3xx, STM32F4xx
+  ✓ arm-none-eabi-gcc  arm-none-eabi-gcc (15.1.0)
+  ✓ HAL 资源           STM32F0xx, STM32F1xx, STM32F3xx, STM32F4xx
   ✓ CMSIS Core
 
 ■ Python 依赖
   ✓ openai
   ✓ rich
   ✓ prompt_toolkit
-  ✓ pyserial  (可选)
-  ✓ pyocd  (可选)
-  ✓ stm32loader  (可选)
+  ✓ pyserial      (可选)
+  ✓ pyocd         (可选)
+  ✓ stm32loader   (可选)
 
 ■ 硬件探针
-  ✓ STM32 STLink V2  (066BFF...)
+  ✓ ST-Link V2
   ✓ 串口 /dev/ttyUSB0
 
-  ✅  所有核心配置正常，Gary 已就绪！
+✅ 所有核心配置正常，Gary 已就绪
 ```
 
 ---
 
 ## 📖 使用指南
 
-### 模式一：单次任务（gary do）
+### 模式一：单次任务（`gary do`）
 
-不启动交互界面，一句话执行完退出：
+适合快速验证单一需求：
 
 ```bash
-# 生成 + 编译（无硬件）
+# 仅生成 + 编译（不连接硬件）
 gary do "写一个 WS2812 灯带驱动，控制 8 颗 LED 跑彩虹效果"
 
-# 生成 + 编译 + 烧录（连接硬件）
+# 生成 + 编译 + 连接硬件
 gary do "PA0 LED 闪烁，500ms 间隔" --connect
 
 # 指定芯片型号
 gary do "读取 ADC 电压，串口打印" --chip STM32F407VET6 --connect
 ```
 
-### 模式二：交互式对话（gary）
+### 模式二：交互式对话（`gary`）
 
-启动沉浸式 TUI，持续对话迭代开发：
+适合多轮迭代开发：
 
 ```bash
-gary                        # 启动
-gary --connect              # 启动并自动连接硬件
-gary --chip STM32F407VET6   # 指定芯片型号
+gary
+gary --connect
+gary --chip STM32F407VET6
+gary --connect --chip STM32F103C8T6
 ```
 
-进入后：
+示例：
 
-```
+```text
 Gary > 帮我做一个 OLED 时钟，I2C1 接 SSD1306，显示时分秒
 
   🔧 stm32_reset_debug_attempts → 计数器已重置
   🔧 stm32_hardware_status → chip: STM32F103C8T6, hw_connected: true
   🔧 stm32_generate_font → 生成 "0123456789:" 字模
-  🔧 stm32_auto_flash_cycle → 编译成功 8.2KB，烧录成功...
+  🔧 stm32_auto_flash_cycle → 编译成功 8.2KB，烧录成功
   串口输出: Gary:BOOT → OLED Init OK → 12:34:56
 
-✓ 编译烧录成功，8.2KB。OLED 已显示时间。
-
-Gary > 加一个按键调时间，PA1 接按键，短按切换时/分/秒，长按加1
-
-  🔧 str_replace_edit → 替换按键相关代码
-  🔧 stm32_auto_flash_cycle → 编译成功 9.1KB，烧录成功...
-
-✓ 已添加按键调时功能。短按切换位，长按+1。
+✓ OLED 已正常显示时间
 ```
 
 ### 模式三：增量修改
 
-Gary 会记住上次的代码。你可以持续迭代：
+Gary 会尽量基于当前项目继续修改，而不是每次都重写整个程序：
 
-```
+```text
 Gary > LED 闪烁太快了，改成 1 秒
 Gary > 改成共阳数码管
 Gary > 加一个蜂鸣器，报警时响
 Gary > 把 I2C 地址从 0x3C 改成 0x3D
 ```
 
-Gary 只修改你要求的部分，不会重写整个程序。
+适合在同一个项目上连续迭代。
 
 ---
 
@@ -295,125 +338,130 @@ Gary 只修改你要求的部分，不会重写整个程序。
 
 ### 终端命令
 
-| 命令 | 说明 |
-|---|---|
-| `gary` | 启动交互式对话界面 |
-| `gary do "任务描述"` | 单次任务模式 |
-| `gary do "任务" --connect` | 单次任务 + 自动连接硬件 |
-| `gary --chip STM32F407VET6` | 指定芯片型号 |
-| `gary --connect` | 启动并连接硬件 |
-| `gary config` | 配置 AI 后端（API Key / Model） |
-| `gary doctor` | 环境诊断（检查所有配置） |
+| 命令                          | 说明            |
+| --------------------------- | ------------- |
+| `gary`                      | 启动交互式对话界面     |
+| `gary do "任务描述"`            | 单次任务模式        |
+| `gary do "任务" --connect`    | 单次任务 + 自动连接硬件 |
+| `gary --chip STM32F407VET6` | 指定芯片型号        |
+| `gary --connect`            | 启动并连接硬件       |
+| `gary config`               | 配置 AI 后端      |
+| `gary doctor`               | 环境诊断          |
 
-### 交互式命令（在 Gary > 提示符下输入）
+### 交互式命令（在 `Gary >` 下输入）
 
-| 命令 | 说明 |
-|---|---|
-| `/connect [芯片]` | 连接 SWD 调试器（如 `/connect STM32F103C8T6`） |
-| `/disconnect` | 断开硬件 |
-| `/serial [端口] [波特率]` | 连接串口（如 `/serial /dev/ttyUSB0 115200`） |
-| `/serial list` | 列出可用串口 |
-| `/chip [型号]` | 查看/切换芯片 |
-| `/flash [uart\|swd\|auto]` | 切换烧录模式 |
-| `/flash status` | 查看烧录工具状态 |
-| `/probes` | 列出所有调试探针 |
-| `/status` | 查看完整硬件状态 |
-| `/config` | 配置 AI 接口 |
-| `/projects` | 列出历史项目 |
-| `/skill list` | 列出已安装技能 |
-| `/skill install <来源>` | 安装技能包 |
-| `/skill create <名称>` | 创建技能模板 |
-| `/clear` | 清空对话历史 |
-| `/exit` | 退出 |
+| 命令                         | 说明             |
+| -------------------------- | -------------- |
+| `/connect [芯片]`            | 连接调试器或初始化硬件上下文 |
+| `/disconnect`              | 断开硬件           |
+| `/serial [端口] [波特率]`       | 连接串口           |
+| `/serial list`             | 列出可用串口         |
+| `/chip [型号]`               | 查看或切换芯片        |
+| `/flash [swd\|uart\|auto]` | 设置烧录方式         |
+| `/flash status`            | 查看烧录工具状态       |
+| `/probes`                  | 列出调试探针         |
+| `/status`                  | 查看完整硬件状态       |
+| `/config`                  | 重新配置 AI 后端     |
+| `/projects`                | 查看历史项目         |
+| `/skill list`              | 查看已安装技能        |
+| `/skill install <来源>`      | 安装技能包          |
+| `/skill create <名称>`       | 创建技能模板         |
+| `/clear`                   | 清空对话历史         |
+| `/exit`                    | 退出             |
 
 ---
 
-## 🔧 硬件接线
+## 🔌 硬件连接建议
 
-### 方案：串口 + SWD
+### 推荐方案：SWD + 串口日志
 
-额外加一个调试器（ST-Link V2，¥10），可以读寄存器、分析 HardFault：
+这是最稳定的组合：
 
+* **SWD**：负责烧录、寄存器读取、故障调试
+* **UART**：负责串口监控与启动确认
+
+```text
+ST-Link / J-Link      STM32
+  SWDIO   ─────────── PA13
+  SWCLK   ─────────── PA14
+  GND     ─────────── GND
+  3.3V    ─────────── 3.3V
+
+USB-TTL               STM32
+  TX      ──────────→ PA10
+  RX      ←────────── PA9
+  GND     ─────────── GND
 ```
-ST-Link           STM32
-  SWDIO ─────────── PA13
-  SWCLK ─────────── PA14
-  GND ──────────── GND
-  3.3V ─────────── 3.3V
 
-USB-TTL           STM32（串口监控）
-  TX  ──────────→ PA10
-  RX  ←────────── PA9
-  GND ──────────── GND
-```
+### 纯串口方案（无调试器）
+
+如果手头没有 ST-Link，也可以只接 USB-TTL，使用 UART ISP 烧录，但能力会受限：
+
+* 可以烧录
+* 可以看串口输出
+* **不能像 SWD 那样方便地读寄存器和分析 Fault**
+
+所以推荐优先使用 SWD。
 
 ---
 
 ## 🧩 技能系统 (Skills)
 
-Gary 通过可插拔的**技能包**扩展功能。每个 Skill 是一个标准目录：
+Gary 支持通过技能包扩展能力。一个标准 Skill 目录如下：
 
-```
+```text
 ~/.gary/skills/
 ├── pid_tuner/
-│   ├── skill.json        ← 元信息（名称、版本、作者、依赖）
-│   ├── tools.py          ← 工具函数（Python）
-│   ├── schemas.json      ← AI 调用格式（OpenAI Function Calling）
-│   ├── prompt.md         ← 教 AI 什么场景用这些工具
-│   └── requirements.txt  ← Python 依赖
+│   ├── skill.json
+│   ├── tools.py
+│   ├── schemas.json
+│   ├── prompt.md
+│   └── requirements.txt
 ├── uart_flash/
-└── _disabled/            ← 已禁用的技能
+└── _disabled/
 ```
 
 ### 安装技能
 
 ```bash
-# 从 .py 文件（自动包装成 skill）
 /skill install stm32_extra_tools.py
-
-# 从压缩包
 /skill install ~/Downloads/gary_skill_pid_tuner.zip
-
-# 从 Git 仓库
 /skill install https://github.com/someone/gary-skill-motor.git
-
-# 从本地目录
 /skill install ~/my_skills/sensor_kit/
 ```
 
 ### 管理技能
 
 ```bash
-/skill list                  # 列出所有（含已禁用）
-/skill info pid_tuner        # 查看详情
-/skill disable pid_tuner     # 暂时禁用
-/skill enable pid_tuner      # 重新启用
-/skill uninstall pid_tuner   # 卸载
-/skill reload                # 热重载全部
+/skill list
+/skill info pid_tuner
+/skill disable pid_tuner
+/skill enable pid_tuner
+/skill uninstall pid_tuner
+/skill reload
 ```
 
 ### 开发自己的 Skill
 
 ```bash
-# 1. 生成模板
+# 1. 创建模板
 /skill create motor_driver "直流电机 PID 控制工具"
 
 # 2. 编辑生成的文件
-#    ~/.gary/skills/motor_driver/tools.py     ← 写工具函数
-#    ~/.gary/skills/motor_driver/schemas.json ← 写 AI Schema
-#    ~/.gary/skills/motor_driver/prompt.md    ← 写使用指南
+# ~/.gary/skills/motor_driver/tools.py
+# ~/.gary/skills/motor_driver/schemas.json
+# ~/.gary/skills/motor_driver/prompt.md
 
 # 3. 热重载
 /skill reload
 
-# 4. 打包分享
+# 4. 导出分享
 /skill export motor_driver
-# → gary_skill_motor_driver.zip
 ```
 
 ### Skill 开发规范
 
-**tools.py**（必须导出 `TOOLS_MAP`）：
+**tools.py**：
 
 ```python
 def motor_set_speed(rpm: int) -> dict:
@@ -425,7 +473,7 @@ TOOLS_MAP = {
 }
 ```
 
-**schemas.json**（OpenAI Function Calling 格式）：
+**schemas.json**：
 
 ```json
 [
@@ -437,7 +485,10 @@ TOOLS_MAP = {
       "parameters": {
         "type": "object",
         "properties": {
-          "rpm": {"type": "integer", "description": "目标转速 RPM"}
+          "rpm": {
+            "type": "integer",
+            "description": "目标转速 RPM"
+          }
         },
         "required": ["rpm"]
       }
@@ -446,7 +497,7 @@ TOOLS_MAP = {
 ]
 ```
 
-**prompt.md**（教 AI 怎么用）：
+**prompt.md**：
 
 ```markdown
 ## 电机控制
@@ -457,124 +508,116 @@ TOOLS_MAP = {
 
 ## 🏗️ 架构
 
-```
+```text
 ┌──────────────────────────────────────────────────────┐
-│                    Gary CLI (TUI)                     │
-│              rich + prompt_toolkit                    │
+│                    Gary CLI (TUI)                    │
+│              rich + prompt_toolkit                   │
 ├──────────────────────────────────────────────────────┤
-│                   AI 对话引擎                         │
-│         OpenAI API (流式 + Function Calling)          │
-│    DeepSeek │ Kimi │ GPT │ Gemini │ Ollama │ ...    │
+│                   AI 对话引擎                        │
+│         流式对话 + Function Calling                  │
+│   DeepSeek │ Kimi │ GPT │ Gemini │ Ollama │ ...     │
 ├──────────────┬──────────────┬────────────────────────┤
 │  代码生成     │   编译器      │    硬件后端            │
-│  STM32 HAL   │  GCC Cross   │  ┌─────────────────┐  │
-│  C 代码模板   │  Compiler    │  │ UART ISP (首选)  │  │
-│              │              │  │  stm32loader     │  │
+│  HAL 模板     │  GCC Cross   │  ┌─────────────────┐  │
+│  历史项目复用 │  Compiler    │  │ SWD（默认）      │  │
+│  经验与模板库 │              │  │ pyocd            │  │
 │              │              │  ├─────────────────┤  │
-│              │              │  │ SWD (备选)       │  │
-│              │              │  │  pyocd           │  │
+│              │              │  │ UART ISP（可选） │  │
+│              │              │  │ stm32loader      │  │
 │              │              │  ├─────────────────┤  │
 │              │              │  │ 串口监控         │  │
-│              │              │  │  pyserial        │  │
+│              │              │  │ pyserial         │  │
 │              │              │  └─────────────────┘  │
 ├──────────────┴──────────────┴────────────────────────┤
-│                   技能系统 (Skills)                    │
-│  PID调参 │ I2C扫描 │ PWM扫描 │ 字模生成 │ 自定义...  │
+│                   技能系统 (Skills)                  │
+│   PID 调参 │ I2C 扫描 │ PWM 工具 │ 字模生成 │ ...    │
 └──────────────────────────────────────────────────────┘
-         ↕ USB                    ↕ USB
-┌──────────────┐          ┌──────────────────┐
-│  USB-TTL     │          │  ST-Link/J-Link  │
-│  (CH340)     │          │  (可选)          │
-└──────┬───────┘          └──────┬───────────┘
-       │ UART                    │ SWD
-┌──────┴─────────────────────────┴───────────┐
-│              STM32 目标板                    │
-│   PA9/PA10 (UART)    PA13/PA14 (SWD)       │
-└────────────────────────────────────────────┘
 ```
 
 ---
 
 ## <a name="supported-chips"></a> 📟 支持的芯片
 
-| 系列 | 典型型号 | Flash | RAM |
-|---|---|---|---|
-| **STM32F0** | F030F4, F030C8, F072CB | 16-128 KB | 4-16 KB |
-| **STM32F1** | F103C8T6 (BluePill), F103RCT6, F103ZET6 | 64-512 KB | 20-64 KB |
-| **STM32F3** | F303CCT6, F303RCT6 | 256 KB | 40 KB |
+当前重点支持以下 STM32 系列：
+
+| 系列          | 典型型号                         | Flash       | RAM       |
+| ----------- | ---------------------------- | ----------- | --------- |
+| **STM32F0** | F030F4, F030C8, F072CB       | 16-128 KB   | 4-16 KB   |
+| **STM32F1** | F103C8T6, F103RCT6, F103ZET6 | 64-512 KB   | 20-64 KB  |
+| **STM32F3** | F303CCT6, F303RCT6           | 256 KB      | 40 KB     |
 | **STM32F4** | F401CCU6, F407VET6, F411CEU6 | 256-1024 KB | 64-128 KB |
 
-> 其他型号：Gary 会自动下载对应的 CMSIS Pack（首次连接时），理论上支持所有 Cortex-M 系列。
+> 其他型号可能可以通过补充 HAL / CMSIS 资源和模板继续适配，但当前 README 只对上述系列做明确承诺。
 
 ---
 
 ## 💡 实战示例
 
-### 🔰 入门：LED 闪烁
+### 🔰 LED 闪烁
 
-```
+```text
 Gary > 帮我做一个 LED 闪烁，PA0 引脚，500ms 间隔
 ```
 
 ### 🔢 数码管显示
 
-```
+```text
 Gary > 4 位共阳数码管，PA0-PA7 接段选，PB0-PB3 接位选，显示计数器
 ```
 
 ### 📡 传感器读取
 
-```
+```text
 Gary > I2C1 接 AHT20 温湿度传感器，串口打印温度和湿度
 Gary > 再加个 SSD1306 OLED 显示温度
 ```
 
 ### 🎛️ PID 电机控速
 
-```
+```text
 Gary > 直流电机 PID 速度控制：TIM2 CH1 输出 PWM，TIM3 编码器读反馈，目标 500rpm
 ```
 
-Gary 会自动：生成 PID 代码 → 烧录 → 采集串口数据 → 分析响应 → 调参 → 重新烧录 → 循环直到稳定。
+### 🔍 I2C 排查
 
-### 🔍 I2C 设备排查
-
-```
+```text
 Gary > 我接了几个 I2C 设备但不确定地址，帮我扫描一下
 ```
 
 ### 🎵 蜂鸣器音乐
 
-```
+```text
 Gary > 无源蜂鸣器接 PA1，帮我播放一段《小星星》
 ```
 
 ### 🖥️ OLED 中文显示
 
+```text
+Gary > OLED 显示中文“你好世界”，字体 16x16
 ```
-Gary > OLED 显示中文"你好世界"，字体 16x16
-```
-
-Gary 自动调用字模生成工具，用系统字体渲染真实点阵，不是手写数据。
 
 ---
 
 ## 📁 项目结构
 
-```
-gary/
-├── stm32_agent.py          # 主程序（TUI + AI 对话 + 工具框架）
-├── compiler.py             # GCC 交叉编译器封装
-├── config.py               # 配置文件（API Key、芯片、路径）
-├── setup.py                # 安装脚本
-├── stm32_uart_flash.py     # 串口 ISP 烧录模块
-├── stm32_extra_tools.py    # 扩展工具集（PID/I2C/PWM/信号分析...）
+以下结构更贴近当前仓库的实际组织方式：
+
+```text
+garycli/
+├── stm32_agent.py          # 主程序：TUI + AI 对话 + 工具调度
+├── compiler.py             # GCC 交叉编译封装
+├── config.py               # 配置文件与路径管理
+├── setup.py                # 安装与初始化脚本
+├── stm32_extra_tools.py    # 扩展工具集
 ├── gary_skills.py          # 技能系统管理器
 ├── requirements.txt        # Python 依赖
+├── install.sh              # Linux / macOS / WSL 安装脚本
+├── install.ps1             # Windows 安装脚本
 └── ~/.gary/                # 用户数据目录
     ├── skills/             # 已安装技能
     ├── projects/           # 历史项目存档
-    └── skills_registry.json
+    ├── templates/          # 模板库
+    └── member.md           # 经验库 / 记忆
 ```
 
 ---
@@ -587,30 +630,31 @@ gary/
 <summary><b>Q: arm-none-eabi-gcc 安装后找不到？</b></summary>
 
 确认已加入 PATH：
+
 ```bash
 which arm-none-eabi-gcc
-# 若无输出，手动添加：
-export PATH=$PATH:/usr/lib/arm-none-eabi/bin
 ```
-或运行 `gary doctor` 查看诊断结果。
+
+若没有输出，请手动加入 PATH，或执行 `gary doctor` 查看诊断结果。
+
 </details>
 
 <details>
-<summary><b>Q: HAL 库下载失败？</b></summary>
+<summary><b>Q: HAL 资源下载失败？</b></summary>
 
 ```bash
-# 手动下载
 python3 setup.py --hal
-
 # 或指定系列
 python3 setup.py --hal f1 f4
 ```
+
 </details>
 
 <details>
-<summary><b>Q: Windows 上串口权限问题？</b></summary>
+<summary><b>Q: Windows 上串口权限或驱动异常？</b></summary>
 
-确认安装了 CH340/CP2102 驱动。在设备管理器中确认 COM 口已识别。
+确认已安装 CH340 / CP2102 驱动，并在设备管理器中看到对应 COM 口。
+
 </details>
 
 <details>
@@ -620,6 +664,7 @@ python3 setup.py --hal f1 f4
 sudo usermod -aG dialout $USER
 newgrp dialout
 ```
+
 </details>
 
 ### 使用相关
@@ -627,78 +672,87 @@ newgrp dialout
 <details>
 <summary><b>Q: 串口烧录没有响应？</b></summary>
 
-检查清单：
-1. BOOT0 跳线是否拨到 1（VCC 侧）？
-2. 是否按了复位键？
-3. TX/RX 是否交叉连接？（TTL-TX → STM32-PA10）
-4. 串口波特率是否为 115200？
+检查：
+
+1. BOOT0 是否拉高到下载模式
+2. 板子是否复位
+3. TX / RX 是否交叉连接
+4. 端口与波特率是否正确
+
 </details>
 
 <details>
 <summary><b>Q: 编译报错 undefined reference to _sbrk？</b></summary>
 
-代码中用了 `sprintf`/`printf`/`malloc`。Gary 生成的代码不使用这些函数，如果你手动加了，改用 Gary 的 `Debug_Print`/`Debug_PrintInt` 替代。
+通常说明代码里引入了 `printf` / `sprintf` / `malloc` 等依赖堆实现的符号。裸机最小工程建议避免直接使用这些函数。
+
 </details>
 
 <details>
 <summary><b>Q: HardFault 怎么排查？</b></summary>
 
-Gary 连接 SWD 后会自动读取 SCB_CFSR 寄存器分析。常见原因：
-- `PRECISERR`：访问了未使能时钟的外设
-- `UNDEFINSTR`：栈溢出或函数指针错误
-- `IACCVIOL`：Flash 地址非法
+推荐使用 SWD 连接。Gary 会结合寄存器信息辅助判断：
+
+* `PRECISERR`：常见于访问未就绪外设
+* `UNDEFINSTR`：可能是栈损坏、跳转错误或指令异常
+* `IACCVIOL`：可能访问了非法代码区
+
 </details>
 
 <details>
 <summary><b>Q: 可以用 Ollama 本地模型吗？</b></summary>
 
-可以。运行 `gary config`，选择 Ollama，模型建议用 `qwen2.5-coder:14b` 或更大的。小模型（7B）函数调用能力较弱。
+可以。运行 `gary config` 后选择 Ollama，建议优先使用函数调用能力相对更稳定的代码模型。
+
 </details>
 
 <details>
 <summary><b>Q: 支持 Arduino / ESP32 吗？</b></summary>
 
-目前仅支持 STM32。ESP32/Arduino 支持在路线图中。
+当前主目标是 STM32。其他平台计划后续扩展。
+
 </details>
 
 ---
 
 ## 🗺️ 路线图
 
-- [x] STM32F1/F4 全系列支持
-- [x] UART 串口烧录（免调试器）
-- [x] PID 自动调参
-- [x] 技能系统（Skills）
-- [ ] 技能市场（在线浏览/安装社区技能）
-- [ ] 可视化波形（串口数据实时绘图）
-- [ ] ESP32 支持
-- [ ] STM32CubeMX 项目导入
-- [ ] VS Code 扩展
+* [x] STM32F0 / F1 / F3 / F4 基础支持
+* [x] UART ISP 烧录支持
+* [x] SWD 调试与寄存器读取
+* [x] 技能系统（Skills）
+* [x] 模板库与经验库雏形
+* [ ] 技能市场（在线浏览 / 安装社区技能）
+* [ ] 串口数据实时可视化
+* [ ] STM32CubeMX 项目导入
+* [ ] VS Code 扩展
+* [ ] ESP32 支持
 
 ---
 
 ## 🤝 贡献
 
-欢迎提交 Issue 和 PR！特别欢迎以下贡献：
+欢迎 Issue 和 PR。尤其欢迎以下方向：
 
-- **新的 Skill 包**：将你的工具封装成标准 Skill 分享给社区
-- **芯片支持**：适配更多 STM32 系列的寄存器地址表
-- **文档翻译**：帮助翻译为英文/其他语言
-- **Bug 修复**：使用中遇到的任何问题
+* 新的 Skill 包
+* 更多 STM32 系列支持
+* 文档改进与翻译
+* 故障复现与修复
+* 示例工程与演示视频
 
-### 开发 Skill 并贡献
+### 贡献 Skill
 
 ```bash
-# 1. 创建 skill 模板
+# 1. 创建模板
 /skill create my_awesome_tool "我的工具"
 
-# 2. 开发 & 测试
-# 编辑 ~/.gary/skills/my_awesome_tool/ 下的文件
+# 2. 开发与测试
+# 编辑 ~/.gary/skills/my_awesome_tool/
 
 # 3. 导出
 /skill export my_awesome_tool
 
-# 4. 提交 PR 到本仓库的 skills/ 目录
+# 4. 提交 PR
 ```
 
 ---
@@ -713,6 +767,6 @@ Gary 连接 SWD 后会自动读取 SCB_CFSR 寄存器分析。常见原因：
 
 **🗡️ Just Gary Do It.**
 
-[官网](https://www.garycli.com) · [GitHub](https://github.com/GaryCLI/gary) · [反馈问题](https://github.com/GaryCLI/gary/issues)
+[官网](https://www.garycli.com) · [GitHub](https://github.com/PrettyMyGirlZyy4Embedded/garycli) · [提交 Issue](https://github.com/PrettyMyGirlZyy4Embedded/garycli/issues)
 
 </div>
