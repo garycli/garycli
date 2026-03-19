@@ -2,8 +2,8 @@
 
 # 🗡️ GARY CLI: The Spear Carrier
 
-**Piercing the Silicon with AI.** <br>
-*An AI-native command-line development and debugging agent purpose-built for STM32*
+**Piercing the Silicon with AI.**
+*An AI-native command-line development and debugging agent built for STM32*
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python](https://img.shields.io/badge/Python-3.8+-green.svg)](https://www.python.org/)
@@ -12,7 +12,7 @@
 
 <br>
 
-```
+```text
    ██████╗  █████╗ ██████╗ ██╗   ██╗
   ██╔════╝ ██╔══██╗██╔══██╗╚██╗ ██╔╝
   ██║  ███╗███████║██████╔╝ ╚████╔╝
@@ -21,119 +21,156 @@
    ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝
 ```
 
-**Talk in natural language and let AI directly control your STM32 hardware.**
+**Talk to it in natural language, and let AI directly participate in STM32 development, compilation, flashing, and debugging.**
 
 <p align="center">
-  <a href="./README_CN.md"><b>简体中文</b></a> | <a href="./README.md"><b>English</b></a>
+  <a href="./README.md"><b>中文</b></a>
 </p>
 
-[Quick Start](#-quick-start) · [Features](#-core-features) · [User Guide](#-user-guide) · [Command Reference](#-command-reference) · [Skill System](#-skill-system-skills) · [FAQ](#-faq)
+[Quick Start](#-quick-start) · [Core Features](#-core-features) · [Usage Guide](#-usage-guide) · [Command Reference](#-command-reference) · [Skill System](#-skill-system-skills) · [FAQ](#-faq)
+
 </div>
 
 ---
 
 ## ⚡ What is Gary?
 
-In traditional embedded development, engineers spend 80% of their effort reading hundreds of pages of Reference Manuals, configuring registers, and dealing with mysterious wiring issues.
+In traditional embedded development, the real time sink is usually not just “writing a few lines of C code,” but this full chain:
 
-**Gary (The Spear Carrier)** is not just another code generator — it is an AI agent that can **directly intervene in your physical hardware**. You only need to describe your requirements in natural language, and Gary will automatically complete the **full closed loop** from code generation, cross-compilation, and physical flashing to error self-healing.
+**Requirement understanding → Peripheral configuration → Code generation → Cross-compilation → Firmware flashing → Serial verification → Register inspection → Fault fixing → Reflashing**
 
-```
-You say: "Help me make a program that displays temperature and humidity on an OLED, using an AHT20 sensor"
+**Gary (The Spear Carrier)** is not just another chat tool that can only “generate code.”
+It is an **AI execution agent for STM32 development**: you describe the goal, and it generates code, invokes toolchains, connects to hardware, collects runtime feedback, and keeps fixing issues when the results are verifiable.
+
+```text
+You say:
+  “Help me build an OLED temperature and humidity display using an AHT20 sensor.”
 
 Gary automatically executes:
-  ✓ Generate a complete main.c (HAL library + I2C driver + OLED display)
-  ✓ Cross-compile with arm-none-eabi-gcc
-  ✓ Flash to STM32 via UART/SWD
-  ✓ Monitor serial output and verify startup
-  ✓ Read registers to confirm peripheral status
-  ✗ Detect no I2C response → automatically analyze the cause → fix the code → reflash
-  ✓ Succeeds on round 2, program runs normally
+  ✓ Generates a complete main.c (HAL + I2C + AHT20 + SSD1306)
+  ✓ Cross-compiles with arm-none-eabi-gcc
+  ✓ Flashes the STM32 via SWD or UART ISP
+  ✓ Monitors serial output to verify that the program really started
+  ✓ Reads registers to inspect peripheral state
+  ✗ Detects no I2C response → analyzes cause → patches code → reflashes
+  ✓ Second run succeeds
 ```
+
+In one sentence:
+
+> **Gary is not just trying to “write STM32 code for you” — it is trying to complete an STM32 development loop for you.**
 
 ---
 
 ## 🎯 Core Features
 
-### 🗣️ Natural Language → Hardware Control
+### 🗣️ Natural language → compilable STM32 HAL project code
 
-No more digging through Reference Manuals. Just say what you want in plain language, and Gary generates complete, compilable STM32 HAL C code.
+Describe the target behavior directly, and Gary generates complete STM32 HAL C code that can be cross-compiled.
 
 ```bash
-gary do "PA0 is connected to an LED, help me make a breathing light with a PWM frequency of 1kHz"
-gary do "Use I2C1 to read MPU6050 acceleration data and print it over serial"
-gary do "Configure TIM2 encoder mode to read motor speed"
+gary do "PA0 has an LED connected. Make a breathing light with 1kHz PWM"
+gary do "Read MPU6050 acceleration data over I2C1 and print it over UART"
+gary do "Configure TIM2 in encoder mode to read motor speed"
 ```
 
-### 🔄 Fully Automated Closed-Loop Debugging
+Typical use cases:
 
-Gary’s core capability is not "generating code" — it is **automatically verifying and fixing it**:
+* GPIO / PWM / ADC / EXTI
+* UART / I2C / SPI / timers
+* OLED / sensors / seven-segment displays / buzzers
+* PID control / encoder feedback / motor control
+* Rapid bare-metal prototyping
 
+### 🔄 Automatic closed-loop debugging
+
+Gary’s priority is not “getting it right on the first try,” but this:
+
+```text
+Generate code → Compile → Flash → Verify over serial → Read registers → Analyze issue → Patch code → Recompile and reflash
 ```
-Compile → Flash → Read serial → Read registers → Analyze results
-  ↑                                      ↓
-  └──── Automatically fix code ←── Find problem ←──────┘
-```
 
-* **Compilation failed** → Read GCC error messages and automatically fix the code
-* **HardFault** → Analyze SCB_CFSR/HFSR registers and locate the exact cause
-* **Program hangs** → Check SysTick, I2C bus lockup, and clock configuration
-* **Sensor not responding** → Detect I2C NACK/ARLO and determine whether the issue is unconnected hardware or a wrong address
-* **Up to 8 rounds of automatic repair**; if it still cannot be fixed, Gary will tell you the exact hardware problem
+It tries to continue based on real feedback instead of stopping at “you may want to change this.”
 
-### ⚡ Flashing
+Typical diagnostics include:
 
-Gary **prefers SWD flashing by default**, and when a scenario requires register-level debugging, it automatically switches to SWD plus serial communication.
+* **Compilation failures**: reads GCC errors and fixes syntax, symbol, or initialization problems
+* **No program output**: checks startup path, SysTick, clock configuration, and UART init sequence
+* **HardFault**: inspects SCB-related registers to help locate the fault type
+* **I2C failures**: checks device address, bus lockup, init order, NACK/ARLO, and similar conditions
+* **Multiple automatic repair rounds**: if it still cannot fix the issue, it tries to narrow it down clearly to either a **code problem** or a **hardware problem**
 
-### 🧰 Built-in Toolset
+### ⚡ Consistent flashing and debugging strategy
 
-| Tool                            | Purpose                                                                                                            |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| **PID Auto-Tuning**             | Analyze response curves (overshoot / oscillation / steady-state error) and automatically recommend Kp/Ki/Kd        |
-| **I2C Bus Scan**                | Scan all device addresses and automatically identify 100+ common chip models                                       |
-| **Pin Conflict Detection**      | Staticaly analyze code to detect duplicate pin configuration, accidental SWD occupation, and similar issues        |
-| **PWM Frequency Scan**          | Automatically calculate PSC/ARR and generate frequency scan tables for motors/buzzers                              |
-| **Servo Calibration**           | Generate angle sweep code to precisely map pulse width to angle                                                    |
-| **Signal Acquisition Analysis** | Analyze ADC/sensor data noise, signal-to-noise ratio, and frequency characteristics                                |
-| **Peripheral Smoke Test**       | One-click generation of minimal test code for GPIO/UART/I2C/SPI/ADC                                                |
-| **Flash/RAM Analysis**          | Display firmware resource usage and warn about Flash overflow                                                      |
-| **Power Estimation**            | Estimate MCU current draw and power consumption based on enabled peripherals                                       |
-| **Font Bitmap Generation**      | Convert arbitrary Chinese/English text into OLED dot-matrix C arrays (rendered with system fonts, not handwritten) |
+Gary uses a clear and consistent hardware strategy:
+
+* **SWD by default**: best for stable flashing, register access, fault analysis, and debug loops
+* **UART ISP optional**: can be used when no debugger is available
+* **Serial monitoring stays separate**: whether you flash over SWD or UART ISP, UART is still used to observe real runtime behavior
+
+That means:
+
+* **SWD** handles “flashing + debugging”
+* **UART** handles “logs + runtime verification”
+
+This is more stable than mixing flashing and runtime feedback together, and better matches real embedded workflows.
+
+### 🧰 Built-in tools
+
+| Tool                         | Purpose                                                                           |
+| ---------------------------- | --------------------------------------------------------------------------------- |
+| **PID Auto Tuning**          | Analyzes overshoot, oscillation, and steady-state error, then recommends Kp/Ki/Kd |
+| **I2C Bus Scan**             | Scans device addresses and helps identify common chips                            |
+| **Pin Conflict Detection**   | Detects GPIO mux conflicts, SWD pin misuse, and similar issues                    |
+| **PWM Parameter Calculator** | Computes PSC/ARR automatically and quickly validates target frequencies           |
+| **Servo Calibration**        | Generates angle sweep logic and maps pulse width to angle                         |
+| **Signal Capture Analysis**  | Analyzes ADC/sensor waveform fluctuation, noise, and frequency characteristics    |
+| **Peripheral Smoke Tests**   | One-click minimal test code for GPIO/UART/I2C/SPI/ADC                             |
+| **Flash/RAM Analysis**       | Shows memory usage and warns about capacity issues                                |
+| **Power Estimation**         | Estimates power consumption from enabled peripherals                              |
+| **Font Generator**           | Converts Chinese/English text into OLED bitmap arrays                             |
 
 ### 🔌 Bring Your Own Key
 
-Gary is not tied to any AI provider. Your API key, your choice:
+Gary is not tied to a single AI provider. You can switch backends freely:
 
 | Provider        | Model             | Notes                        |
 | --------------- | ----------------- | ---------------------------- |
-| DeepSeek        | deepseek-chat     | Best value for money         |
+| DeepSeek        | deepseek-chat     | Cost-effective               |
 | Kimi / Moonshot | kimi-k2.5         | Strong Chinese capability    |
-| OpenAI          | gpt-4o            | Strong overall capability    |
-| Google Gemini   | gemini-2.0-flash  | Large free quota             |
+| OpenAI          | gpt-4o            | Strong overall performance   |
+| Google Gemini   | gemini-2.0-flash  | Fast response                |
 | Tongyi Qianwen  | qwen-plus         | Alibaba Cloud                |
-| Zhipu GLM       | glm-4-flash       | Free                         |
+| Zhipu GLM       | glm-4-flash       | Easy to integrate            |
 | Ollama          | qwen2.5-coder:14b | Local offline, fully private |
 
 ### 🧩 Skill System (Skills)
 
-Extend Gary’s capabilities through **pluggable skill packages**:
+Gary supports pluggable skill packs to extend its capabilities.
 
 ```bash
-/skill install pid_tuner.py              # Install from a .py file
-/skill install ~/Downloads/skill.zip     # Install from a compressed package
-/skill install https://github.com/xxx    # Install from a Git repository
-/skill list                               # View all skills
-/skill create my_tool "My Tool"          # Create a new skill template
-/skill export my_tool                     # Package and share it with others
+/skill install pid_tuner.py
+/skill install ~/Downloads/skill.zip
+/skill install https://github.com/xxx/skill.git
+/skill list
+/skill create my_tool "My tool"
+/skill export my_tool
 ```
 
-Each Skill contains tool functions + AI schema + prompt files, and **takes effect immediately after installation** with no restart required.
+Each Skill can include:
+
+* Python tool functions
+* OpenAI Function Calling schemas
+* Prompt instructions
+* Dependency files
+
+Once installed, skills can be hot-loaded without restarting.
 
 ---
 
 ## 🚀 Quick Start
 
-### One-Click Installation
+### One-line install
 
 **Linux / macOS / WSL:**
 
@@ -141,21 +178,22 @@ Each Skill contains tool functions + AI schema + prompt files, and **takes effec
 curl -fsSL https://www.garycli.com/install.sh | bash
 ```
 
-**Windows (PowerShell as Administrator):**
+**Windows (PowerShell):**
 
 ```powershell
 irm https://www.garycli.com/install.ps1 | iex
 ```
 
-The installation script will automatically complete:
+The install script will attempt to complete:
 
-* Python environment detection
-* arm-none-eabi-gcc cross-compiler installation
-* STM32 HAL library download
-* Python dependency installation (openai, rich, pyserial, pyocd, etc.)
-* Serial flashing tool installation (stm32loader)
+* Python environment check
+* arm-none-eabi-gcc installation or detection
+* HAL / CMSIS resource setup
+* Python dependency installation
+* Serial and debug tool installation
+* CLI launcher command setup
 
-### Manual Installation
+### Manual installation
 
 ```bash
 # 1. Clone the repository
@@ -165,36 +203,44 @@ cd garycli
 # 2. Install Python dependencies
 pip install -r requirements.txt
 
-# 3. Install the cross-compiler
-# Ubuntu/Debian:
+# 3. Install the cross compiler
+# Ubuntu / Debian:
 sudo apt install gcc-arm-none-eabi
+
 # macOS:
 brew install --cask gcc-arm-embedded
-# Windows: Download and install from the ARM official website
 
-# 4. Install the serial flashing tool (optional, recommended)
+# Windows:
+# Install gcc-arm-none-eabi from ARM official sources or a suitable distribution
+
+# 4. Optional: install UART ISP flashing tool
 pip install stm32loader
 
-# 5. Install debugger drivers (optional)
+# 5. Optional: install SWD debugging tool
 pip install pyocd
 
-# 6. Download the HAL library
+# 6. Download HAL resources
 python3 setup.py --hal
 
 # 7. Run environment diagnostics
 python3 stm32_agent.py --doctor
 ```
 
-### Initial Configuration
+### First-time configuration
 
 ```bash
-# Configure the AI backend (interactive wizard)
 gary config
 ```
 
-Follow the prompts to choose a provider and enter your API key. DeepSeek (cheap and effective) or Ollama (fully local) is recommended.
+Follow the prompts to configure:
 
-### Environment Diagnostics
+* API Key
+* Base URL
+* Model
+* Default chip model
+* Default serial parameters (optional)
+
+### Environment diagnostics
 
 ```bash
 gary doctor
@@ -202,221 +248,220 @@ gary doctor
 
 Example output:
 
-```
+```text
 ■ AI Interface
   ✓ API Key   sk-abc...xyz
   ✓ Base URL  https://api.deepseek.com/v1
   ✓ Model     deepseek-chat
-  ✓ API Connectivity  Test passed
+  ✓ API connectivity  OK
 
 ■ Compilation Toolchain
-  ✓ arm-none-eabi-gcc  arm-none-eabi-gcc (15.1.0) 15.1.0
-  ✓ HAL Libraries      STM32F0xx, STM32F1xx, STM32F3xx, STM32F4xx
+  ✓ arm-none-eabi-gcc  arm-none-eabi-gcc (15.1.0)
+  ✓ HAL resources      STM32F0xx, STM32F1xx, STM32F3xx, STM32F4xx
   ✓ CMSIS Core
 
 ■ Python Dependencies
   ✓ openai
   ✓ rich
   ✓ prompt_toolkit
-  ✓ pyserial  (optional)
-  ✓ pyocd  (optional)
-  ✓ stm32loader  (optional)
+  ✓ pyserial      (optional)
+  ✓ pyocd         (optional)
+  ✓ stm32loader   (optional)
 
 ■ Hardware Probes
-  ✓ STM32 STLink V2  (066BFF...)
-  ✓ Serial Port /dev/ttyUSB0
+  ✓ ST-Link V2
+  ✓ Serial port /dev/ttyUSB0
 
-  ✅  All core configuration is normal. Gary is ready!
+✅ All core components are ready. Gary is good to go.
 ```
 
 ---
 
-## 📖 User Guide
+## 📖 Usage Guide
 
-### Mode 1: Single Task (`gary do`)
+### Mode 1: One-shot task (`gary do`)
 
-Run one command and exit without launching the interactive interface:
-
-```bash
-# Generate + compile (no hardware)
-gary do "Write a WS2812 LED strip driver to control 8 LEDs with a rainbow animation"
-
-# Generate + compile + flash (hardware connected)
-gary do "PA0 LED blinking, 500ms interval" --connect
-
-# Specify the chip model
-gary do "Read ADC voltage and print over serial" --chip STM32F407VET6 --connect
-```
-
-### Mode 2: Interactive Conversation (`gary`)
-
-Launch the immersive TUI for continuous conversational and iterative development:
+Best for quickly validating a single requirement:
 
 ```bash
-gary                        # Start
-gary --connect              # Start and automatically connect hardware
-gary --chip STM32F407VET6   # Specify chip model
+# Generate + compile only (no hardware connection)
+gary do "Write a WS2812 driver for 8 LEDs with a rainbow animation"
+
+# Generate + compile + connect to hardware
+gary do "Blink an LED on PA0 with a 500ms interval" --connect
+
+# Specify chip model
+gary do "Read ADC voltage and print it over UART" --chip STM32F407VET6 --connect
 ```
 
-After entering:
+### Mode 2: Interactive conversation (`gary`)
 
+Best for iterative, multi-turn development:
+
+```bash
+gary
+gary --connect
+gary --chip STM32F407VET6
+gary --connect --chip STM32F103C8T6
 ```
-Gary > Help me make an OLED clock, connect SSD1306 to I2C1, and display hours, minutes, and seconds
 
-  🔧 stm32_reset_debug_attempts → Counter reset
+Example:
+
+```text
+Gary > Help me build an OLED clock on I2C1 with SSD1306, showing HH:MM:SS
+
+  🔧 stm32_reset_debug_attempts → counter reset
   🔧 stm32_hardware_status → chip: STM32F103C8T6, hw_connected: true
-  🔧 stm32_generate_font → Generated bitmap for "0123456789:"
-  🔧 stm32_auto_flash_cycle → Compilation successful, 8.2KB, flashing successful...
+  🔧 stm32_generate_font → generated bitmap for "0123456789:"
+  🔧 stm32_auto_flash_cycle → compile success 8.2KB, flash success
   Serial output: Gary:BOOT → OLED Init OK → 12:34:56
 
-✓ Compilation and flashing successful, 8.2KB. OLED is now displaying the time.
-
-Gary > Add a button to adjust the time. Connect the button to PA1. Short press switches hours/minutes/seconds, long press adds 1.
-
-  🔧 str_replace_edit → Replaced button-related code
-  🔧 stm32_auto_flash_cycle → Compilation successful, 9.1KB, flashing successful...
-
-✓ Button-based time adjustment has been added. Short press switches the field, long press adds 1.
+✓ OLED is now displaying the time correctly
 ```
 
-### Mode 3: Incremental Modifications
+### Mode 3: Incremental modifications
 
-Gary remembers your previous code. You can keep iterating continuously:
+Gary tries to continue from the current project instead of rewriting everything from scratch each time:
 
-```
-Gary > The LED blinks too fast, change it to 1 second
-Gary > Change it to a common-anode seven-segment display
-Gary > Add a buzzer that sounds during alarms
+```text
+Gary > The LED is blinking too fast, change it to 1 second
+Gary > Change it to common-anode seven-segment
+Gary > Add a buzzer that sounds on alarm
 Gary > Change the I2C address from 0x3C to 0x3D
 ```
 
-Gary only modifies the parts you request and does not rewrite the whole program.
+This works well for continuous iteration on the same project.
 
 ---
 
 ## 📋 Command Reference
 
-### Terminal Commands
+### Terminal commands
 
-| Command                      | Description                                       |
-| ---------------------------- | ------------------------------------------------- |
-| `gary`                       | Launch the interactive conversation interface     |
-| `gary do "task description"` | Single-task mode                                  |
-| `gary do "task" --connect`   | Single-task mode + automatically connect hardware |
-| `gary --chip STM32F407VET6`  | Specify the chip model                            |
-| `gary --connect`             | Start and connect hardware                        |
-| `gary config`                | Configure AI backend (API key / model)            |
-| `gary doctor`                | Environment diagnostics (check all configuration) |
+| Command                      | Description                           |
+| ---------------------------- | ------------------------------------- |
+| `gary`                       | Launch interactive conversation mode  |
+| `gary do "task description"` | One-shot task mode                    |
+| `gary do "task" --connect`   | One-shot task + auto-connect hardware |
+| `gary --chip STM32F407VET6`  | Specify chip model                    |
+| `gary --connect`             | Launch and connect hardware           |
+| `gary config`                | Configure AI backend                  |
+| `gary doctor`                | Run environment diagnostics           |
 
-### Interactive Commands (entered at the `Gary >` prompt)
+### Interactive commands (inside `Gary >`)
 
-| Command                     | Description                                                     |
-| --------------------------- | --------------------------------------------------------------- |
-| `/connect [chip]`           | Connect SWD debugger (for example `/connect STM32F103C8T6`)     |
-| `/disconnect`               | Disconnect hardware                                             |
-| `/serial [port] [baudrate]` | Connect serial port (for example `/serial /dev/ttyUSB0 115200`) |
-| `/serial list`              | List available serial ports                                     |
-| `/chip [model]`             | View/switch chip model                                          |
-| `/flash [uart\|swd\|auto]`  | Switch flashing mode                                            |
-| `/flash status`             | View flashing tool status                                       |
-| `/probes`                   | List all debug probes                                           |
-| `/status`                   | View full hardware status                                       |
-| `/config`                   | Configure AI interface                                          |
-| `/projects`                 | List historical projects                                        |
-| `/skill list`               | List installed skills                                           |
-| `/skill install <source>`   | Install a skill package                                         |
-| `/skill create <name>`      | Create a skill template                                         |
-| `/clear`                    | Clear conversation history                                      |
-| `/exit`                     | Exit                                                            |
+| Command                     | Description                                     |
+| --------------------------- | ----------------------------------------------- |
+| `/connect [chip]`           | Connect debugger or initialize hardware context |
+| `/disconnect`               | Disconnect hardware                             |
+| `/serial [port] [baudrate]` | Connect serial port                             |
+| `/serial list`              | List available serial ports                     |
+| `/chip [model]`             | Show or switch chip model                       |
+| `/flash [swd\|uart\|auto]`  | Set flashing method                             |
+| `/flash status`             | Show flashing tool status                       |
+| `/probes`                   | List debug probes                               |
+| `/status`                   | Show full hardware status                       |
+| `/config`                   | Reconfigure AI backend                          |
+| `/projects`                 | Show project history                            |
+| `/skill list`               | List installed skills                           |
+| `/skill install <source>`   | Install a skill pack                            |
+| `/skill create <name>`      | Create a skill template                         |
+| `/clear`                    | Clear conversation history                      |
+| `/exit`                     | Exit                                            |
 
 ---
 
-## 🔧 Hardware Wiring
+## 🔌 Hardware Connection Recommendations
 
-### Setup: Serial + SWD
+### Recommended setup: SWD + serial logging
 
-Add one more debugger (ST-Link V2, ¥10) to read registers and analyze HardFaults:
+This is the most stable combination:
 
+* **SWD**: flashing, register inspection, fault debugging
+* **UART**: serial monitoring and startup verification
+
+```text
+ST-Link / J-Link      STM32
+  SWDIO   ─────────── PA13
+  SWCLK   ─────────── PA14
+  GND     ─────────── GND
+  3.3V    ─────────── 3.3V
+
+USB-TTL               STM32
+  TX      ──────────→ PA10
+  RX      ←────────── PA9
+  GND     ─────────── GND
 ```
-ST-Link           STM32
-  SWDIO ─────────── PA13
-  SWCLK ─────────── PA14
-  GND ──────────── GND
-  3.3V ─────────── 3.3V
 
-USB-TTL           STM32 (serial monitoring)
-  TX  ──────────→ PA10
-  RX  ←────────── PA9
-  GND ──────────── GND
-```
+### Pure serial setup (no debugger)
+
+If you do not have an ST-Link, you can also use only a USB-TTL adapter and flash over UART ISP, but capability will be limited:
+
+* Flashing is possible
+* Serial output is visible
+* **Register reads and fault analysis are not as convenient as with SWD**
+
+So SWD is still strongly recommended when available.
 
 ---
 
 ## 🧩 Skill System (Skills)
 
-Gary extends functionality through pluggable **skill packages**. Each Skill is a standard directory:
+Gary supports capability extensions through skill packs. A standard Skill directory looks like this:
 
-```
+```text
 ~/.gary/skills/
 ├── pid_tuner/
-│   ├── skill.json        ← Metadata (name, version, author, dependencies)
-│   ├── tools.py          ← Tool functions (Python)
-│   ├── schemas.json      ← AI invocation format (OpenAI Function Calling)
-│   ├── prompt.md         ← Teach the AI when to use these tools
-│   └── requirements.txt  ← Python dependencies
+│   ├── skill.json
+│   ├── tools.py
+│   ├── schemas.json
+│   ├── prompt.md
+│   └── requirements.txt
 ├── uart_flash/
-└── _disabled/            ← Disabled skills
+└── _disabled/
 ```
 
-### Install Skills
+### Install a skill
 
 ```bash
-# From a .py file (automatically wrapped into a skill)
 /skill install stm32_extra_tools.py
-
-# From a zip package
 /skill install ~/Downloads/gary_skill_pid_tuner.zip
-
-# From a Git repository
 /skill install https://github.com/someone/gary-skill-motor.git
-
-# From a local directory
 /skill install ~/my_skills/sensor_kit/
 ```
 
-### Manage Skills
+### Manage skills
 
 ```bash
-/skill list                  # List all (including disabled)
-/skill info pid_tuner        # View details
-/skill disable pid_tuner     # Temporarily disable
-/skill enable pid_tuner      # Re-enable
-/skill uninstall pid_tuner   # Uninstall
-/skill reload                # Hot reload all
+/skill list
+/skill info pid_tuner
+/skill disable pid_tuner
+/skill enable pid_tuner
+/skill uninstall pid_tuner
+/skill reload
 ```
 
-### Develop Your Own Skill
+### Build your own Skill
 
 ```bash
-# 1. Generate a template
-/skill create motor_driver "DC Motor PID Control Tool"
+# 1. Create a template
+/skill create motor_driver "DC motor PID control tool"
 
 # 2. Edit the generated files
-#    ~/.gary/skills/motor_driver/tools.py     ← Write tool functions
-#    ~/.gary/skills/motor_driver/schemas.json ← Write AI schema
-#    ~/.gary/skills/motor_driver/prompt.md    ← Write usage guide
+# ~/.gary/skills/motor_driver/tools.py
+# ~/.gary/skills/motor_driver/schemas.json
+# ~/.gary/skills/motor_driver/prompt.md
 
 # 3. Hot reload
 /skill reload
 
-# 4. Package and share
+# 4. Export for sharing
 /skill export motor_driver
-# → gary_skill_motor_driver.zip
 ```
 
-### Skill Development Specification
+### Skill development spec
 
-**tools.py** (must export `TOOLS_MAP`):
+**tools.py**:
 
 ```python
 def motor_set_speed(rpm: int) -> dict:
@@ -428,7 +473,7 @@ TOOLS_MAP = {
 }
 ```
 
-**schemas.json** (OpenAI Function Calling format):
+**schemas.json**:
 
 ```json
 [
@@ -436,11 +481,14 @@ TOOLS_MAP = {
     "type": "function",
     "function": {
       "name": "motor_set_speed",
-      "description": "Set target speed for a DC motor",
+      "description": "Set the target speed of a DC motor",
       "parameters": {
         "type": "object",
         "properties": {
-          "rpm": {"type": "integer", "description": "Target speed in RPM"}
+          "rpm": {
+            "type": "integer",
+            "description": "Target speed in RPM"
+          }
         },
         "required": ["rpm"]
       }
@@ -449,135 +497,127 @@ TOOLS_MAP = {
 ]
 ```
 
-**prompt.md** (teach the AI how to use it):
+**prompt.md**:
 
 ```markdown
 ## Motor Control
-When the user wants to control a motor, call motor_set_speed to set the target speed.
+When the user wants to control a motor, call motor_set_speed to set the target RPM.
 ```
 
 ---
 
 ## 🏗️ Architecture
 
-```
+```text
 ┌──────────────────────────────────────────────────────┐
-│                    Gary CLI (TUI)                     │
-│              rich + prompt_toolkit                    │
+│                    Gary CLI (TUI)                    │
+│              rich + prompt_toolkit                   │
 ├──────────────────────────────────────────────────────┤
-│                  AI Conversation Engine               │
-│         OpenAI API (streaming + Function Calling)     │
-│    DeepSeek │ Kimi │ GPT │ Gemini │ Ollama │ ...     │
+│                   AI Conversation Engine             │
+│         Streaming dialogue + Function Calling        │
+│   DeepSeek │ Kimi │ GPT │ Gemini │ Ollama │ ...     │
 ├──────────────┬──────────────┬────────────────────────┤
-│ Code Generation │ Compiler   │    Hardware Backend    │
-│   STM32 HAL     │ GCC Cross  │  ┌─────────────────┐  │
-│   C Templates   │ Compiler   │  │ UART ISP (preferred) │
-│                 │            │  │  stm32loader     │  │
-│                 │            │  ├─────────────────┤  │
-│                 │            │  │ SWD (fallback)   │  │
-│                 │            │  │  pyocd           │  │
-│                 │            │  ├─────────────────┤  │
-│                 │            │  │ Serial Monitor   │  │
-│                 │            │  │  pyserial        │  │
-│                 │            │  └─────────────────┘  │
+│  Code Gen     │   Compiler    │   Hardware Backend    │
+│  HAL templates │  GCC Cross   │  ┌─────────────────┐  │
+│  Project reuse │  Compiler    │  │ SWD (default)   │  │
+│  Template base │              │  │ pyocd           │  │
+│                │              │  ├─────────────────┤  │
+│                │              │  │ UART ISP opt.   │  │
+│                │              │  │ stm32loader     │  │
+│                │              │  ├─────────────────┤  │
+│                │              │  │ Serial monitor  │  │
+│                │              │  │ pyserial        │  │
+│                │              │  └─────────────────┘  │
 ├──────────────┴──────────────┴────────────────────────┤
-│                  Skill System (Skills)                │
-│ PID Tuning │ I2C Scan │ PWM Scan │ Font Gen │ Custom... │
+│                   Skill System (Skills)              │
+│   PID tuning │ I2C scan │ PWM tools │ Font gen │ ... │
 └──────────────────────────────────────────────────────┘
-         ↕ USB                    ↕ USB
-┌──────────────┐          ┌──────────────────┐
-│  USB-TTL     │          │  ST-Link/J-Link  │
-│  (CH340)     │          │  (optional)      │
-└──────┬───────┘          └──────┬───────────┘
-       │ UART                    │ SWD
-┌──────┴─────────────────────────┴───────────┐
-│              STM32 Target Board            │
-│   PA9/PA10 (UART)    PA13/PA14 (SWD)       │
-└────────────────────────────────────────────┘
 ```
 
 ---
 
 ## <a name="supported-chips"></a> 📟 Supported Chips
 
-| Series      | Typical Models                          | Flash       | RAM       |
-| ----------- | --------------------------------------- | ----------- | --------- |
-| **STM32F0** | F030F4, F030C8, F072CB                  | 16-128 KB   | 4-16 KB   |
-| **STM32F1** | F103C8T6 (BluePill), F103RCT6, F103ZET6 | 64-512 KB   | 20-64 KB  |
-| **STM32F3** | F303CCT6, F303RCT6                      | 256 KB      | 40 KB     |
-| **STM32F4** | F401CCU6, F407VET6, F411CEU6            | 256-1024 KB | 64-128 KB |
+Gary currently focuses on the following STM32 series:
 
-> Other models: Gary will automatically download the corresponding CMSIS Pack (upon first connection). In theory, all Cortex-M series are supported.
+| Series      | Typical models               | Flash       | RAM       |
+| ----------- | ---------------------------- | ----------- | --------- |
+| **STM32F0** | F030F4, F030C8, F072CB       | 16–128 KB   | 4–16 KB   |
+| **STM32F1** | F103C8T6, F103RCT6, F103ZET6 | 64–512 KB   | 20–64 KB  |
+| **STM32F3** | F303CCT6, F303RCT6           | 256 KB      | 40 KB     |
+| **STM32F4** | F401CCU6, F407VET6, F411CEU6 | 256–1024 KB | 64–128 KB |
+
+> Other models may also work by adding HAL / CMSIS resources and templates, but this README only makes explicit commitments for the series listed above.
 
 ---
 
 ## 💡 Practical Examples
 
-### 🔰 Beginner: LED Blinking
+### 🔰 LED blink
 
-```
-Gary > Help me make an LED blink, PA0 pin, 500ms interval
-```
-
-### 🔢 Seven-Segment Display
-
-```
-Gary > 4-digit common-anode seven-segment display, PA0-PA7 for segment select, PB0-PB3 for digit select, display a counter
+```text
+Gary > Help me make an LED blink on PA0 with a 500ms interval
 ```
 
-### 📡 Sensor Reading
+### 🔢 Seven-segment display
 
-```
-Gary > Connect an AHT20 temperature and humidity sensor to I2C1 and print temperature and humidity over serial
-Gary > Add an SSD1306 OLED to display the temperature too
+```text
+Gary > A 4-digit common-anode seven-segment display, PA0-PA7 for segment select, PB0-PB3 for digit select, show a counter
 ```
 
-### 🎛️ PID Motor Speed Control
+### 📡 Sensor reading
 
+```text
+Gary > Connect an AHT20 temperature and humidity sensor to I2C1 and print temperature and humidity over UART
+Gary > Now add an SSD1306 OLED to display the temperature too
 ```
+
+### 🎛️ PID motor speed control
+
+```text
 Gary > DC motor PID speed control: TIM2 CH1 outputs PWM, TIM3 encoder reads feedback, target 500rpm
 ```
 
-Gary will automatically: generate PID code → flash → collect serial data → analyze response → tune parameters → reflash → loop until stable.
+### 🔍 I2C troubleshooting
 
-### 🔍 I2C Device Troubleshooting
-
-```
-Gary > I connected several I2C devices but I'm not sure of their addresses, help me scan them
+```text
+Gary > I connected several I2C devices but I’m not sure about the addresses, help me scan them
 ```
 
-### 🎵 Buzzer Music
+### 🎵 Buzzer music
 
-```
-Gary > Passive buzzer connected to PA1, help me play a section of "Twinkle Twinkle Little Star"
-```
-
-### 🖥️ OLED Chinese Display
-
-```
-Gary > Display the Chinese text "你好世界" on the OLED, font size 16x16
+```text
+Gary > A passive buzzer is connected to PA1. Help me play Twinkle Twinkle Little Star
 ```
 
-Gary automatically calls the font bitmap generation tool to render true dot-matrix glyphs using system fonts, not handwritten data.
+### 🖥️ Chinese text on OLED
+
+```text
+Gary > Display the Chinese text “你好世界” on the OLED with a 16x16 font
+```
 
 ---
 
 ## 📁 Project Structure
 
-```
-gary/
-├── stm32_agent.py          # Main program (TUI + AI conversation + tool framework)
-├── compiler.py             # GCC cross-compiler wrapper
-├── config.py               # Configuration file (API key, chip, paths)
-├── setup.py                # Installation script
-├── stm32_uart_flash.py     # UART ISP flashing module
-├── stm32_extra_tools.py    # Extended toolset (PID/I2C/PWM/signal analysis...)
+This layout is closer to the repository’s current structure:
+
+```text
+garycli/
+├── stm32_agent.py          # Main program: TUI + AI dialogue + tool orchestration
+├── compiler.py             # GCC cross-compilation wrapper
+├── config.py               # Config files and path management
+├── setup.py                # Installation and initialization script
+├── stm32_extra_tools.py    # Extra tool collection
 ├── gary_skills.py          # Skill system manager
 ├── requirements.txt        # Python dependencies
+├── install.sh              # Linux / macOS / WSL install script
+├── install.ps1             # Windows install script
 └── ~/.gary/                # User data directory
     ├── skills/             # Installed skills
     ├── projects/           # Historical project archives
-    └── skills_registry.json
+    ├── templates/          # Template library
+    └── member.md           # Knowledge / memory base
 ```
 
 ---
@@ -587,42 +627,38 @@ gary/
 ### Installation
 
 <details>
-<summary><b>Q: arm-none-eabi-gcc cannot be found after installation?</b></summary>
+<summary><b>Q: I installed arm-none-eabi-gcc, but it still cannot be found.</b></summary>
 
-Make sure it has been added to PATH:
+Confirm it is in your PATH:
 
 ```bash
 which arm-none-eabi-gcc
-# If there is no output, add it manually:
-export PATH=$PATH:/usr/lib/arm-none-eabi/bin
 ```
 
-Or run `gary doctor` to view diagnostic results.
+If nothing is returned, add it to PATH manually or run `gary doctor` for diagnosis.
 
 </details>
 
 <details>
-<summary><b>Q: HAL library download failed?</b></summary>
+<summary><b>Q: HAL resource download failed.</b></summary>
 
 ```bash
-# Download manually
 python3 setup.py --hal
-
-# Or specify series
+# Or specify families
 python3 setup.py --hal f1 f4
 ```
 
 </details>
 
 <details>
-<summary><b>Q: Serial port permission issue on Windows?</b></summary>
+<summary><b>Q: Serial port permissions or drivers are broken on Windows.</b></summary>
 
-Make sure the CH340/CP2102 driver is installed. Confirm in Device Manager that the COM port has been recognized.
+Make sure the CH340 / CP2102 driver is installed and that the corresponding COM port appears in Device Manager.
 
 </details>
 
 <details>
-<summary><b>Q: Cannot open serial port on Linux (Permission denied)?</b></summary>
+<summary><b>Q: On Linux, opening the serial port returns Permission denied.</b></summary>
 
 ```bash
 sudo usermod -aG dialout $USER
@@ -634,46 +670,46 @@ newgrp dialout
 ### Usage
 
 <details>
-<summary><b>Q: No response during serial flashing?</b></summary>
+<summary><b>Q: UART flashing does not respond.</b></summary>
 
-Checklist:
+Check the following:
 
-1. Is the BOOT0 jumper set to 1 (VCC side)?
-2. Did you press the reset button?
-3. Are TX/RX cross-connected? (TTL-TX → STM32-PA10)
-4. Is the serial baud rate set to 115200?
-
-</details>
-
-<details>
-<summary><b>Q: Compilation error `undefined reference to _sbrk`?</b></summary>
-
-The code uses `sprintf` / `printf` / `malloc`. Gary-generated code does not use these functions. If you added them manually, replace them with Gary’s `Debug_Print` / `Debug_PrintInt`.
+1. Whether BOOT0 is pulled high for download mode
+2. Whether the board has been reset
+3. Whether TX / RX are cross-connected
+4. Whether the port and baudrate are correct
 
 </details>
 
 <details>
-<summary><b>Q: How do I troubleshoot a HardFault?</b></summary>
+<summary><b>Q: Compilation fails with undefined reference to _sbrk.</b></summary>
 
-After Gary connects through SWD, it automatically reads the SCB_CFSR register for analysis. Common causes:
-
-* `PRECISERR`: Accessed a peripheral whose clock was not enabled
-* `UNDEFINSTR`: Stack overflow or invalid function pointer
-* `IACCVIOL`: Illegal Flash address
+This usually means the code pulls in symbols that depend on heap support, such as `printf`, `sprintf`, or `malloc`. For minimal bare-metal projects, it is better to avoid these directly.
 
 </details>
 
 <details>
-<summary><b>Q: Can I use a local Ollama model?</b></summary>
+<summary><b>Q: How do I debug a HardFault?</b></summary>
 
-Yes. Run `gary config`, choose Ollama, and it is recommended to use `qwen2.5-coder:14b` or a larger model. Smaller models (7B) have weaker function-calling capability.
+SWD is recommended. Gary can use register information to help classify the issue:
+
+* `PRECISERR`: often caused by accessing a peripheral before it is ready
+* `UNDEFINSTR`: may indicate stack corruption, bad branching, or invalid instructions
+* `IACCVIOL`: may indicate access to an illegal code region
 
 </details>
 
 <details>
-<summary><b>Q: Does it support Arduino / ESP32?</b></summary>
+<summary><b>Q: Can I use a local model through Ollama?</b></summary>
 
-Currently only STM32 is supported. ESP32/Arduino support is on the roadmap.
+Yes. Run `gary config` and select Ollama. Models with more stable function-calling behavior are recommended.
+
+</details>
+
+<details>
+<summary><b>Q: Does it support Arduino or ESP32?</b></summary>
+
+STM32 is the current primary target. Other platforms are planned for future expansion.
 
 </details>
 
@@ -681,47 +717,49 @@ Currently only STM32 is supported. ESP32/Arduino support is on the roadmap.
 
 ## 🗺️ Roadmap
 
-* [x] Full STM32F1/F4 series support
-* [x] UART serial flashing (no debugger required)
-* [x] PID auto-tuning
+* [x] Basic support for STM32F0 / F1 / F3 / F4
+* [x] UART ISP flashing support
+* [x] SWD debugging and register inspection
 * [x] Skill system (Skills)
-* [ ] Skill marketplace (browse/install community skills online)
-* [ ] Visualized waveforms (real-time plotting of serial data)
-* [ ] ESP32 support
+* [x] Early template library and experience base
+* [ ] Skill marketplace (browse / install community skills online)
+* [ ] Real-time serial data visualization
 * [ ] STM32CubeMX project import
 * [ ] VS Code extension
+* [ ] ESP32 support
 
 ---
 
 ## 🤝 Contributing
 
-Issues and PRs are welcome! Contributions in the following areas are especially appreciated:
+Issues and PRs are welcome. Contributions are especially appreciated in these areas:
 
-* **New Skill packages**: Package your tools as standard Skills and share them with the community
-* **Chip support**: Adapt register address tables for more STM32 series
-* **Documentation translation**: Help translate into English / other languages
-* **Bug fixes**: Any issue encountered during use
+* New Skill packs
+* More STM32 family support
+* Documentation improvements and translations
+* Fault reproduction and fixes
+* Example projects and demo videos
 
-### Develop a Skill and Contribute It
+### Contributing a Skill
 
 ```bash
-# 1. Create a skill template
-/skill create my_awesome_tool "My Tool"
+# 1. Create a template
+/skill create my_awesome_tool "My tool"
 
-# 2. Develop & test
-# Edit the files under ~/.gary/skills/my_awesome_tool/
+# 2. Develop and test
+# Edit ~/.gary/skills/my_awesome_tool/
 
 # 3. Export
 /skill export my_awesome_tool
 
-# 4. Submit a PR to the skills/ directory of this repository
+# 4. Submit a PR
 ```
 
 ---
 
 ## 📜 License
 
-This project is open source under the [Apache-2.0 License](https://opensource.org/licenses/Apache-2.0).
+This project is released under the [Apache-2.0 License](https://opensource.org/licenses/Apache-2.0).
 
 ---
 
@@ -729,6 +767,6 @@ This project is open source under the [Apache-2.0 License](https://opensource.or
 
 **🗡️ Just Gary Do It.**
 
-[Official Website](https://www.garycli.com) · [GitHub](https://github.com/GaryCLI/gary) · [Report Issues](https://github.com/GaryCLI/gary/issues)
+[Website](https://www.garycli.com) · [GitHub](https://github.com/PrettyMyGirlZyy4Embedded/garycli) · [Submit an Issue](https://github.com/PrettyMyGirlZyy4Embedded/garycli/issues)
 
 </div>
