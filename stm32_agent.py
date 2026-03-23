@@ -24,34 +24,15 @@ AI 前端  ：流式对话 + 函数调用工具链
 import sys, os, json, re, time, shutil, subprocess, threading, shlex
 from pathlib import Path
 from datetime import datetime
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Callable
 import requests
-from gary_skills import (
-    handle_skill_command,
-    _get_manager,
-)
+from gary_skills import _get_manager
 
 # ─────────────────────────────────────────────────────────────
 # 将本文件所在目录加入路径，使能 import compiler / config
 # ─────────────────────────────────────────────────────────────
 _HERE = Path(__file__).parent.resolve()
 sys.path.insert(0, str(_HERE))
-
-# TUI 依赖
-from rich.console import Console
-from rich.panel import Panel
-from rich.text import Text
-from rich.table import Table
-from rich.markdown import Markdown
-from rich.rule import Rule
-from rich import box
-
-from prompt_toolkit import PromptSession
-from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
-from prompt_toolkit.completion import Completer, Completion
-from prompt_toolkit.formatted_text import HTML
-from prompt_toolkit.styles import Style
-from prompt_toolkit.history import FileHistory, InMemoryHistory
 
 # Flash 项目内部模块
 import ai.client as _ai_client_module
@@ -72,8 +53,6 @@ from ai.client import (
 from ai.tools import TOOL_SCHEMAS, bind_tool_implementations, dispatch_tool_call
 from core.memory import (
     _append_member_memory,
-    _ensure_member_file,
-    _member_preview_markdown,
     _record_success_memory,
     gary_save_member_memory,
 )
@@ -97,7 +76,6 @@ from hardware.swd import (
 from hardware.uart_isp import flash_via_uart
 from integrations.telegram import (
     configure_telegram_integration,
-    get_telegram_target_candidates,
     handle_telegram_command,
     start_telegram_bot,
     stop_local_telegram_bridge,
@@ -108,6 +86,8 @@ from integrations.telegram import (
 from prompts.debug import get_debug_prompt
 from prompts.member import get_member_prompt_section
 from prompts.system import build_system_prompt
+from tui.commands import GaryCompleter, handle_slash_command
+from tui.ui import console as CONSOLE, print_banner, run_doctor, run_interactive, run_oneshot
 
 Compiler = _compiler_module.Compiler
 
@@ -253,7 +233,6 @@ def _ensure_cli_telegram_daemon() -> Optional[dict]:
 # ─────────────────────────────────────────────────────────────
 # UI 常量
 # ─────────────────────────────────────────────────────────────
-CONSOLE = Console()
 THEME = "cyan"
 MAX_CONTEXT_TOKENS = 128000
 MAX_TOOL_RESULT_LEN = 8000
@@ -2696,137 +2675,6 @@ bind_tool_implementations(
 # ─────────────────────────────────────────────────────────────
 # STM32 系统提示词
 # ─────────────────────────────────────────────────────────────
-# Gary doctor — 一键诊断所有配置
-# ─────────────────────────────────────────────────────────────
-def run_doctor():
-    """检查 AI 接口、工具链、HAL、硬件探针的完整状态"""
-    CONSOLE.print()
-    CONSOLE.rule(f"[bold cyan]  Gary Doctor  —  环境诊断[/]")
-    CONSOLE.print()
-    all_ok = True
-
-    # ── 1. AI 接口 ──────────────────────────────────────────
-    CONSOLE.print("[bold]■ AI 接口[/]")
-    cur_key, cur_url, cur_model = _read_ai_config()
-    ai_configured = bool(cur_key and not _api_key_is_placeholder(cur_key))
-    if ai_configured:
-        CONSOLE.print(f"  [green]✓[/] API Key   {_mask_key(cur_key)}")
-        CONSOLE.print(f"  [green]✓[/] Base URL  {cur_url}")
-        CONSOLE.print(f"  [green]✓[/] Model     {cur_model}")
-        # 尝试连接 AI 服务
-        try:
-            _sync_ai_runtime_settings(reload_ai_config())
-            c = get_ai_client(timeout=8.0, force_reload=True)
-            c.models.list()
-            CONSOLE.print("  [green]✓[/] API 连通性  [dim]测试通过[/]")
-        except Exception as e:
-            err_msg = str(e)[:80]
-            # 部分服务不支持 /models，收到 4xx 也算通（至少网络通了）
-            if any(code in err_msg for code in ("401", "403", "404", "400")):
-                CONSOLE.print(f"  [yellow]⚠[/] API 连通性  [dim]{err_msg}[/]")
-            else:
-                CONSOLE.print(f"  [red]✗[/] API 连通性  [dim]{err_msg}[/]")
-                CONSOLE.print("    [dim]→ 运行 Gary config 重新设置 API Key[/]")
-                all_ok = False
-    else:
-        CONSOLE.print("  [red]✗[/] API Key 未配置")
-        CONSOLE.print("    [dim]→ 运行 Gary config 配置 AI 接口[/]")
-        all_ok = False
-    CONSOLE.print()
-
-    # ── 2. 编译工具链 ────────────────────────────────────────
-    CONSOLE.print("[bold]■ 编译工具链[/]")
-    gcc = shutil.which("arm-none-eabi-gcc")
-    if gcc:
-        try:
-            r = subprocess.run([gcc, "--version"], capture_output=True, text=True)
-            ver = r.stdout.split("\n")[0][:70]
-        except Exception:
-            ver = gcc
-        CONSOLE.print(f"  [green]✓[/] arm-none-eabi-gcc  [dim]{ver}[/]")
-    else:
-        CONSOLE.print("  [red]✗[/] arm-none-eabi-gcc  未找到")
-        CONSOLE.print(
-            "    [dim]→ sudo apt install gcc-arm-none-eabi  或  python3 setup.py --auto[/]"
-        )
-        all_ok = False
-
-    # HAL
-    from config import WORKSPACE as _WS
-
-    hal_dir = _WS / "hal"
-    hal_found = []
-    for fam in ("f0", "f1", "f3", "f4"):
-        if (hal_dir / "Inc" / f"stm32{fam}xx_hal.h").exists():
-            hal_found.append(f"STM32{fam.upper()}xx")
-    cmsis_ok = (hal_dir / "CMSIS" / "Include" / "core_cm3.h").exists()
-    if hal_found and cmsis_ok:
-        CONSOLE.print(f"  [green]✓[/] HAL 库      {', '.join(hal_found)}")
-        CONSOLE.print(f"  [green]✓[/] CMSIS Core")
-    elif hal_found:
-        CONSOLE.print(f"  [yellow]⚠[/] HAL 库      {', '.join(hal_found)}（CMSIS Core 缺失）")
-        CONSOLE.print("    [dim]→ python3 setup.py --hal[/]")
-        all_ok = False
-    else:
-        CONSOLE.print("  [yellow]⚠[/] HAL 库      未下载（仅代码生成模式）")
-        CONSOLE.print("    [dim]→ python3 setup.py --hal  下载所需系列[/]")
-    CONSOLE.print()
-
-    # ── 3. Python 依赖 ───────────────────────────────────────
-    CONSOLE.print("[bold]■ Python 依赖[/]")
-    _required = [("openai", "openai"), ("rich", "rich"), ("prompt_toolkit", "prompt_toolkit")]
-    _optional = [
-        ("serial", "pyserial"),
-        ("pyocd", "pyocd"),
-        ("docx", "python-docx"),
-        ("PIL", "Pillow"),
-    ]
-    for imp, pkg in _required:
-        try:
-            __import__(imp)
-            CONSOLE.print(f"  [green]✓[/] {pkg}")
-        except ImportError:
-            CONSOLE.print(f"  [red]✗[/] {pkg}  [dim][必须] pip install {pkg}[/]")
-            all_ok = False
-    for imp, pkg in _optional:
-        try:
-            __import__(imp)
-            CONSOLE.print(f"  [green]✓[/] {pkg}  [dim](可选)[/]")
-        except Exception:
-            CONSOLE.print(f"  [dim]○[/] {pkg}  [dim](可选，pip install {pkg})[/]")
-    CONSOLE.print()
-
-    # ── 4. 硬件探针 ─────────────────────────────────────────
-    CONSOLE.print("[bold]■ 硬件探针[/]")
-    try:
-        import pyocd.probe.usb_probe as _up
-
-        probes = _up.USBProbe.get_all_connected_probes(unique_id=None, is_explicit=False)
-        if probes:
-            for p in probes:
-                CONSOLE.print(f"  [green]✓[/] {p.description}  [dim]({p.unique_id})[/]")
-        else:
-            CONSOLE.print("  [yellow]⚠[/] 未检测到探针  [dim](连接 ST-Link / CMSIS-DAP 后重试)[/]")
-    except Exception:
-        CONSOLE.print("  [dim]○[/] pyocd 未安装，无法扫描探针")
-
-    serial_ports = detect_serial_ports(verbose=False)
-    if serial_ports:
-        for p in serial_ports:
-            CONSOLE.print(f"  [green]✓[/] 串口 {p}")
-    else:
-        CONSOLE.print("  [dim]○[/] 未检测到串口设备")
-    CONSOLE.print()
-
-    # ── 总结 ─────────────────────────────────────────────────
-    if all_ok:
-        CONSOLE.print("[bold green]  ✅  所有核心配置正常，Gary 已就绪！[/]")
-    else:
-        CONSOLE.print("[bold yellow]  ⚠  存在问题，请按上方提示修复[/]")
-    CONSOLE.print()
-
-
-# ─────────────────────────────────────────────────────────────
 # Gary config — CLI 内 AI 接口配置向导
 # ─────────────────────────────────────────────────────────────
 def configure_ai_cli(agent: "STM32Agent | None" = None):
@@ -2927,187 +2775,6 @@ def configure_ai_cli(agent: "STM32Agent | None" = None):
 
 
 # ─────────────────────────────────────────────────────────────
-# Gary Prompt 补全
-# ─────────────────────────────────────────────────────────────
-class GaryCommandCompleter(Completer):
-    COMMANDS = (
-        "/help",
-        "/connect",
-        "/disconnect",
-        "/serial",
-        "/chip",
-        "/status",
-        "/probes",
-        "/projects",
-        "/member",
-        "/telegram",
-        "/skill",
-        "/config",
-        "/language",
-        "/clear",
-        "/exit",
-        "/quit",
-    )
-    LANGUAGE_OPTIONS = ("en", "zh")
-    MEMBER_SUBCOMMANDS = ("path", "reload")
-    SKILL_SUBCOMMANDS = (
-        "list",
-        "install",
-        "uninstall",
-        "enable",
-        "disable",
-        "info",
-        "create",
-        "export",
-        "reload",
-        "dir",
-    )
-    TELEGRAM_SUBCOMMANDS = (
-        "status",
-        "config",
-        "start",
-        "stop",
-        "restart",
-        "allow",
-        "remove",
-        "allow-all",
-        "whitelist",
-        "reset",
-    )
-    SERIAL_BAUD_RATES = ("9600", "19200", "38400", "57600", "115200", "230400", "460800", "921600")
-
-    def _complete(self, current: str, candidates: list[str] | tuple[str, ...]):
-        needle = (current or "").lower()
-        seen = set()
-        for candidate in candidates:
-            if candidate is None:
-                continue
-            value = str(candidate)
-            if value in seen:
-                continue
-            seen.add(value)
-            if needle and not value.lower().startswith(needle):
-                continue
-            yield Completion(value, start_position=-len(current))
-
-    def _chip_candidates(self) -> list[str]:
-        ctx = get_context()
-        chips = set(_compiler_module.CHIP_DB.keys())
-        for value in (DEFAULT_CHIP, ctx.chip):
-            if value:
-                chips.add(str(value).upper())
-        return sorted(chips)
-
-    def _serial_candidates(self) -> list[str]:
-        ports = []
-        try:
-            ports = detect_serial_ports(verbose=False)
-        except Exception:
-            ports = []
-        return ["list", *ports]
-
-    def _project_candidates(self) -> list[str]:
-        try:
-            result = stm32_list_projects()
-            return [p["name"] for p in result.get("projects", [])]
-        except Exception:
-            return []
-
-    def _skill_candidates(self) -> list[str]:
-        try:
-            mgr = _get_manager()
-            result = mgr.list_skills()
-            return sorted(
-                {
-                    s.get("name") or s.get("display_name")
-                    for s in result.get("skills", [])
-                    if s.get("name") or s.get("display_name")
-                }
-            )
-        except Exception:
-            return []
-
-    def _telegram_target_candidates(self) -> list[str]:
-        return get_telegram_target_candidates()
-
-    def get_completions(self, document, complete_event):
-        text = document.text_before_cursor
-        stripped = text.lstrip()
-        if not stripped:
-            yield from self._complete("", self.COMMANDS)
-            return
-        if not stripped.startswith("/"):
-            return
-
-        trailing_space = stripped.endswith(" ")
-        parts = stripped.split()
-        if not parts:
-            yield from self._complete("", self.COMMANDS)
-            return
-
-        if len(parts) == 1 and not trailing_space:
-            yield from self._complete(parts[0], self.COMMANDS)
-            return
-
-        head = parts[0].lower()
-        if trailing_space:
-            current = ""
-            args = parts[1:]
-        else:
-            current = parts[-1]
-            args = parts[1:-1]
-        arg_index = len(args)
-
-        if head in ("/connect", "/chip"):
-            if arg_index == 0:
-                yield from self._complete(current, self._chip_candidates())
-            return
-
-        if head == "/serial":
-            if arg_index == 0:
-                yield from self._complete(
-                    current, self._serial_candidates() + list(self.SERIAL_BAUD_RATES)
-                )
-            elif arg_index == 1 and args and args[0] != "list":
-                yield from self._complete(current, self.SERIAL_BAUD_RATES)
-            return
-
-        if head == "/language":
-            if arg_index == 0:
-                yield from self._complete(current, self.LANGUAGE_OPTIONS)
-            return
-
-        if head == "/projects":
-            if arg_index == 0:
-                yield from self._complete(current, self._project_candidates())
-            return
-
-        if head == "/member":
-            if arg_index == 0:
-                yield from self._complete(current, self.MEMBER_SUBCOMMANDS)
-            return
-
-        if head == "/skill":
-            if arg_index == 0:
-                yield from self._complete(current, self.SKILL_SUBCOMMANDS)
-                return
-            subcmd = (args[0] if args else "").lower()
-            if subcmd in ("uninstall", "remove", "rm", "enable", "disable", "info", "export"):
-                if arg_index == 1:
-                    yield from self._complete(current, self._skill_candidates())
-            return
-
-        if head == "/telegram":
-            if arg_index == 0:
-                yield from self._complete(current, self.TELEGRAM_SUBCOMMANDS)
-                return
-            subcmd = (args[0] if args else "").lower()
-            if subcmd in ("allow", "remove", "add", "delete", "del", "rm") and arg_index >= 1:
-                yield from self._complete(current, self._telegram_target_candidates())
-            return
-
-
-# ─────────────────────────────────────────────────────────────
 # STM32 Agent（TUI + 流式对话 + 工具框架）
 # ─────────────────────────────────────────────────────────────
 class STM32Agent:
@@ -3115,30 +2782,12 @@ class STM32Agent:
         self.interactive = interactive
         self.messages: List[Dict] = [{"role": "system", "content": self._compose_system_prompt()}]
         self.client = get_ai_client(timeout=180.0)
-        self.command_completer = GaryCommandCompleter()
-        self.session = (
-            PromptSession(
-                history=self._build_history(),
-                complete_while_typing=False,
-                enable_history_search=True,
-                completer=self.command_completer,
-                auto_suggest=AutoSuggestFromHistory(),
-                reserve_space_for_menu=8,
-            )
-            if interactive
-            else None
+        self.command_completer = GaryCompleter(
+            list_projects=stm32_list_projects,
+            default_chip=DEFAULT_CHIP,
         )
         os.environ.setdefault("no_proxy", "localhost,127.0.0.1")
         os.environ.setdefault("NO_PROXY", "localhost,127.0.0.1")
-
-    def _build_history(self):
-        if not self.interactive:
-            return InMemoryHistory()
-        try:
-            _ensure_gary_home()
-            return FileHistory(str(GARY_HOME / "prompt_history.txt"))
-        except Exception:
-            return InMemoryHistory()
 
     def refresh_ai_client(self):
         self.client = get_ai_client(timeout=180.0)
@@ -3587,391 +3236,77 @@ class STM32Agent:
 
     # ── 内置命令处理 ────────────────────────────────────────
     def handle_builtin(self, cmd: str) -> bool:
-        """处理 /xxx 命令，返回 True 表示已处理"""
-        parts = cmd.strip().split(None, 1)
-        head = parts[0].lower()
-        arg = parts[1] if len(parts) > 1 else ""
+        """Delegate slash command handling to the modular TUI command router."""
 
-        if head in ("/help", "?"):
-            self._show_help()
-            return True
-
-        if head == "/connect":
-            chip = arg.strip() or None
-            CONSOLE.print(f"\n[{THEME}]{_cli_text('连接硬件...', 'Connecting hardware...')}[/]")
-            r = stm32_connect(chip)
-            if r["success"]:
-                serial_state = (
-                    _cli_text("已连接", "connected")
-                    if r.get("serial_connected")
-                    else _cli_text("未连接", "disconnected")
-                )
-                ctx = get_context()
-                msg = _cli_text(
-                    f"硬件已连接: {r.get('chip', ctx.chip)}  串口: {serial_state}",
-                    f"Connected: {r.get('chip', ctx.chip)}  Serial: {serial_state}",
-                )
-            else:
-                msg = _cli_text(
-                    "连接失败，请检查探针 USB 连接和驱动",
-                    "Connection failed. Check the probe USB connection and driver.",
-                )
-            CONSOLE.print(f"[{'green' if r['success'] else 'red'}]{msg}[/]\n")
-            return True
-
-        if head == "/disconnect":
-            stm32_disconnect()
-            CONSOLE.print(f"[{THEME}]{_cli_text('已断开', 'Disconnected.')}[/]\n")
-            return True
-
-        if head == "/skill":
-            handle_skill_command(arg, agent=self)
-            return True
-
-        if head == "/telegram":
-            handle_telegram_command(arg, source="builtin")
-            return True
-
-        if head == "/serial":
-            # /serial              → 自动检测并连接
-            # /serial list         → 列出可用串口
-            # /serial /dev/ttyUSB0 → 指定端口
-            # /serial /dev/ttyUSB0 9600 → 指定端口+波特率
-            tokens = arg.split()
-            if tokens and tokens[0] == "list":
-                ports = detect_serial_ports()
-                if ports:
-                    CONSOLE.print(
-                        f"[green]  {_cli_text('可用串口:', 'Available serial ports:')}[/]"
-                    )
-                    for p in ports:
-                        try:
-                            import serial.tools.list_ports as lp
-
-                            infos = {i.device: i.description for i in lp.comports()}
-                            desc = infos.get(p, "")
-                        except Exception:
-                            desc = ""
-                        CONSOLE.print(f"    {p}  {desc}")
-                else:
-                    CONSOLE.print(
-                        f"[yellow]  {_cli_text('未检测到可用串口', 'No serial ports detected')}[/]"
-                    )
-                CONSOLE.print()
-                return True
-            port = tokens[0] if tokens and tokens[0].startswith("/dev/") else None
-            baud = None
-            for t in tokens:
-                if t.isdigit():
-                    baud = int(t)
-                    break
-            r = stm32_serial_connect(port, baud)
-            color = "green" if r["success"] else "red"
-            if r["success"]:
-                msg = _cli_text(
-                    f"串口已连接: {r.get('port')} @ {r.get('baud')}",
-                    f"Serial connected: {r.get('port')} @ {r.get('baud')}",
-                )
-            else:
-                candidates = detect_serial_ports(verbose=False)
-                available = ", ".join(candidates) if candidates else _cli_text("无", "none")
-                msg = _cli_text(
-                    f"串口打开失败，可用端口: {available}",
-                    f"Failed to open serial port. Available ports: {available}",
-                )
-            CONSOLE.print(f"[{color}]{msg}[/]\n")
-            return True
-
-        if head == "/chip":
-            if not arg:
-                ctx = get_context()
-                CONSOLE.print(
-                    f"[{THEME}]{_cli_text('当前芯片', 'Current chip')}: {ctx.chip}[/]\n"
-                )
-            else:
-                r = stm32_set_chip(arg)
-                CONSOLE.print(
-                    f"[{THEME}]{_cli_text('已切换', 'Switched to')}: {r['chip']} ({r['family']})[/]\n"
-                )
-            return True
-
-        if head == "/language":
-            target = _parse_cli_language(arg, default="en")
-            if target is None:
-                CONSOLE.print(
-                    f"[yellow]{_cli_text('用法: /language [en|zh]', 'Usage: /language [en|zh]')}[/]\n"
-                )
-                return True
-            result = self.set_cli_language(target)
-            if target == "en":
-                message = "CLI language switched to English."
-                if result["saved"]:
-                    message += " Saved to config.py."
-                else:
-                    message += " Running in the current session only."
-            else:
-                message = "CLI 语言已切换为中文。"
-                if result["saved"]:
-                    message += " 已保存到 config.py。"
-                else:
-                    message += " 仅当前会话生效。"
-            CONSOLE.print(f"[green]{message}[/]\n")
-            return True
-
-        if head == "/status":
-            s = stm32_hardware_status()
-            table = Table(box=box.SIMPLE, show_header=False)
-            table.add_column(style=f"bold {THEME}")
-            table.add_column(style="white")
-            for k, v in s.items():
-                value = "not found" if _is_cli_english() and str(v) == "未找到" else str(v)
-                table.add_row(k, value)
-            CONSOLE.print(table)
-            CONSOLE.print()
-            return True
-
-        if head == "/probes":
-            probes = stm32_list_probes()
-            if probes["probes"]:
-                for p in probes["probes"]:
-                    CONSOLE.print(f"  [{THEME}]{p['description']}[/] ({p['uid']})")
-            else:
-                CONSOLE.print(
-                    f"[yellow]{_cli_text('未检测到任何探针，请检查 USB 连接', 'No probes detected. Check the USB connection.')}[/]"
-                )
-            CONSOLE.print()
-            return True
-
-        if head == "/projects":
-            r = stm32_list_projects()
-            if r["projects"]:
-                table = Table(title=_cli_text("历史项目", "Project History"), box=box.SIMPLE)
-                table.add_column(_cli_text("项目名", "Project"), style=f"bold {THEME}")
-                table.add_column(_cli_text("芯片", "Chip"), style="cyan")
-                table.add_column(_cli_text("描述", "Description"), style="white")
-                for p in r["projects"]:
-                    table.add_row(p["name"], p["chip"], p["request"][:40])
-                CONSOLE.print(table)
-            else:
-                CONSOLE.print(f"[dim]{_cli_text('暂无历史项目', 'No project history yet')}[/]")
-            CONSOLE.print()
-            return True
-
-        if head == "/member":
-            subcmd = arg.strip().lower()
-            if subcmd == "path":
-                path = _ensure_member_file()
-                CONSOLE.print(
-                    f"[{THEME}]{_cli_text('member.md 路径', 'member.md path')}: {path}[/]\n"
-                )
-                return True
-            if subcmd == "reload":
-                self.refresh_system_prompt()
-                CONSOLE.print(
-                    f"[green]{_cli_text('member.md 已重新加载到当前会话', 'member.md reloaded into the current session')}[/]\n"
-                )
-                return True
-            if subcmd and subcmd not in {"path", "reload"}:
-                CONSOLE.print(
-                    f"[yellow]{_cli_text('用法: /member [path|reload]', 'Usage: /member [path|reload]')}[/]\n"
-                )
-                return True
-            self.refresh_system_prompt()
-            title = _cli_text("Gary 经验库", "Gary Memory")
-            CONSOLE.print(
-                Panel(
-                    Markdown(_member_preview_markdown(path_label=_cli_text("路径", "Path"))),
-                    title=f"[bold {THEME}]{title}[/]",
-                    border_style=THEME,
-                )
-            )
-            CONSOLE.print()
-            return True
-
-        if head == "/clear":
-            self.reset_conversation()
-            CONSOLE.clear()
-            self._print_header()
-            return True
-
-        if head == "/config":
-            configure_ai_cli(agent=self)
-            return True
-
-        if head in ("/exit", "/quit"):
-            CONSOLE.print(
-                f"\n[{THEME}]{_cli_text('正在退出，清理硬件和 Telegram...', 'Exiting, cleaning up hardware and Telegram...')}[/]"
-            )
-            shutdown = _shutdown_cli_runtime(stop_telegram=True)
-            tg = shutdown.get("telegram", {})
-            if tg.get("message"):
-                color = "green" if tg.get("success") else "yellow"
-                CONSOLE.print(f"[{color}]{tg['message']}[/]")
-            CONSOLE.print(_cli_text("再见！", "Goodbye!"))
-            sys.exit(0)
-
-        return False
-
-    # ── UI ──────────────────────────────────────────────────
-    def _print_header(self):
-        ctx = get_context()
-        chip_line = _cli_text(
-            f"芯片: [bold]{ctx.chip}[/]  |  模型: [bold]{AI_MODEL}[/]",
-            f"Chip: [bold]{ctx.chip}[/]  |  Model: [bold]{AI_MODEL}[/]",
+        return handle_slash_command(
+            self,
+            cmd,
+            theme=THEME,
+            cli_text=_cli_text,
+            actions=_command_actions(),
+            print_banner=_print_runtime_banner,
         )
-        hw_line = (
-            _cli_text(
-                f"硬件: [green]已连接[/]  串口: [{'green' if ctx.serial_connected else 'yellow'}]"
-                f"{'已连接' if ctx.serial_connected else '未连接'}[/]",
-                f"Hardware: [green]connected[/]  Serial: [{'green' if ctx.serial_connected else 'yellow'}]"
-                f"{'connected' if ctx.serial_connected else 'disconnected'}[/]",
-            )
-            if ctx.hw_connected
-            else _cli_text("硬件: [dim]未连接[/]", "Hardware: [dim]disconnected[/]")
+
+    def run(self) -> None:
+        """Run the interactive TUI loop."""
+
+        run_interactive(
+            self,
+            handle_command=lambda agent, command: agent.handle_builtin(command),
+            cli_text=_cli_text,
+            theme=THEME,
+            model=AI_MODEL,
+            status_snapshot=_status_snapshot,
+            ensure_cli_telegram_daemon=_ensure_cli_telegram_daemon,
+            shutdown_runtime=_shutdown_cli_runtime,
+            history_path=GARY_HOME / "prompt_history.txt",
+            ensure_gary_home=_ensure_gary_home,
+            completer=self.command_completer,
         )
-        art = (
-            "   ██████╗  █████╗ ██████╗ ██╗   ██╗\n"
-            "  ██╔════╝ ██╔══██╗██╔══██╗╚██╗ ██╔╝\n"
-            "  ██║  ███╗███████║██████╔╝ ╚████╔╝ \n"
-            "  ██║   ██║██╔══██║██╔══██╗  ╚██╔╝  \n"
-            "  ╚██████╔╝██║  ██║██║  ██║   ██║   \n"
-            "   ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝  "
-        )
-        panel = Panel(
-            f"[bold {THEME}]{art}[/]\n\n"
-            f"  {chip_line}\n  {hw_line}\n\n"
-            f"  [dim]{_cli_text('输入需求即可生成代码 · Tab 补全命令 · /help 查看命令 · /connect 连接硬件', 'Describe what you want to build · Tab completes commands · /help shows commands · /connect attaches hardware')}[/]",
-            title=f"[bold {THEME}]Gary Dev Agent[/]",
-            border_style=THEME,
-            padding=(0, 1),
-        )
-        CONSOLE.print(panel)
-        CONSOLE.print()
 
-    def _show_help(self):
-        table = Table(title=_cli_text("内置命令", "Built-in Commands"), box=box.SIMPLE)
-        table.add_column(_cli_text("命令", "Command"), style=f"bold {THEME}")
-        table.add_column(_cli_text("说明", "Description"), style="white")
-        cmds = [
-            (
-                "/connect [chip]",
-                _cli_text(
-                    "连接探针（如 /connect STM32F103C8T6）",
-                    "Connect the probe (for example: /connect STM32F103C8T6)",
-                ),
-            ),
-            (
-                "/serial [port] [baud]",
-                _cli_text(
-                    "连接串口（如 /serial /dev/ttyUSB0 115200）",
-                    "Connect serial (for example: /serial /dev/ttyUSB0 115200)",
-                ),
-            ),
-            ("/disconnect", _cli_text("断开探针和串口", "Disconnect probe and serial")),
-            ("/chip [model]", _cli_text("查看/切换芯片型号", "Show or change the chip model")),
-            (
-                "/language [en|zh]",
-                _cli_text(
-                    "切换 CLI 语言，默认一键切到英文",
-                    "Switch CLI language. `/language` switches to English immediately",
-                ),
-            ),
-            ("/probes", _cli_text("列出所有可用探针", "List all available probes")),
-            ("/status", _cli_text("查看硬件+工具链状态", "Show hardware and toolchain status")),
-            (
-                "/config",
-                _cli_text(
-                    "配置 AI 接口（API Key / Model / Base URL）",
-                    "Configure AI settings (API Key / Model / Base URL)",
-                ),
-            ),
-            ("/projects", _cli_text("列出历史项目", "List saved projects")),
-            (
-                "/member [path|reload]",
-                _cli_text(
-                    "查看经验库；`path` 显示路径；`reload` 重新载入 member.md",
-                    "View memory; `path` shows the file location; `reload` refreshes member.md",
-                ),
-            ),
-            (
-                "/telegram [subcommand]",
-                _cli_text(
-                    "Telegram 机器人管理: start/stop/status/allow/remove/reset",
-                    "Manage the Telegram bot: start/stop/status/allow/remove/reset",
-                ),
-            ),
-            ("/clear", _cli_text("清空对话历史", "Clear conversation history")),
-            ("/exit", _cli_text("退出并停止 Telegram", "Exit and stop Telegram")),
-            ("?", _cli_text("显示帮助", "Show help")),
-            (
-                "Tab",
-                _cli_text(
-                    "补全命令/子命令/芯片/串口/技能名，历史输入会自动预测",
-                    "Complete commands, subcommands, chips, serial ports, and skills; history is suggested automatically",
-                ),
-            ),
-            (
-                "/skill [subcommand]",
-                _cli_text(
-                    "技能管理: list/install/enable/disable/create/export",
-                    "Manage skills: list/install/enable/disable/create/export",
-                ),
-            ),
-        ]
-        for cmd, desc in cmds:
-            table.add_row(cmd, desc)
-        CONSOLE.print(table)
-        CONSOLE.print()
 
-    def _status_bar(self):
-        tokens = self._tokens()
-        ctx = get_context()
-        hw = (
-            f"[green]●[/] {ctx.chip}"
-            if ctx.hw_connected
-            else _cli_text("[dim]○ 未连接[/]", "[dim]○ Disconnected[/]")
-        )
-        CONSOLE.print(
-            f"[dim]{hw}  │  {AI_MODEL}  │  {_cli_text('上下文', 'context')}: ~{tokens} tokens[/]"
-        )
-        CONSOLE.rule(style="dim")
 
-    # ── 主循环 ──────────────────────────────────────────────
-    def run(self):
-        if self.session is None:
-            raise RuntimeError("当前实例未启用交互式 PromptSession")
-        telegram_startup = _ensure_cli_telegram_daemon()
-        CONSOLE.clear()
-        self._print_header()
-        if telegram_startup and telegram_startup.get("message"):
-            color = "green" if telegram_startup.get("success") else "yellow"
-            CONSOLE.print(f"[{color}]  Telegram: {telegram_startup.get('message', '')}[/]")
-            CONSOLE.print()
-        pt_style = Style.from_dict({"prompt": f"bold {THEME}"})
+def _status_snapshot() -> dict[str, Any]:
+    """Return the current UI status snapshot for banner/status rendering."""
 
-        while True:
-            try:
-                self._status_bar()
-                user_input = self.session.prompt(
-                    HTML(f'<style color="cyan"><b>Gary > </b></style>'),
-                    style=pt_style,
-                )
-                if not user_input.strip():
-                    continue
+    ctx = get_context()
+    return {
+        "chip": ctx.chip,
+        "hw_connected": ctx.hw_connected,
+        "serial_connected": ctx.serial_connected,
+    }
 
-                if user_input.startswith("/") or user_input.strip() == "?":
-                    self.handle_builtin(user_input.strip())
-                    continue
 
-                self.chat(user_input)
 
-            except KeyboardInterrupt:
-                CONSOLE.print(
-                    f"\n[dim]{_cli_text('Ctrl+C 中断。/exit 退出。', 'Interrupted by Ctrl+C. Use /exit to quit.')}[/]"
-                )
-            except EOFError:
-                _shutdown_cli_runtime(stop_telegram=True)
-                break
+def _print_runtime_banner() -> None:
+    """Render the current runtime banner using the modular TUI UI helpers."""
+
+    print_banner(
+        model=AI_MODEL,
+        cli_text=_cli_text,
+        theme=THEME,
+        **_status_snapshot(),
+    )
+
+
+
+def _command_actions() -> dict[str, Callable[..., Any]]:
+    """Build the slash-command action map for the TUI command router."""
+
+    return {
+        "connect": stm32_connect,
+        "disconnect": stm32_disconnect,
+        "serial_connect": stm32_serial_connect,
+        "serial_disconnect": stm32_serial_disconnect,
+        "set_chip": stm32_set_chip,
+        "flash": stm32_flash,
+        "hardware_status": stm32_hardware_status,
+        "list_probes": stm32_list_probes,
+        "list_projects": stm32_list_projects,
+        "configure_ai_cli": configure_ai_cli,
+        "shutdown_runtime": _shutdown_cli_runtime,
+        "parse_cli_language": _parse_cli_language,
+    }
 
 
 def _configure_telegram_runtime() -> None:
@@ -4019,7 +3354,7 @@ def main():
 
     # ── 诊断模式：Gary doctor ────────────────────────────────
     if "--doctor" in args:
-        run_doctor()
+        run_doctor(cli_text=_cli_text)
         sys.exit(0)
 
     # ── 配置模式：Gary config ────────────────────────────────
@@ -4134,9 +3469,8 @@ def main():
                 if ci_idx + 1 < len(args):
                     chip_arg = args[ci_idx + 1]
             stm32_connect(chip_arg)
-        agent = STM32Agent()
-        CONSOLE.print(f"\n[cyan]  ▶ Gary do: {task}[/]\n")
-        agent.chat(task)
+        agent = STM32Agent(interactive=False)
+        run_oneshot(agent, task)
         stm32_disconnect()
         sys.exit(0)
 
