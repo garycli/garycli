@@ -4,9 +4,6 @@ Tests for config.py — configuration loading and path management.
 
 import os
 import json
-import tempfile
-import pytest
-from unittest.mock import patch, MagicMock
 
 
 class TestConfigPaths:
@@ -49,23 +46,21 @@ class TestConfigFile:
         assert loaded["model"] == "deepseek-chat"
         assert loaded["chip"] == "STM32F103C8T6"
 
-    def test_api_key_not_logged(self, tmp_path):
+    def test_api_key_not_logged(self):
         """API key should never appear in plaintext log output."""
         config_data = {"api_key": "sk-super-secret-key-12345"}
         config_str = json.dumps(config_data)
 
-        # Simulate what a log sanitizer should do
         sanitized = config_str.replace(config_data["api_key"], "sk-***")
         assert "sk-super-secret-key-12345" not in sanitized
         assert "sk-***" in sanitized
 
     def test_missing_config_key_does_not_raise(self, tmp_path):
         """Loading a config missing optional keys should not crash."""
-        config_data = {"api_key": "sk-test"}  # missing base_url, model, chip
+        config_data = {"api_key": "sk-test"}
         config_file = tmp_path / "config.json"
         config_file.write_text(json.dumps(config_data))
 
         loaded = json.loads(config_file.read_text())
-        # Optional keys should fall back gracefully
         assert loaded.get("base_url") is None
         assert loaded.get("model") is None
