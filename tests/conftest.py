@@ -2,10 +2,8 @@
 Shared pytest fixtures for Gary CLI test suite.
 """
 
-import os
 import json
 import pytest
-import tempfile
 
 
 @pytest.fixture
@@ -65,7 +63,9 @@ TOOLS_MAP = {"test_tool": test_tool}
                 "description": "A test tool for unit testing",
                 "parameters": {
                     "type": "object",
-                    "properties": {"param": {"type": "string", "description": "Input param"}},
+                    "properties": {
+                        "param": {"type": "string", "description": "Input param"}
+                    },
                     "required": ["param"],
                 },
             },
