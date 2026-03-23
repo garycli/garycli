@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 讨论 / Discussion
+    url: https://github.com/PrettyMyGirlZyy4Embedded/garycli/discussions
+    about: 有问题想讨论，或者不确定是不是 Bug？来这里聊 / Not sure if it's a bug? Start a discussion here.
+  - name: 🔒 安全漏洞 / Security Vulnerability
+    url: https://github.com/PrettyMyGirlZyy4Embedded/garycli/security/advisories/new
+    about: 请私下报告安全问题 / Please report security issues privately
+  - name: 🌐 官网 / Website
+    url: https://www.garycli.com
+    about: 访问 Gary CLI 官网 / Visit the Gary CLI website
