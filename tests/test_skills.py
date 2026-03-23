@@ -4,7 +4,7 @@ Tests for gary_skills.py — Skill system manager.
 
 import json
 import pytest
-from unittest.mock import patch, MagicMock
+
 
 VALID_SKILL_JSON = {
     "name": "test_skill",
@@ -23,7 +23,9 @@ VALID_SCHEMA = [
             "description": "A test tool",
             "parameters": {
                 "type": "object",
-                "properties": {"param": {"type": "string", "description": "A test param"}},
+                "properties": {
+                    "param": {"type": "string", "description": "A test param"}
+                },
                 "required": ["param"],
             },
         },
@@ -80,7 +82,6 @@ class TestSkillSchema:
         for entry in VALID_SCHEMA:
             params = entry["function"].get("parameters", {})
             if params.get("properties"):
-                # If there are properties, required should be declared
                 assert "required" in params
 
 
@@ -94,7 +95,6 @@ class TestToolsMap:
 
     def test_tools_map_values_are_callable(self):
         """All values in TOOLS_MAP must be callable."""
-
         def test_tool(param: str) -> dict:
             return {"success": True}
 
@@ -104,7 +104,6 @@ class TestToolsMap:
 
     def test_tool_returns_dict(self):
         """Tool functions must return a dict."""
-
         def test_tool(param: str) -> dict:
             return {"success": True, "result": param}
 
