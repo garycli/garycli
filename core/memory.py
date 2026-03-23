@@ -159,7 +159,6 @@ def _append_member_memory(
     clean_source = _normalize_member_text(source, limit=40) or "manual"
     clean_importance = _normalize_member_text(importance, limit=16) or "high"
 
-    fingerprint = _normalize_member_text(clean_title + " " + " ".join(lines), limit=500).lower()
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
     entry_lines = [
         f"### [{timestamp}] {clean_title}",
@@ -174,14 +173,19 @@ def _append_member_memory(
     with _MEMBER_LOCK:
         path = _ensure_member_file()
         current = path.read_text(encoding="utf-8")
-        normalized_current = re.sub(r"\s+", " ", current).lower()
-        if fingerprint and fingerprint in normalized_current:
-            return {
-                "success": True,
-                "deduplicated": True,
-                "path": str(path),
-                "message": f"member.md 已存在相似经验: {clean_title}",
-            }
+        _, existing_entries = _split_member_content(current)
+        normalized_lines = [_normalize_member_text(line, limit=220).lower() for line in lines]
+        for existing in existing_entries:
+            normalized_entry = re.sub(r"\s+", " ", existing).lower()
+            if clean_title.lower() not in normalized_entry:
+                continue
+            if all(line in normalized_entry for line in normalized_lines):
+                return {
+                    "success": True,
+                    "deduplicated": True,
+                    "path": str(path),
+                    "message": f"member.md 已存在相似经验: {clean_title}",
+                }
         updated = _prune_member_content(current.rstrip() + "\n\n" + entry + "\n")
         path.write_text(updated, encoding="utf-8")
 
@@ -348,4 +352,3 @@ __all__ = [
     "_split_member_content",
     "gary_save_member_memory",
 ]
-

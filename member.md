@@ -26,9 +26,3 @@
 
 ### [Pinned] 裸机禁止 sprintf/printf/malloc
 - 裸机项目优先手写轻量调试输出，避免 `_sbrk/end` 链接错误。
-
-### [2026-03-23 18:46] 测试经验
-- importance: low
-- source: model
-- tags: test
-- 这是一条测试写入的经验条目
