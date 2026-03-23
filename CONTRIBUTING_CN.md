@@ -1,5 +1,5 @@
 # 🗡️ 贡献指南 · Contributing Guide
-
+[🇬🇧 English](CONTRIBUTING.md)
 > 感谢你愿意为 **Gary CLI** 做出贡献！  
 > 无论是修 Bug、扩展芯片支持、贡献 Skill 包，还是改善文档，你的每一次提交都会让更多嵌入式开发者受益。
 
