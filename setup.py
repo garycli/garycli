@@ -164,16 +164,16 @@ PIP = [sys.executable, "-m", "pip"]
 _IS_CHINA_NETWORK: Optional[bool] = None
 
 # GitHub 代理（国内加速）
-_GITHUB_PROXY       = "https://ghfast.top/"          # 支持 github.com 归档/Release
-_GITHUB_RAW_MIRROR  = "https://raw.gitmirror.com/"   # 替换 raw.githubusercontent.com
+_GITHUB_PROXY = "https://ghfast.top/"  # 支持 github.com 归档/Release
+_GITHUB_RAW_MIRROR = "https://raw.gitmirror.com/"  # 替换 raw.githubusercontent.com
 
 # pip 国内镜像
-_PIP_MIRROR         = "https://pypi.tuna.tsinghua.edu.cn/simple/"
+_PIP_MIRROR = "https://pypi.tuna.tsinghua.edu.cn/simple/"
 
 # 国内网络判定阈值（秒）：访问 GitHub 耗时超过此值视为国内
 _CN_LATENCY_THRESHOLD = 3.0
 # 检测超时（秒）
-_CN_DETECT_TIMEOUT    = 5
+_CN_DETECT_TIMEOUT = 5
 
 
 def _detect_china_network() -> bool:
@@ -192,7 +192,7 @@ def _detect_china_network() -> bool:
 
     print(f"\n  {_c('36', '->')} 检测网络环境（探测 GitHub 连通性）...", end=" ", flush=True)
 
-    github_ok   = False
+    github_ok = False
     github_slow = True
 
     try:
@@ -203,10 +203,10 @@ def _detect_china_network() -> bool:
         )
         with urllib.request.urlopen(req, timeout=_CN_DETECT_TIMEOUT):
             elapsed = time.time() - t0
-            github_ok   = True
+            github_ok = True
             github_slow = elapsed > _CN_LATENCY_THRESHOLD
     except Exception:
-        github_ok   = False
+        github_ok = False
         github_slow = True
 
     _IS_CHINA_NETWORK = (not github_ok) or github_slow
@@ -388,7 +388,7 @@ def _extract_zip(zip_path: Path, dest_dir: Path, sub_paths: List[str]) -> bool:
                 for member in zf.namelist():
                     if not member.startswith(src_prefix):
                         continue
-                    rel = member[len(src_prefix):]
+                    rel = member[len(src_prefix) :]
                     if not rel or rel.endswith("/"):
                         continue
                     fname = Path(rel).name
@@ -777,9 +777,15 @@ def _arm_gcc_mac(auto: bool):
             # 国内网络给 Homebrew 设置镜像环境变量
             brew_env = os.environ.copy()
             if _detect_china_network():
-                brew_env["HOMEBREW_BREW_GIT_REMOTE"]   = "https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/brew.git"
-                brew_env["HOMEBREW_CORE_GIT_REMOTE"]   = "https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-core.git"
-                brew_env["HOMEBREW_BOTTLE_DOMAIN"]      = "https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles"
+                brew_env["HOMEBREW_BREW_GIT_REMOTE"] = (
+                    "https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/brew.git"
+                )
+                brew_env["HOMEBREW_CORE_GIT_REMOTE"] = (
+                    "https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-core.git"
+                )
+                brew_env["HOMEBREW_BOTTLE_DOMAIN"] = (
+                    "https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles"
+                )
                 info("国内网络：Homebrew 已切换清华镜像源")
             _run(["brew", "install", "arm-none-eabi-gcc"], capture=False, env=brew_env)
     else:
@@ -1000,16 +1006,16 @@ HAL_REPOS = {
 }
 
 CMSIS_CORE_FILES = {
-    "core_cm0.h":       "https://raw.githubusercontent.com/ARM-software/CMSIS_5/5.9.0/CMSIS/Core/Include/core_cm0.h",
-    "core_cm0plus.h":   "https://raw.githubusercontent.com/ARM-software/CMSIS_5/5.9.0/CMSIS/Core/Include/core_cm0plus.h",
-    "core_cm3.h":       "https://raw.githubusercontent.com/ARM-software/CMSIS_5/5.9.0/CMSIS/Core/Include/core_cm3.h",
-    "core_cm4.h":       "https://raw.githubusercontent.com/ARM-software/CMSIS_5/5.9.0/CMSIS/Core/Include/core_cm4.h",
-    "cmsis_version.h":  "https://raw.githubusercontent.com/ARM-software/CMSIS_5/5.9.0/CMSIS/Core/Include/cmsis_version.h",
+    "core_cm0.h": "https://raw.githubusercontent.com/ARM-software/CMSIS_5/5.9.0/CMSIS/Core/Include/core_cm0.h",
+    "core_cm0plus.h": "https://raw.githubusercontent.com/ARM-software/CMSIS_5/5.9.0/CMSIS/Core/Include/core_cm0plus.h",
+    "core_cm3.h": "https://raw.githubusercontent.com/ARM-software/CMSIS_5/5.9.0/CMSIS/Core/Include/core_cm3.h",
+    "core_cm4.h": "https://raw.githubusercontent.com/ARM-software/CMSIS_5/5.9.0/CMSIS/Core/Include/core_cm4.h",
+    "cmsis_version.h": "https://raw.githubusercontent.com/ARM-software/CMSIS_5/5.9.0/CMSIS/Core/Include/cmsis_version.h",
     "cmsis_compiler.h": "https://raw.githubusercontent.com/ARM-software/CMSIS_5/5.9.0/CMSIS/Core/Include/cmsis_compiler.h",
-    "cmsis_gcc.h":      "https://raw.githubusercontent.com/ARM-software/CMSIS_5/5.9.0/CMSIS/Core/Include/cmsis_gcc.h",
-    "cmsis_armcc.h":    "https://raw.githubusercontent.com/ARM-software/CMSIS_5/5.9.0/CMSIS/Core/Include/cmsis_armcc.h",
+    "cmsis_gcc.h": "https://raw.githubusercontent.com/ARM-software/CMSIS_5/5.9.0/CMSIS/Core/Include/cmsis_gcc.h",
+    "cmsis_armcc.h": "https://raw.githubusercontent.com/ARM-software/CMSIS_5/5.9.0/CMSIS/Core/Include/cmsis_armcc.h",
     "cmsis_armclang.h": "https://raw.githubusercontent.com/ARM-software/CMSIS_5/5.9.0/CMSIS/Core/Include/cmsis_armclang.h",
-    "mpu_armv7.h":      "https://raw.githubusercontent.com/ARM-software/CMSIS_5/5.9.0/CMSIS/Core/Include/mpu_armv7.h",
+    "mpu_armv7.h": "https://raw.githubusercontent.com/ARM-software/CMSIS_5/5.9.0/CMSIS/Core/Include/mpu_armv7.h",
 }
 
 
