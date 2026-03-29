@@ -1,0 +1,4283 @@
+
+# 2026-03-28 17:13:53.848757
++/connect
+
+# 2026-03-28 17:19:17.752914
++测试串口
+
+# 2026-03-28 17:25:08.962703
++/exit
+
+# 2026-03-28 17:25:33.544908
++/connect
+
+# 2026-03-28 17:25:45.436740
++写代码测试串口
+
+# 2026-03-28 17:26:53.791369
++/connect
+
+# 2026-03-28 17:27:54.314391
++验证烧录
+
+# 2026-03-28 17:31:17.488764
++/exit
+
+# 2026-03-28 17:31:31.014882
++/connect
+
+# 2026-03-28 17:31:37.748404
++写代码测试串口
+
+# 2026-03-28 17:33:38.801245
++再执行，boot是接gnd
+
+# 2026-03-28 17:34:27.913547
++/exit
+
+# 2026-03-28 17:34:52.159793
++/connect STM32F103ZE
+
+# 2026-03-28 17:34:58.422937
++写代码测试串口
+
+# 2026-03-28 17:37:41.348194
++再试一下
+
+# 2026-03-28 17:38:57.784581
++boot0是接gnd
+
+# 2026-03-28 17:39:27.886957
++再试一下
+
+# 2026-03-28 17:40:12.030906
++/connect STM32F103ZE
+
+# 2026-03-28 17:40:38.231552
++再试一下
+
+# 2026-03-28 17:43:34.751954
++再测试一下
+
+# 2026-03-28 17:44:09.333472
++/connect STM32F103ZE
+
+# 2026-03-28 17:44:11.711766
++再测试一下
+
+# 2026-03-28 17:44:27.250119
++连接了
+
+# 2026-03-28 17:44:43.570302
++/exit
+
+# 2026-03-28 17:44:50.123220
++/connect STM32F103ZE
+
+# 2026-03-28 17:44:58.785527
++写代码测试串口
+
+# 2026-03-28 17:45:39.254146
++串口连接了
+
+# 2026-03-28 17:47:04.674277
++有源蜂鸣器。BEEP信号直接连接在MCU的PB8上面，PB8可以做PWM输出 请你尝试用这个唱一个两只老虎
+
+# 2026-03-28 17:50:38.050565
++再唱一个鸡你太美
+
+# 2026-03-28 17:52:03.408441
++你在网上搜一下旋律
+
+# 2026-03-28 17:52:22.986555
++唱一个一闪一闪亮晶晶
+
+# 2026-03-28 17:55:09.287328
++拉高pa0
+
+# 2026-03-29 09:30:42.996369
++/connect
+
+# 2026-03-29 09:31:10.401424
++/connect STM32F103ZE
+
+# 2026-03-29 09:40:49.443229
++单独拉高PA0
+
+# 2026-03-29 09:41:32.179889
++串口连接了
+
+# 2026-03-29 09:45:34.544916
++我现在接入正点原子精英版的oled，SCL (时钟)：PD3 (对应接口的 OV_SCL) 
++SDA/DIN (数据)：PG13 (对应接口的 OV_SDA) 
++RES/RST (复位)：PD6 (对应接口的 OV_WRST) 
++DC/RS (数据/命令选择)：PG14 (对应接口的 OV_RRST)
++CS (片选)：PG15 (对应接口的 OV_OE) DHT11 温湿度传感器PG11，温度传感器ds18b20接pa5，给出温度显示代码
+
+# 2026-03-29 09:53:13.872009
++没有显示
+
+# 2026-03-29 09:59:54.722906
++/clear
+
+# 2026-03-29 10:00:11.563437
++你有哪些skills
+
+# 2026-03-29 10:01:33.843284
++看一下"F:\精英V2 硬件参考手册_V1.0.pdf"
+
+# 2026-03-29 10:03:43.791499
++2.1.19 OLED/摄像头模块接口
+
+# 2026-03-29 10:04:26.203398
++尝试点亮这个oled
+
+# 2026-03-29 10:08:49.671940
++继续
+
+# 2026-03-29 10:14:15.156704
++OLED插入没问题，oled一点没亮，DS0红色LED没闪烁
+
+# 2026-03-29 10:15:46.594285
++无响应
+
+# 2026-03-29 10:17:00.355656
++没有反应
+
+# 2026-03-29 10:17:44.708084
++/connect STM32F103ZE
+
+# 2026-03-29 10:18:27.701967
++SCL (时钟)：PD3 (对应接口的 OV_SCL) 
++SDA/DIN (数据)：PG13 (对应接口的 OV_SDA) 
++RES/RST (复位)：PD6 (对应接口的 OV_WRST) 
++DC/RS (数据/命令选择)：PG14 (对应接口的 OV_RRST)
++CS (片选)：PG15 (对应接口的 OV_OE)  尝试在oled上显示一段文字
+
+# 2026-03-29 10:22:09.732206
++没亮
+
+# 2026-03-29 10:23:38.187465
++BS1和BS2分别怎么接？
+
+# 2026-03-29 10:25:14.312954
++在烧录一次
+
+# 2026-03-29 10:28:02.227946
++：OV_SCL和JOY_CLK共用PD3，OV_VSYNC和PWM_DAC共用PA8，他们
++必须分时复用。另外，OV_SCL和OV_SDA我们加了4.7K上拉电阻，在使用的时候，需要注
++意这个问题。 其中，OV_SCL/OV_SDA/FIFO_WRST/OV_RRST/OV_OE 这 5 个信号是分别连接在 MCU
++的PD3/PG13/PD6/PG14/PG15 上面，OV_D0~OV_D7 则连接在PC0~7上面（放在连续的IO上，
++可以提高读写效率），OV_RCLK/OV_WEN/OV_VSYNC 这 3 个信号是分别连接在 MCU 的
++PB4/PB3/PA8 上面。
+
+# 2026-03-29 10:29:25.781772
++尝试修复
+
+# 2026-03-29 10:31:42.539893
++继续
+
+# 2026-03-29 10:37:23.424625
++不要用 JTAG 仿真，要选择 SWD 模式
+
+# 2026-03-29 10:44:09.567134
++#include "stm32f1xx_hal.h"
++#include <string.h>
++
++/* ========= OLED 引脚定义 ========= */
++#define OLED_SCL_GPIO_Port     GPIOD
++#define OLED_SCL_Pin           GPIO_PIN_3     // OV_SCL
++
++#define OLED_SDA_GPIO_Port     GPIOG
++#define OLED_SDA_Pin           GPIO_PIN_13    // OV_SDA
++
++#define OLED_WRST_GPIO_Port    GPIOD
++#define OLED_WRST_Pin          GPIO_PIN_6     // FIFO_WRST
++
++#define OLED_RRST_GPIO_Port    GPIOG
++#define OLED_RRST_Pin          GPIO_PIN_14    // OV_RRST
++
++#define OLED_OE_GPIO_Port      GPIOG
++#define OLED_OE_Pin            GPIO_PIN_15    // OV_OE
++
++/* ========= 数据口 PC0~PC7 ========= */
++#define OLED_DATA_GPIO_Port    GPIOC
++
++/* ========= 基础宏 ========= */
++#define OLED_SCL(x)    HAL_GPIO_WritePin(OLED_SCL_GPIO_Port, OLED_SCL_Pin, (x) ? GPIO_PIN_SET : GPIO_PIN_RESET)
++#define OLED_SDA(x)    HAL_GPIO_WritePin(OLED_SDA_GPIO_Port, OLED_SDA_Pin, (x) ? GPIO_PIN_SET : GPIO_PIN_RESET)
++#define OLED_WRST(x)   HAL_GPIO_WritePin(OLED_WRST_GPIO_Port, OLED_WRST_Pin, (x) ? GPIO_PIN_SET : GPIO_PIN_RESET)
++#define OLED_RRST(x)   HAL_GPIO_WritePin(OLED_RRST_GPIO_Port, OLED_RRST_Pin, (x) ? GPIO_PIN_SET : GPIO_PIN_RESET)
++#define OLED_OE(x)     HAL_GPIO_WritePin(OLED_OE_GPIO_Port, OLED_OE_Pin, (x) ? GPIO_PIN_SET : GPIO_PIN_RESET)
++
++/* ========= 函数声明 ========= */
++void SystemClock_Config(void);
++static void MX_GPIO_Init(void);
++
++static void OLED_WriteBus(uint8_t dat);
++static void OLED_WriteCmd(uint8_t cmd);
++static void OLED_WriteData(uint8_t data);
++static void OLED_Reset(void);
++static void OLED_Init(void);
++static void OLED_Fill(uint8_t data);
++static void OLED_SetPos(uint8_t x, uint8_t page);
++static void OLED_ShowChar6x8(uint8_t x, uint8_t page, char c);
++static void OLED_ShowString6x8(uint8_t x, uint8_t page, const char *s);
++
++/* 6x8 简单字符表，仅放测试需要字符 */
++static const uint8_t font6x8[][6] = {
++    /* 空格 ' ' */ {0x00,0x00,0x00,0x00,0x00,0x00},
++    /* 'D' */      {0x7F,0x41,0x41,0x22,0x1C,0x00},
++    /* 'E' */      {0x7F,0x49,0x49,0x49,0x41,0x00},
++    /* 'K' */      {0x7F,0x08,0x14,0x22,0x41,0x00},
++    /* 'L' */      {0x7F,0x40,0x40,0x40,0x40,0x00},
++    /* 'O' */      {0x3E,0x41,0x41,0x41,0x3E,0x00},
++};
++
++static const uint8_t* get_font(char c)
++{
++    switch (c)
++    {
++        case ' ': return font6x8[0];
++        case 'D': return font6x8[1];
++        case 'E': return font6x8[2];
++        case 'K': return font6x8[3];
++        case 'L': return font6x8[4];
++        case 'O': return font6x8[5];
++        default:  return font6x8[0];
++    }
++}
++
++int main(void)
++{
++    HAL_Init();
++    SystemClock_Config();
++    MX_GPIO_Init();
++
++    OLED_Init();
++
++    /* 整屏点亮测试 */
++    OLED_Fill(0xFF);
++    HAL_Delay(1000);
++
++    /* 清屏 */
++    OLED_Fill(0x00);
++
++    /* 显示字符串 */
++    OLED_ShowString6x8(0, 0, "OLED OK");
++
++    while (1)
++    {
++    }
++}
++
++/* ========= OLED 低层 ========= */
++
++/* 8位数据输出到 PC0~PC7 */
++static void OLED_WriteBus(uint8_t dat)
++{
++    uint16_t odr = OLED_DATA_GPIO_Port->ODR;
++    odr &= ~0x00FF;          // 清 PC0~PC7
++    odr |= dat;              // 写入数据
++    OLED_DATA_GPIO_Port->ODR = odr;
++}
++
++/*
++ * 这里按“命令/数据分时写”的最小方式实现。
++ * 如果你手上的正点原子 OLED 模块控制器不同，初始化表可能要改。
++ */
++static void OLED_WriteCmd(uint8_t cmd)
++{
++    OLED_OE(0);              // 允许输出
++    OLED_RRST(0);            // 这里当作 CMD/DATA 控制：0=命令
++    OLED_WriteBus(cmd);
++
++    OLED_SCL(0);
++    HAL_Delay(1);
++    OLED_SCL(1);
++}
++
++static void OLED_WriteData(uint8_t data)
++{
++    OLED_OE(0);
++    OLED_RRST(1);            // 1=数据
++    OLED_WriteBus(data);
++
++    OLED_SCL(0);
++    HAL_Delay(1);
++    OLED_SCL(1);
++}
++
++static void OLED_Reset(void)
++{
++    OLED_WRST(0);
++    HAL_Delay(20);
++    OLED_WRST(1);
++    HAL_Delay(20);
++}
++
++/* 常见 128x64 OLED 初始化序列，兼容很多 SSD1306 类模块 */
++static void OLED_Init(void)
++{
++    OLED_Reset();
++
++    OLED_WriteCmd(0xAE); // display off
++
++    OLED_WriteCmd(0xD5);
++    OLED_WriteCmd(0x80);
++
++    OLED_WriteCmd(0xA8);
++    OLED_WriteCmd(0x3F);
++
++    OLED_WriteCmd(0xD3);
++    OLED_WriteCmd(0x00);
++
++    OLED_WriteCmd(0x40);
++
++    OLED_WriteCmd(0x8D);
++    OLED_WriteCmd(0x14);
++
++    OLED_WriteCmd(0x20);
++    OLED_WriteCmd(0x02); // page addressing mode
++
++    OLED_WriteCmd(0xA1);
++    OLED_WriteCmd(0xC8);
++
++    OLED_WriteCmd(0xDA);
++    OLED_WriteCmd(0x12);
++
++    OLED_WriteCmd(0x81);
++    OLED_WriteCmd(0xCF);
++
++    OLED_WriteCmd(0xD9);
++    OLED_WriteCmd(0xF1);
++
++    OLED_WriteCmd(0xDB);
++    OLED_WriteCmd(0x40);
++
++    OLED_WriteCmd(0xA4);
++    OLED_WriteCmd(0xA6);
++
++    OLED_WriteCmd(0xAF); // display on
++}
++
++static void OLED_SetPos(uint8_t x, uint8_t page)
++{
++    OLED_WriteCmd(0xB0 + page);
++    OLED_WriteCmd(((x & 0xF0) >> 4) | 0x10);
++    OLED_WriteCmd((x & 0x0F) | 0x00);
++}
++
++static void OLED_Fill(uint8_t data)
++{
++    for (uint8_t page = 0; page < 8; page++)
++    {
++        OLED_SetPos(0, page);
++        for (uint8_t x = 0; x < 128; x++)
++        {
++            OLED_WriteData(data);
++        }
++    }
++}
++
++static void OLED_ShowChar6x8(uint8_t x, uint8_t page, char c)
++{
++    const uint8_t *p = get_font(c);
++    OLED_SetPos(x, page);
++    for (uint8_t i = 0; i < 6; i++)
++    {
++        OLED_WriteData(p[i]);
++    }
++}
++
++static void OLED_ShowString6x8(uint8_t x, uint8_t page, const char *s)
++{
++    while (*s)
++    {
++        OLED_ShowChar6x8(x, page, *s++);
++        x += 6;
++        if (x > 122)
++        {
++            x = 0;
++            page++;
++            if (page > 7) break;
++        }
++    }
++}
++
++/* ========= GPIO 初始化 ========= */
++static void MX_GPIO_Init(void)
++{
++    __HAL_RCC_GPIOC_CLK_ENABLE();
++    __HAL_RCC_GPIOD_CLK_ENABLE();
++    __HAL_RCC_GPIOG_CLK_ENABLE();
++    __HAL_RCC_AFIO_CLK_ENABLE();
++
++    /* 关闭 JTAG，保留 SWD，避免 PB3/PB4 被占用 */
++    __HAL_AFIO_REMAP_SWJ_NOJTAG();
++
++    GPIO_InitTypeDef GPIO_InitStruct = {0};
++
++    /* PC0~PC7 数据口 */
++    GPIO_InitStruct.Pin = GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3 |
++                          GPIO_PIN_4 | GPIO_PIN_5 | GPIO_PIN_6 | GPIO_PIN_7;
++    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
++    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
++    HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
++
++    /* 控制口 */
++    GPIO_InitStruct.Pin = OLED_SCL_Pin | OLED_WRST_Pin;
++    HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
++
++    GPIO_InitStruct.Pin = OLED_SDA_Pin | OLED_RRST_Pin | OLED_OE_Pin;
++    HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
++
++    /* 默认状态 */
++    HAL_GPIO_WritePin(GPIOC, 0x00FF, GPIO_PIN_RESET);
++    OLED_SCL(1);
++    OLED_SDA(1);
++    OLED_WRST(1);
++    OLED_RRST(1);
++    OLED_OE(0);
++}
++
++/* ========= 时钟配置 ========= */
++/* 你如果已经有 CubeMX 生成的，就用你自己的 */
++void SystemClock_Config(void)
++{
++    RCC_OscInitTypeDef RCC_OscInitStruct = {0};
++    RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
++
++    RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
++    RCC_OscInitStruct.HSEState = RCC_HSE_ON;
++    RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
++    RCC_OscInitStruct.HSIState = RCC_HSI_ON;
++    RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
++    RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
++    RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
++    HAL_RCC_OscConfig(&RCC_OscInitStruct);
++
++    RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK |
++                                  RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
++    RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
++    RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
++    RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
++    RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
++    HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2);
++}烧录这个代码
+
+# 2026-03-29 10:45:02.702638
++/clear
+
+# 2026-03-29 10:45:53.566981
++#include "stm32f1xx_hal.h"
++#include <string.h>
++
++/* ========= OLED 引脚定义 ========= */
++#define OLED_SCL_GPIO_Port     GPIOD
++#define OLED_SCL_Pin           GPIO_PIN_3     // OV_SCL
++
++#define OLED_SDA_GPIO_Port     GPIOG
++#define OLED_SDA_Pin           GPIO_PIN_13    // OV_SDA
++
++#define OLED_WRST_GPIO_Port    GPIOD
++#define OLED_WRST_Pin          GPIO_PIN_6     // FIFO_WRST
++
++#define OLED_RRST_GPIO_Port    GPIOG
++#define OLED_RRST_Pin          GPIO_PIN_14    // OV_RRST
++
++#define OLED_OE_GPIO_Port      GPIOG
++#define OLED_OE_Pin            GPIO_PIN_15    // OV_OE
++
++/* ========= 数据口 PC0~PC7 ========= */
++#define OLED_DATA_GPIO_Port    GPIOC
++
++/* ========= 基础宏 ========= */
++#define OLED_SCL(x)    HAL_GPIO_WritePin(OLED_SCL_GPIO_Port, OLED_SCL_Pin, (x) ? GPIO_PIN_SET : GPIO_PIN_RESET)
++#define OLED_SDA(x)    HAL_GPIO_WritePin(OLED_SDA_GPIO_Port, OLED_SDA_Pin, (x) ? GPIO_PIN_SET : GPIO_PIN_RESET)
++#define OLED_WRST(x)   HAL_GPIO_WritePin(OLED_WRST_GPIO_Port, OLED_WRST_Pin, (x) ? GPIO_PIN_SET : GPIO_PIN_RESET)
++#define OLED_RRST(x)   HAL_GPIO_WritePin(OLED_RRST_GPIO_Port, OLED_RRST_Pin, (x) ? GPIO_PIN_SET : GPIO_PIN_RESET)
++#define OLED_OE(x)     HAL_GPIO_WritePin(OLED_OE_GPIO_Port, OLED_OE_Pin, (x) ? GPIO_PIN_SET : GPIO_PIN_RESET)
++
++/* ========= 函数声明 ========= */
++void SystemClock_Config(void);
++static void MX_GPIO_Init(void);
++
++static void OLED_WriteBus(uint8_t dat);
++static void OLED_WriteCmd(uint8_t cmd);
++static void OLED_WriteData(uint8_t data);
++static void OLED_Reset(void);
++static void OLED_Init(void);
++static void OLED_Fill(uint8_t data);
++static void OLED_SetPos(uint8_t x, uint8_t page);
++static void OLED_ShowChar6x8(uint8_t x, uint8_t page, char c);
++static void OLED_ShowString6x8(uint8_t x, uint8_t page, const char *s);
++
++/* 6x8 简单字符表，仅放测试需要字符 */
++static const uint8_t font6x8[][6] = {
++    /* 空格 ' ' */ {0x00,0x00,0x00,0x00,0x00,0x00},
++    /* 'D' */      {0x7F,0x41,0x41,0x22,0x1C,0x00},
++    /* 'E' */      {0x7F,0x49,0x49,0x49,0x41,0x00},
++    /* 'K' */      {0x7F,0x08,0x14,0x22,0x41,0x00},
++    /* 'L' */      {0x7F,0x40,0x40,0x40,0x40,0x00},
++    /* 'O' */      {0x3E,0x41,0x41,0x41,0x3E,0x00},
++};
++
++static const uint8_t* get_font(char c)
++{
++    switch (c)
++    {
++        case ' ': return font6x8[0];
++        case 'D': return font6x8[1];
++        case 'E': return font6x8[2];
++        case 'K': return font6x8[3];
++        case 'L': return font6x8[4];
++        case 'O': return font6x8[5];
++        default:  return font6x8[0];
++    }
++}
++
++int main(void)
++{
++    HAL_Init();
++    SystemClock_Config();
++    MX_GPIO_Init();
++
++    OLED_Init();
++
++    /* 整屏点亮测试 */
++    OLED_Fill(0xFF);
++    HAL_Delay(1000);
++
++    /* 清屏 */
++    OLED_Fill(0x00);
++
++    /* 显示字符串 */
++    OLED_ShowString6x8(0, 0, "OLED OK");
++
++    while (1)
++    {
++    }
++}
++
++/* ========= OLED 低层 ========= */
++
++/* 8位数据输出到 PC0~PC7 */
++static void OLED_WriteBus(uint8_t dat)
++{
++    uint16_t odr = OLED_DATA_GPIO_Port->ODR;
++    odr &= ~0x00FF;          // 清 PC0~PC7
++    odr |= dat;              // 写入数据
++    OLED_DATA_GPIO_Port->ODR = odr;
++}
++
++/*
++ * 这里按“命令/数据分时写”的最小方式实现。
++ * 如果你手上的正点原子 OLED 模块控制器不同，初始化表可能要改。
++ */
++static void OLED_WriteCmd(uint8_t cmd)
++{
++    OLED_OE(0);              // 允许输出
++    OLED_RRST(0);            // 这里当作 CMD/DATA 控制：0=命令
++    OLED_WriteBus(cmd);
++
++    OLED_SCL(0);
++    HAL_Delay(1);
++    OLED_SCL(1);
++}
++
++static void OLED_WriteData(uint8_t data)
++{
++    OLED_OE(0);
++    OLED_RRST(1);            // 1=数据
++    OLED_WriteBus(data);
++
++    OLED_SCL(0);
++    HAL_Delay(1);
++    OLED_SCL(1);
++}
++
++static void OLED_Reset(void)
++{
++    OLED_WRST(0);
++    HAL_Delay(20);
++    OLED_WRST(1);
++    HAL_Delay(20);
++}
++
++/* 常见 128x64 OLED 初始化序列，兼容很多 SSD1306 类模块 */
++static void OLED_Init(void)
++{
++    OLED_Reset();
++
++    OLED_WriteCmd(0xAE); // display off
++
++    OLED_WriteCmd(0xD5);
++    OLED_WriteCmd(0x80);
++
++    OLED_WriteCmd(0xA8);
++    OLED_WriteCmd(0x3F);
++
++    OLED_WriteCmd(0xD3);
++    OLED_WriteCmd(0x00);
++
++    OLED_WriteCmd(0x40);
++
++    OLED_WriteCmd(0x8D);
++    OLED_WriteCmd(0x14);
++
++    OLED_WriteCmd(0x20);
++    OLED_WriteCmd(0x02); // page addressing mode
++
++    OLED_WriteCmd(0xA1);
++    OLED_WriteCmd(0xC8);
++
++    OLED_WriteCmd(0xDA);
++    OLED_WriteCmd(0x12);
++
++    OLED_WriteCmd(0x81);
++    OLED_WriteCmd(0xCF);
++
++    OLED_WriteCmd(0xD9);
++    OLED_WriteCmd(0xF1);
++
++    OLED_WriteCmd(0xDB);
++    OLED_WriteCmd(0x40);
++
++    OLED_WriteCmd(0xA4);
++    OLED_WriteCmd(0xA6);
++
++    OLED_WriteCmd(0xAF); // display on
++}
++
++static void OLED_SetPos(uint8_t x, uint8_t page)
++{
++    OLED_WriteCmd(0xB0 + page);
++    OLED_WriteCmd(((x & 0xF0) >> 4) | 0x10);
++    OLED_WriteCmd((x & 0x0F) | 0x00);
++}
++
++static void OLED_Fill(uint8_t data)
++{
++    for (uint8_t page = 0; page < 8; page++)
++    {
++        OLED_SetPos(0, page);
++        for (uint8_t x = 0; x < 128; x++)
++        {
++            OLED_WriteData(data);
++        }
++    }
++}
++
++static void OLED_ShowChar6x8(uint8_t x, uint8_t page, char c)
++{
++    const uint8_t *p = get_font(c);
++    OLED_SetPos(x, page);
++    for (uint8_t i = 0; i < 6; i++)
++    {
++        OLED_WriteData(p[i]);
++    }
++}
++
++static void OLED_ShowString6x8(uint8_t x, uint8_t page, const char *s)
++{
++    while (*s)
++    {
++        OLED_ShowChar6x8(x, page, *s++);
++        x += 6;
++        if (x > 122)
++        {
++            x = 0;
++            page++;
++            if (page > 7) break;
++        }
++    }
++}
++
++/* ========= GPIO 初始化 ========= */
++static void MX_GPIO_Init(void)
++{
++    __HAL_RCC_GPIOC_CLK_ENABLE();
++    __HAL_RCC_GPIOD_CLK_ENABLE();
++    __HAL_RCC_GPIOG_CLK_ENABLE();
++    __HAL_RCC_AFIO_CLK_ENABLE();
++
++    /* 关闭 JTAG，保留 SWD，避免 PB3/PB4 被占用 */
++    __HAL_AFIO_REMAP_SWJ_NOJTAG();
++
++    GPIO_InitTypeDef GPIO_InitStruct = {0};
++
++    /* PC0~PC7 数据口 */
++    GPIO_InitStruct.Pin = GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3 |
++                          GPIO_PIN_4 | GPIO_PIN_5 | GPIO_PIN_6 | GPIO_PIN_7;
++    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
++    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
++    HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
++
++    /* 控制口 */
++    GPIO_InitStruct.Pin = OLED_SCL_Pin | OLED_WRST_Pin;
++    HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
++
++    GPIO_InitStruct.Pin = OLED_SDA_Pin | OLED_RRST_Pin | OLED_OE_Pin;
++    HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
++
++    /* 默认状态 */
++    HAL_GPIO_WritePin(GPIOC, 0x00FF, GPIO_PIN_RESET);
++    OLED_SCL(1);
++    OLED_SDA(1);
++    OLED_WRST(1);
++    OLED_RRST(1);
++    OLED_OE(0);
++}
++
++/* ========= 时钟配置 ========= */
++/* 你如果已经有 CubeMX 生成的，就用你自己的 */
++void SystemClock_Config(void)
++{
++    RCC_OscInitTypeDef RCC_OscInitStruct = {0};
++    RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
++
++    RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
++    RCC_OscInitStruct.HSEState = RCC_HSE_ON;
++    RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
++    RCC_OscInitStruct.HSIState = RCC_HSI_ON;
++    RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
++    RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
++    RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
++    HAL_RCC_OscConfig(&RCC_OscInitStruct);
++
++    RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK |
++                                  RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
++    RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
++    RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
++    RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
++    RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
++    HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2);
++#include "stm32f1xx_hal.h"
++#include <string.h>
++
++/* ========= OLED 引脚定义 ========= */
++#define OLED_SCL_GPIO_Port     GPIOD
++#define OLED_SCL_Pin           GPIO_PIN_3     // OV_SCL
++
++#define OLED_SDA_GPIO_Port     GPIOG
++#define OLED_SDA_Pin           GPIO_PIN_13    // OV_SDA
++
++#define OLED_WRST_GPIO_Port    GPIOD
++#define OLED_WRST_Pin          GPIO_PIN_6     // FIFO_WRST
++
++#define OLED_RRST_GPIO_Port    GPIOG
++#define OLED_RRST_Pin          GPIO_PIN_14    // OV_RRST
++
++#define OLED_OE_GPIO_Port      GPIOG
++#define OLED_OE_Pin            GPIO_PIN_15    // OV_OE
++
++/* ========= 数据口 PC0~PC7 ========= */
++#define OLED_DATA_GPIO_Port    GPIOC
++
++/* ========= 基础宏 ========= */
++#define OLED_SCL(x)    HAL_GPIO_WritePin(OLED_SCL_GPIO_Port, OLED_SCL_Pin, (x) ? GPIO_PIN_SET : GPIO_PIN_RESET)
++#define OLED_SDA(x)    HAL_GPIO_WritePin(OLED_SDA_GPIO_Port, OLED_SDA_Pin, (x) ? GPIO_PIN_SET : GPIO_PIN_RESET)
++#define OLED_WRST(x)   HAL_GPIO_WritePin(OLED_WRST_GPIO_Port, OLED_WRST_Pin, (x) ? GPIO_PIN_SET : GPIO_PIN_RESET)
++#define OLED_RRST(x)   HAL_GPIO_WritePin(OLED_RRST_GPIO_Port, OLED_RRST_Pin, (x) ? GPIO_PIN_SET : GPIO_PIN_RESET)
++#define OLED_OE(x)     HAL_GPIO_WritePin(OLED_OE_GPIO_Port, OLED_OE_Pin, (x) ? GPIO_PIN_SET : GPIO_PIN_RESET)
++
++/* ========= 函数声明 ========= */
++void SystemClock_Config(void);
++static void MX_GPIO_Init(void);
++
++static void OLED_WriteBus(uint8_t dat);
++static void OLED_WriteCmd(uint8_t cmd);
++static void OLED_WriteData(uint8_t data);
++static void OLED_Reset(void);
++static void OLED_Init(void);
++static void OLED_Fill(uint8_t data);
++static void OLED_SetPos(uint8_t x, uint8_t page);
++static void OLED_ShowChar6x8(uint8_t x, uint8_t page, char c);
++static void OLED_ShowString6x8(uint8_t x, uint8_t page, const char *s);
++
++/* 6x8 简单字符表，仅放测试需要字符 */
++static const uint8_t font6x8[][6] = {
++    /* 空格 ' ' */ {0x00,0x00,0x00,0x00,0x00,0x00},
++    /* 'D' */      {0x7F,0x41,0x41,0x22,0x1C,0x00},
++    /* 'E' */      {0x7F,0x49,0x49,0x49,0x41,0x00},
++    /* 'K' */      {0x7F,0x08,0x14,0x22,0x41,0x00},
++    /* 'L' */      {0x7F,0x40,0x40,0x40,0x40,0x00},
++    /* 'O' */      {0x3E,0x41,0x41,0x41,0x3E,0x00},
++};
++
++static const uint8_t* get_font(char c)
++{
++    switch (c)
++    {
++        case ' ': return font6x8[0];
++        case 'D': return font6x8[1];
++        case 'E': return font6x8[2];
++        case 'K': return font6x8[3];
++        case 'L': return font6x8[4];
++        case 'O': return font6x8[5];
++        default:  return font6x8[0];
++    }
++}
++
++int main(void)
++{
++    HAL_Init();
++    SystemClock_Config();
++    MX_GPIO_Init();
++
++    OLED_Init();
++
++    /* 整屏点亮测试 */
++    OLED_Fill(0xFF);
++    HAL_Delay(1000);
++
++    /* 清屏 */
++    OLED_Fill(0x00);
++
++    /* 显示字符串 */
++    OLED_ShowString6x8(0, 0, "OLED OK");
++
++    while (1)
++    {
++    }
++}
++
++/* ========= OLED 低层 ========= */
++
++/* 8位数据输出到 PC0~PC7 */
++static void OLED_WriteBus(uint8_t dat)
++{
++    uint16_t odr = OLED_DATA_GPIO_Port->ODR;
++    odr &= ~0x00FF;          // 清 PC0~PC7
++    odr |= dat;              // 写入数据
++    OLED_DATA_GPIO_Port->ODR = odr;
++}
++
++/*
++ * 这里按“命令/数据分时写”的最小方式实现。
++ * 如果你手上的正点原子 OLED 模块控制器不同，初始化表可能要改。
++ */
++static void OLED_WriteCmd(uint8_t cmd)
++{
++    OLED_OE(0);              // 允许输出
++    OLED_RRST(0);            // 这里当作 CMD/DATA 控制：0=命令
++    OLED_WriteBus(cmd);
++
++    OLED_SCL(0);
++    HAL_Delay(1);
++    OLED_SCL(1);
++}
++
++static void OLED_WriteData(uint8_t data)
++{
++    OLED_OE(0);
++    OLED_RRST(1);            // 1=数据
++    OLED_WriteBus(data);
++
++    OLED_SCL(0);
++    HAL_Delay(1);
++    OLED_SCL(1);
++}
++
++static void OLED_Reset(void)
++{
++    OLED_WRST(0);
++    HAL_Delay(20);
++    OLED_WRST(1);
++    HAL_Delay(20);
++}
++
++/* 常见 128x64 OLED 初始化序列，兼容很多 SSD1306 类模块 */
++static void OLED_Init(void)
++{
++    OLED_Reset();
++
++    OLED_WriteCmd(0xAE); // display off
++
++    OLED_WriteCmd(0xD5);
++    OLED_WriteCmd(0x80);
++
++    OLED_WriteCmd(0xA8);
++    OLED_WriteCmd(0x3F);
++
++    OLED_WriteCmd(0xD3);
++    OLED_WriteCmd(0x00);
++
++    OLED_WriteCmd(0x40);
++
++    OLED_WriteCmd(0x8D);
++    OLED_WriteCmd(0x14);
++
++    OLED_WriteCmd(0x20);
++    OLED_WriteCmd(0x02); // page addressing mode
++
++    OLED_WriteCmd(0xA1);
++    OLED_WriteCmd(0xC8);
++
++    OLED_WriteCmd(0xDA);
++    OLED_WriteCmd(0x12);
++
++    OLED_WriteCmd(0x81);
++    OLED_WriteCmd(0xCF);
++
++    OLED_WriteCmd(0xD9);
++    OLED_WriteCmd(0xF1);
++
++    OLED_WriteCmd(0xDB);
++    OLED_WriteCmd(0x40);
++
++    OLED_WriteCmd(0xA4);
++    OLED_WriteCmd(0xA6);
++
++    OLED_WriteCmd(0xAF); // display on
++}
++
++static void OLED_SetPos(uint8_t x, uint8_t page)
++{
++    OLED_WriteCmd(0xB0 + page);
++    OLED_WriteCmd(((x & 0xF0) >> 4) | 0x10);
++    OLED_WriteCmd((x & 0x0F) | 0x00);
++}
++
++static void OLED_Fill(uint8_t data)
++{
++    for (uint8_t page = 0; page < 8; page++)
++    {
++        OLED_SetPos(0, page);
++        for (uint8_t x = 0; x < 128; x++)
++        {
++            OLED_WriteData(data);
++        }
++    }
++}
++
++static void OLED_ShowChar6x8(uint8_t x, uint8_t page, char c)
++{
++    const uint8_t *p = get_font(c);
++    OLED_SetPos(x, page);
++    for (uint8_t i = 0; i < 6; i++)
++    {
++        OLED_WriteData(p[i]);
++    }
++}
++
++static void OLED_ShowString6x8(uint8_t x, uint8_t page, const char *s)
++{
++    while (*s)
++    {
++        OLED_ShowChar6x8(x, page, *s++);
++        x += 6;
++        if (x > 122)
++        {
++            x = 0;
++            page++;
++            if (page > 7) break;
++        }
++    }
++}
++
++/* ========= GPIO 初始化 ========= */
++static void MX_GPIO_Init(void)
++{
++    __HAL_RCC_GPIOC_CLK_ENABLE();
++    __HAL_RCC_GPIOD_CLK_ENABLE();
++    __HAL_RCC_GPIOG_CLK_ENABLE();
++    __HAL_RCC_AFIO_CLK_ENABLE();
++
++    /* 关闭 JTAG，保留 SWD，避免 PB3/PB4 被占用 */
++    __HAL_AFIO_REMAP_SWJ_NOJTAG();
++
++    GPIO_InitTypeDef GPIO_InitStruct = {0};
++
++    /* PC0~PC7 数据口 */
++    GPIO_InitStruct.Pin = GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3 |
++                          GPIO_PIN_4 | GPIO_PIN_5 | GPIO_PIN_6 | GPIO_PIN_7;
++    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
++    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
++    HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
++
++    /* 控制口 */
++    GPIO_InitStruct.Pin = OLED_SCL_Pin | OLED_WRST_Pin;
++    HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
++
++    GPIO_InitStruct.Pin = OLED_SDA_Pin | OLED_RRST_Pin | OLED_OE_Pin;
++    HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
++
++    /* 默认状态 */
++    HAL_GPIO_WritePin(GPIOC, 0x00FF, GPIO_PIN_RESET);
++    OLED_SCL(1);
++    OLED_SDA(1);
++    OLED_WRST(1);
++    OLED_RRST(1);
++    OLED_OE(0);
++}
++
++/* ========= 时钟配置 ========= */
++/* 你如果已经有 CubeMX 生成的，就用你自己的 */
++void SystemClock_Config(void)
++{
++    RCC_OscInitTypeDef RCC_OscInitStruct = {0};
++    RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
++
++    RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
++    RCC_OscInitStruct.HSEState = RCC_HSE_ON;
++    RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
++    RCC_OscInitStruct.HSIState = RCC_HSI_ON;
++    RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
++    RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
++    RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
++    HAL_RCC_OscConfig(&RCC_OscInitStruct);
++
++    RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK |
++                                  RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
++    RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
++    RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
++    RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
++    RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
++    HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2);
++}烧录这个代码
+
+# 2026-03-29 10:51:04.838863
++#include "stm32f1xx_hal.h"
++
++void SystemClock_Config(void);
++static void MX_GPIO_Init(void);
++
++int main(void)
++{
++    HAL_Init();
++    SystemClock_Config();
++    MX_GPIO_Init();
++
++    while (1)
++    {
++        HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_5); // DS0
++        HAL_Delay(500);
++    }
++}
++
++static void MX_GPIO_Init(void)
++{
++    __HAL_RCC_GPIOB_CLK_ENABLE();
++
++    GPIO_InitTypeDef GPIO_InitStruct = {0};
++    GPIO_InitStruct.Pin = GPIO_PIN_5;
++    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
++    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
++    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
++}
++
++void SystemClock_Config(void)
++{
++    RCC_OscInitTypeDef RCC_OscInitStruct = {0};
++    RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
++
++    RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
++    RCC_OscInitStruct.HSEState = RCC_HSE_ON;
++    RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
++    RCC_OscInitStruct.HSIState = RCC_HSI_ON;
++    RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
++    RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
++    RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
++    HAL_RCC_OscConfig(&RCC_OscInitStruct);
++
++    RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK |
++                                  RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
++    RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
++    RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
++    RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
++    RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
++    HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2);
++}这个版本试试
+
+# 2026-03-29 10:58:16.398603
++#include "stm32f1xx_hal.h"
++#include <string.h>
++
++/* ================= 引脚定义（精英V2 P4接口） =================
++   PD3  -> OV_SCL
++   PG13 -> OV_SDA
++   PD6  -> OV_WRST
++   PG14 -> OV_RRST
++*/
++#define OLED_SCL_PORT    GPIOD
++#define OLED_SCL_PIN     GPIO_PIN_3
++
++#define OLED_SDA_PORT    GPIOG
++#define OLED_SDA_PIN     GPIO_PIN_13
++
++#define OLED_RST1_PORT   GPIOD
++#define OLED_RST1_PIN    GPIO_PIN_6
++
++#define OLED_RST2_PORT   GPIOG
++#define OLED_RST2_PIN    GPIO_PIN_14
++
++#define OLED_SCL(x) HAL_GPIO_WritePin(OLED_SCL_PORT, OLED_SCL_PIN, (x)?GPIO_PIN_SET:GPIO_PIN_RESET)
++#define OLED_SDA(x) HAL_GPIO_WritePin(OLED_SDA_PORT, OLED_SDA_PIN, (x)?GPIO_PIN_SET:GPIO_PIN_RESET)
++#define OLED_RST1(x) HAL_GPIO_WritePin(OLED_RST1_PORT, OLED_RST1_PIN, (x)?GPIO_PIN_SET:GPIO_PIN_RESET)
++#define OLED_RST2(x) HAL_GPIO_WritePin(OLED_RST2_PORT, OLED_RST2_PIN, (x)?GPIO_PIN_SET:GPIO_PIN_RESET)
++
++/* 常见 SSD1306 8bit 地址写地址：
++   0x78 -> SA0=0
++   0x7A -> SA0=1
++   这里两种都试一遍，兼容不同模块配置
++*/
++#define OLED_ADDR1 0x78
++#define OLED_ADDR2 0x7A
++
++void SystemClock_Config(void);
++static void MX_GPIO_Init(void);
++
++static void delay_us_soft(volatile uint32_t t)
++{
++    while (t--) __NOP();
++}
++
++/* ================= 软件I2C ================= */
++static void I2C_Start(void)
++{
++    OLED_SDA(1);
++    OLED_SCL(1);
++    delay_us_soft(30);
++    OLED_SDA(0);
++    delay_us_soft(30);
++    OLED_SCL(0);
++}
++
++static void I2C_Stop(void)
++{
++    OLED_SCL(0);
++    OLED_SDA(0);
++    delay_us_soft(30);
++    OLED_SCL(1);
++    delay_us_soft(30);
++    OLED_SDA(1);
++    delay_us_soft(30);
++}
++
++static void I2C_SendByte(uint8_t byte)
++{
++    for (uint8_t i = 0; i < 8; i++)
++    {
++        OLED_SCL(0);
++        if (byte & 0x80) OLED_SDA(1);
++        else             OLED_SDA(0);
++        delay_us_soft(20);
++        OLED_SCL(1);
++        delay_us_soft(20);
++        byte <<= 1;
++    }
++    /* 不读ACK，直接给一个时钟脉冲跳过 */
++    OLED_SCL(0);
++    OLED_SDA(1);
++    delay_us_soft(20);
++    OLED_SCL(1);
++    delay_us_soft(20);
++    OLED_SCL(0);
++}
++
++static void OLED_WriteCmd_Addr(uint8_t addr, uint8_t cmd)
++{
++    I2C_Start();
++    I2C_SendByte(addr);   // 器件地址
++    I2C_SendByte(0x00);   // Co=0, D/C#=0 -> 命令
++    I2C_SendByte(cmd);
++    I2C_Stop();
++}
++
++static void OLED_WriteData_Addr(uint8_t addr, uint8_t data)
++{
++    I2C_Start();
++    I2C_SendByte(addr);   // 器件地址
++    I2C_SendByte(0x40);   // Co=0, D/C#=1 -> 数据
++    I2C_SendByte(data);
++    I2C_Stop();
++}
++
++/* 两个地址都发一次，避免模块 SA0 配置不同 */
++static void OLED_WriteCmd(uint8_t cmd)
++{
++    OLED_WriteCmd_Addr(OLED_ADDR1, cmd);
++    OLED_WriteCmd_Addr(OLED_ADDR2, cmd);
++}
++
++static void OLED_WriteData(uint8_t data)
++{
++    OLED_WriteData_Addr(OLED_ADDR1, data);
++    OLED_WriteData_Addr(OLED_ADDR2, data);
++}
++
++static void OLED_Reset(void)
++{
++    OLED_RST1(1);
++    OLED_RST2(1);
++    HAL_Delay(10);
++
++    OLED_RST1(0);
++    OLED_RST2(0);
++    HAL_Delay(20);
++
++    OLED_RST1(1);
++    OLED_RST2(1);
++    HAL_Delay(20);
++}
++
++static void OLED_SetPos(uint8_t x, uint8_t page)
++{
++    OLED_WriteCmd(0xB0 + page);
++    OLED_WriteCmd(((x & 0xF0) >> 4) | 0x10);
++    OLED_WriteCmd((x & 0x0F) | 0x01);
++}
++
++static void OLED_Clear(void)
++{
++    for (uint8_t page = 0; page < 8; page++)
++    {
++        OLED_SetPos(0, page);
++        for (uint8_t x = 0; x < 128; x++)
++        {
++            OLED_WriteData(0x00);
++        }
++    }
++}
++
++static void OLED_Fill(uint8_t dat)
++{
++    for (uint8_t page = 0; page < 8; page++)
++    {
++        OLED_SetPos(0, page);
++        for (uint8_t x = 0; x < 128; x++)
++        {
++            OLED_WriteData(dat);
++        }
++    }
++}
++
++static void OLED_Init(void)
++{
++    OLED_Reset();
++
++    OLED_WriteCmd(0xAE); // display off
++    OLED_WriteCmd(0xD5); OLED_WriteCmd(0x80);
++    OLED_WriteCmd(0xA8); OLED_WriteCmd(0x3F);
++    OLED_WriteCmd(0xD3); OLED_WriteCmd(0x00);
++    OLED_WriteCmd(0x40);
++    OLED_WriteCmd(0x8D); OLED_WriteCmd(0x14);
++    OLED_WriteCmd(0x20); OLED_WriteCmd(0x02); // page mode
++    OLED_WriteCmd(0xA1);
++    OLED_WriteCmd(0xC8);
++    OLED_WriteCmd(0xDA); OLED_WriteCmd(0x12);
++    OLED_WriteCmd(0x81); OLED_WriteCmd(0xCF);
++    OLED_WriteCmd(0xD9); OLED_WriteCmd(0xF1);
++    OLED_WriteCmd(0xDB); OLED_WriteCmd(0x30);
++    OLED_WriteCmd(0xA4);
++    OLED_WriteCmd(0xA6);
++    OLED_WriteCmd(0xAF); // display on
++
++    HAL_Delay(50);
++    OLED_Clear();
++}
++
++/* 只放测试字符：O L E D 空格 K */
++static const uint8_t font6x8[][6] =
++{
++    {0x00,0x00,0x00,0x00,0x00,0x00}, // ' '
++    {0x3E,0x41,0x41,0x41,0x3E,0x00}, // O
++    {0x7F,0x40,0x40,0x40,0x40,0x00}, // L
++    {0x7F,0x49,0x49,0x49,0x41,0x00}, // E
++    {0x7F,0x41,0x41,0x22,0x1C,0x00}, // D
++    {0x7F,0x08,0x14,0x22,0x41,0x00}, // K
++};
++
++static const uint8_t* font_get(char c)
++{
++    switch(c)
++    {
++        case ' ': return font6x8[0];
++        case 'O': return font6x8[1];
++        case 'L': return font6x8[2];
++        case 'E': return font6x8[3];
++        case 'D': return font6x8[4];
++        case 'K': return font6x8[5];
++        default:  return font6x8[0];
++    }
++}
++
++static void OLED_ShowChar(uint8_t x, uint8_t page, char c)
++{
++    const uint8_t *p = font_get(c);
++    OLED_SetPos(x, page);
++    for (uint8_t i = 0; i < 6; i++)
++    {
++        OLED_WriteData(p[i]);
++    }
++}
++
++static void OLED_ShowString(uint8_t x, uint8_t page, const char *s)
++{
++    while (*s)
++    {
++        OLED_ShowChar(x, page, *s++);
++        x += 6;
++        if (x > 122)
++        {
++            x = 0;
++            page++;
++            if (page > 7) break;
++        }
++    }
++}
++
++int main(void)
++{
++    HAL_Init();
++    SystemClock_Config();
++    MX_GPIO_Init();
++
++    OLED_Init();
++
++    /* 上电先全亮 1 秒，便于确认屏已被驱动 */
++    OLED_Fill(0xFF);
++    HAL_Delay(1000);
++
++    OLED_Clear();
++    OLED_ShowString(0, 0, "OLED OK");
++
++    while (1)
++    {
++        HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_5); // DS0继续闪
++        HAL_Delay(500);
++    }
++}
++
++static void MX_GPIO_Init(void)
++{
++    __HAL_RCC_GPIOB_CLK_ENABLE();
++    __HAL_RCC_GPIOD_CLK_ENABLE();
++    __HAL_RCC_GPIOG_CLK_ENABLE();
++    __HAL_RCC_AFIO_CLK_ENABLE();
++
++    GPIO_InitTypeDef GPIO_InitStruct = {0};
++
++    /* DS0 */
++    GPIO_InitStruct.Pin = GPIO_PIN_5;
++    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
++    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
++    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
++
++    /* SCL / RST1 */
++    GPIO_InitStruct.Pin = OLED_SCL_PIN | OLED_RST1_PIN;
++    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
++    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
++    HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
++
++    /* SDA / RST2 */
++    GPIO_InitStruct.Pin = OLED_SDA_PIN | OLED_RST2_PIN;
++    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
++    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
++    HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
++
++    OLED_SCL(1);
++    OLED_SDA(1);
++    OLED_RST1(1);
++    OLED_RST2(1);
++}
++
++void SystemClock_Config(void)
++{
++    RCC_OscInitTypeDef RCC_OscInitStruct = {0};
++    RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
++
++    RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
++    RCC_OscInitStruct.HSEState = RCC_HSE_ON;
++    RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
++    RCC_OscInitStruct.HSIState = RCC_HSI_ON;
++    RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
++    RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
++    RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
++    HAL_RCC_OscConfig(&RCC_OscInitStruct);
++
++    RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK |
++                                  RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
++    RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
++    RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
++    RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
++    RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
++    HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2);
++}再烧录这个
+
+# 2026-03-29 10:59:24.061451
++/clear
+
+# 2026-03-29 10:59:30.742801
++#include "stm32f1xx_hal.h"
++#include <string.h>
++
++/* ================= 引脚定义（精英V2 P4接口） =================
++   PD3  -> OV_SCL
++   PG13 -> OV_SDA
++   PD6  -> OV_WRST
++   PG14 -> OV_RRST
++*/
++#define OLED_SCL_PORT    GPIOD
++#define OLED_SCL_PIN     GPIO_PIN_3
++
++#define OLED_SDA_PORT    GPIOG
++#define OLED_SDA_PIN     GPIO_PIN_13
++
++#define OLED_RST1_PORT   GPIOD
++#define OLED_RST1_PIN    GPIO_PIN_6
++
++#define OLED_RST2_PORT   GPIOG
++#define OLED_RST2_PIN    GPIO_PIN_14
++
++#define OLED_SCL(x) HAL_GPIO_WritePin(OLED_SCL_PORT, OLED_SCL_PIN, (x)?GPIO_PIN_SET:GPIO_PIN_RESET)
++#define OLED_SDA(x) HAL_GPIO_WritePin(OLED_SDA_PORT, OLED_SDA_PIN, (x)?GPIO_PIN_SET:GPIO_PIN_RESET)
++#define OLED_RST1(x) HAL_GPIO_WritePin(OLED_RST1_PORT, OLED_RST1_PIN, (x)?GPIO_PIN_SET:GPIO_PIN_RESET)
++#define OLED_RST2(x) HAL_GPIO_WritePin(OLED_RST2_PORT, OLED_RST2_PIN, (x)?GPIO_PIN_SET:GPIO_PIN_RESET)
++
++/* 常见 SSD1306 8bit 地址写地址：
++   0x78 -> SA0=0
++   0x7A -> SA0=1
++   这里两种都试一遍，兼容不同模块配置
++*/
++#define OLED_ADDR1 0x78
++#define OLED_ADDR2 0x7A
++
++void SystemClock_Config(void);
++static void MX_GPIO_Init(void);
++
++static void delay_us_soft(volatile uint32_t t)
++{
++    while (t--) __NOP();
++}
++
++/* ================= 软件I2C ================= */
++static void I2C_Start(void)
++{
++    OLED_SDA(1);
++    OLED_SCL(1);
++    delay_us_soft(30);
++    OLED_SDA(0);
++    delay_us_soft(30);
++    OLED_SCL(0);
++}
++
++static void I2C_Stop(void)
++{
++    OLED_SCL(0);
++    OLED_SDA(0);
++    delay_us_soft(30);
++    OLED_SCL(1);
++    delay_us_soft(30);
++    OLED_SDA(1);
++    delay_us_soft(30);
++}
++
++static void I2C_SendByte(uint8_t byte)
++{
++    for (uint8_t i = 0; i < 8; i++)
++    {
++        OLED_SCL(0);
++        if (byte & 0x80) OLED_SDA(1);
++        else             OLED_SDA(0);
++        delay_us_soft(20);
++        OLED_SCL(1);
++        delay_us_soft(20);
++        byte <<= 1;
++    }
++    /* 不读ACK，直接给一个时钟脉冲跳过 */
++    OLED_SCL(0);
++    OLED_SDA(1);
++    delay_us_soft(20);
++    OLED_SCL(1);
++    delay_us_soft(20);
++    OLED_SCL(0);
++}
++
++static void OLED_WriteCmd_Addr(uint8_t addr, uint8_t cmd)
++{
++    I2C_Start();
++    I2C_SendByte(addr);   // 器件地址
++    I2C_SendByte(0x00);   // Co=0, D/C#=0 -> 命令
++    I2C_SendByte(cmd);
++    I2C_Stop();
++}
++
++static void OLED_WriteData_Addr(uint8_t addr, uint8_t data)
++{
++    I2C_Start();
++    I2C_SendByte(addr);   // 器件地址
++    I2C_SendByte(0x40);   // Co=0, D/C#=1 -> 数据
++    I2C_SendByte(data);
++    I2C_Stop();
++}
++
++/* 两个地址都发一次，避免模块 SA0 配置不同 */
++static void OLED_WriteCmd(uint8_t cmd)
++{
++    OLED_WriteCmd_Addr(OLED_ADDR1, cmd);
++    OLED_WriteCmd_Addr(OLED_ADDR2, cmd);
++}
++
++static void OLED_WriteData(uint8_t data)
++{
++    OLED_WriteData_Addr(OLED_ADDR1, data);
++    OLED_WriteData_Addr(OLED_ADDR2, data);
++}
++
++static void OLED_Reset(void)
++{
++    OLED_RST1(1);
++    OLED_RST2(1);
++    HAL_Delay(10);
++
++    OLED_RST1(0);
++    OLED_RST2(0);
++    HAL_Delay(20);
++
++    OLED_RST1(1);
++    OLED_RST2(1);
++    HAL_Delay(20);
++}
++
++static void OLED_SetPos(uint8_t x, uint8_t page)
++{
++    OLED_WriteCmd(0xB0 + page);
++    OLED_WriteCmd(((x & 0xF0) >> 4) | 0x10);
++    OLED_WriteCmd((x & 0x0F) | 0x01);
++}
++
++static void OLED_Clear(void)
++{
++    for (uint8_t page = 0; page < 8; page++)
++    {
++        OLED_SetPos(0, page);
++        for (uint8_t x = 0; x < 128; x++)
++        {
++            OLED_WriteData(0x00);
++        }
++    }
++}
++
++static void OLED_Fill(uint8_t dat)
++{
++    for (uint8_t page = 0; page < 8; page++)
++    {
++        OLED_SetPos(0, page);
++        for (uint8_t x = 0; x < 128; x++)
++        {
++            OLED_WriteData(dat);
++        }
++    }
++}
++
++static void OLED_Init(void)
++{
++    OLED_Reset();
++
++    OLED_WriteCmd(0xAE); // display off
++    OLED_WriteCmd(0xD5); OLED_WriteCmd(0x80);
++    OLED_WriteCmd(0xA8); OLED_WriteCmd(0x3F);
++    OLED_WriteCmd(0xD3); OLED_WriteCmd(0x00);
++    OLED_WriteCmd(0x40);
++    OLED_WriteCmd(0x8D); OLED_WriteCmd(0x14);
++    OLED_WriteCmd(0x20); OLED_WriteCmd(0x02); // page mode
++    OLED_WriteCmd(0xA1);
++    OLED_WriteCmd(0xC8);
++    OLED_WriteCmd(0xDA); OLED_WriteCmd(0x12);
++    OLED_WriteCmd(0x81); OLED_WriteCmd(0xCF);
++    OLED_WriteCmd(0xD9); OLED_WriteCmd(0xF1);
++    OLED_WriteCmd(0xDB); OLED_WriteCmd(0x30);
++    OLED_WriteCmd(0xA4);
++    OLED_WriteCmd(0xA6);
++    OLED_WriteCmd(0xAF); // display on
++
++    HAL_Delay(50);
++    OLED_Clear();
++}
++
++/* 只放测试字符：O L E D 空格 K */
++static const uint8_t font6x8[][6] =
++{
++    {0x00,0x00,0x00,0x00,0x00,0x00}, // ' '
++    {0x3E,0x41,0x41,0x41,0x3E,0x00}, // O
++    {0x7F,0x40,0x40,0x40,0x40,0x00}, // L
++    {0x7F,0x49,0x49,0x49,0x41,0x00}, // E
++    {0x7F,0x41,0x41,0x22,0x1C,0x00}, // D
++    {0x7F,0x08,0x14,0x22,0x41,0x00}, // K
++};
++
++static const uint8_t* font_get(char c)
++{
++    switch(c)
++    {
++        case ' ': return font6x8[0];
++        case 'O': return font6x8[1];
++        case 'L': return font6x8[2];
++        case 'E': return font6x8[3];
++        case 'D': return font6x8[4];
++        case 'K': return font6x8[5];
++        default:  return font6x8[0];
++    }
++}
++
++static void OLED_ShowChar(uint8_t x, uint8_t page, char c)
++{
++    const uint8_t *p = font_get(c);
++    OLED_SetPos(x, page);
++    for (uint8_t i = 0; i < 6; i++)
++    {
++        OLED_WriteData(p[i]);
++    }
++}
++
++static void OLED_ShowString(uint8_t x, uint8_t page, const char *s)
++{
++    while (*s)
++    {
++        OLED_ShowChar(x, page, *s++);
++        x += 6;
++        if (x > 122)
++        {
++            x = 0;
++            page++;
++            if (page > 7) break;
++        }
++    }
++}
++
++int main(void)
++{
++    HAL_Init();
++    SystemClock_Config();
++    MX_GPIO_Init();
++
++    OLED_Init();
++
++    /* 上电先全亮 1 秒，便于确认屏已被驱动 */
++    OLED_Fill(0xFF);
++    HAL_Delay(1000);
++
++    OLED_Clear();
++    OLED_ShowString(0, 0, "OLED OK");
++
++    while (1)
++    {
++        HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_5); // DS0继续闪
++        HAL_Delay(500);
++    }
++}
++
++static void MX_GPIO_Init(void)
++{
++    __HAL_RCC_GPIOB_CLK_ENABLE();
++    __HAL_RCC_GPIOD_CLK_ENABLE();
++    __HAL_RCC_GPIOG_CLK_ENABLE();
++    __HAL_RCC_AFIO_CLK_ENABLE();
++
++    GPIO_InitTypeDef GPIO_InitStruct = {0};
++
++    /* DS0 */
++    GPIO_InitStruct.Pin = GPIO_PIN_5;
++    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
++    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
++    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
++
++    /* SCL / RST1 */
++    GPIO_InitStruct.Pin = OLED_SCL_PIN | OLED_RST1_PIN;
++    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
++    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
++    HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
++
++    /* SDA / RST2 */
++    GPIO_InitStruct.Pin = OLED_SDA_PIN | OLED_RST2_PIN;
++    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
++    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
++    HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
++
++    OLED_SCL(1);
++    OLED_SDA(1);
++    OLED_RST1(1);
++    OLED_RST2(1);
++}
++
++void SystemClock_Config(void)
++{
++    RCC_OscInitTypeDef RCC_OscInitStruct = {0};
++    RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
++
++    RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
++    RCC_OscInitStruct.HSEState = RCC_HSE_ON;
++    RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
++    RCC_OscInitStruct.HSIState = RCC_HSI_ON;
++    RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
++    RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
++    RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
++    HAL_RCC_OscConfig(&RCC_OscInitStruct);
++
++    RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK |
++                                  RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
++    RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
++    RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
++    RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
++    RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
++    HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2);
++}再烧录这个
+
+# 2026-03-29 11:00:28.092876
++/con
+
+# 2026-03-29 11:00:33.153882
++#include "stm32f1xx_hal.h"
++#include <string.h>
++
++/* ================= 引脚定义（精英V2 P4接口） =================
++   PD3  -> OV_SCL
++   PG13 -> OV_SDA
++   PD6  -> OV_WRST
++   PG14 -> OV_RRST
++*/
++#define OLED_SCL_PORT    GPIOD
++#define OLED_SCL_PIN     GPIO_PIN_3
++
++#define OLED_SDA_PORT    GPIOG
++#define OLED_SDA_PIN     GPIO_PIN_13
++
++#define OLED_RST1_PORT   GPIOD
++#define OLED_RST1_PIN    GPIO_PIN_6
++
++#define OLED_RST2_PORT   GPIOG
++#define OLED_RST2_PIN    GPIO_PIN_14
++
++#define OLED_SCL(x) HAL_GPIO_WritePin(OLED_SCL_PORT, OLED_SCL_PIN, (x)?GPIO_PIN_SET:GPIO_PIN_RESET)
++#define OLED_SDA(x) HAL_GPIO_WritePin(OLED_SDA_PORT, OLED_SDA_PIN, (x)?GPIO_PIN_SET:GPIO_PIN_RESET)
++#define OLED_RST1(x) HAL_GPIO_WritePin(OLED_RST1_PORT, OLED_RST1_PIN, (x)?GPIO_PIN_SET:GPIO_PIN_RESET)
++#define OLED_RST2(x) HAL_GPIO_WritePin(OLED_RST2_PORT, OLED_RST2_PIN, (x)?GPIO_PIN_SET:GPIO_PIN_RESET)
++
++/* 常见 SSD1306 8bit 地址写地址：
++   0x78 -> SA0=0
++   0x7A -> SA0=1
++   这里两种都试一遍，兼容不同模块配置
++*/
++#define OLED_ADDR1 0x78
++#define OLED_ADDR2 0x7A
++
++void SystemClock_Config(void);
++static void MX_GPIO_Init(void);
++
++static void delay_us_soft(volatile uint32_t t)
++{
++    while (t--) __NOP();
++}
++
++/* ================= 软件I2C ================= */
++static void I2C_Start(void)
++{
++    OLED_SDA(1);
++    OLED_SCL(1);
++    delay_us_soft(30);
++    OLED_SDA(0);
++    delay_us_soft(30);
++    OLED_SCL(0);
++}
++
++static void I2C_Stop(void)
++{
++    OLED_SCL(0);
++    OLED_SDA(0);
++    delay_us_soft(30);
++    OLED_SCL(1);
++    delay_us_soft(30);
++    OLED_SDA(1);
++    delay_us_soft(30);
++}
++
++static void I2C_SendByte(uint8_t byte)
++{
++    for (uint8_t i = 0; i < 8; i++)
++    {
++        OLED_SCL(0);
++        if (byte & 0x80) OLED_SDA(1);
++        else             OLED_SDA(0);
++        delay_us_soft(20);
++        OLED_SCL(1);
++        delay_us_soft(20);
++        byte <<= 1;
++    }
++    /* 不读ACK，直接给一个时钟脉冲跳过 */
++    OLED_SCL(0);
++    OLED_SDA(1);
++    delay_us_soft(20);
++    OLED_SCL(1);
++    delay_us_soft(20);
++    OLED_SCL(0);
++}
++
++static void OLED_WriteCmd_Addr(uint8_t addr, uint8_t cmd)
++{
++    I2C_Start();
++    I2C_SendByte(addr);   // 器件地址
++    I2C_SendByte(0x00);   // Co=0, D/C#=0 -> 命令
++    I2C_SendByte(cmd);
++    I2C_Stop();
++}
++
++static void OLED_WriteData_Addr(uint8_t addr, uint8_t data)
++{
++    I2C_Start();
++    I2C_SendByte(addr);   // 器件地址
++    I2C_SendByte(0x40);   // Co=0, D/C#=1 -> 数据
++    I2C_SendByte(data);
++    I2C_Stop();
++}
++
++/* 两个地址都发一次，避免模块 SA0 配置不同 */
++static void OLED_WriteCmd(uint8_t cmd)
++{
++    OLED_WriteCmd_Addr(OLED_ADDR1, cmd);
++    OLED_WriteCmd_Addr(OLED_ADDR2, cmd);
++}
++
++static void OLED_WriteData(uint8_t data)
++{
++    OLED_WriteData_Addr(OLED_ADDR1, data);
++    OLED_WriteData_Addr(OLED_ADDR2, data);
++}
++
++static void OLED_Reset(void)
++{
++    OLED_RST1(1);
++    OLED_RST2(1);
++    HAL_Delay(10);
++
++    OLED_RST1(0);
++    OLED_RST2(0);
++    HAL_Delay(20);
++
++    OLED_RST1(1);
++    OLED_RST2(1);
++    HAL_Delay(20);
++}
++
++static void OLED_SetPos(uint8_t x, uint8_t page)
++{
++    OLED_WriteCmd(0xB0 + page);
++    OLED_WriteCmd(((x & 0xF0) >> 4) | 0x10);
++    OLED_WriteCmd((x & 0x0F) | 0x01);
++}
++
++static void OLED_Clear(void)
++{
++    for (uint8_t page = 0; page < 8; page++)
++    {
++        OLED_SetPos(0, page);
++        for (uint8_t x = 0; x < 128; x++)
++        {
++            OLED_WriteData(0x00);
++        }
++    }
++}
++
++static void OLED_Fill(uint8_t dat)
++{
++    for (uint8_t page = 0; page < 8; page++)
++    {
++        OLED_SetPos(0, page);
++        for (uint8_t x = 0; x < 128; x++)
++        {
++            OLED_WriteData(dat);
++        }
++    }
++}
++
++static void OLED_Init(void)
++{
++    OLED_Reset();
++
++    OLED_WriteCmd(0xAE); // display off
++    OLED_WriteCmd(0xD5); OLED_WriteCmd(0x80);
++    OLED_WriteCmd(0xA8); OLED_WriteCmd(0x3F);
++    OLED_WriteCmd(0xD3); OLED_WriteCmd(0x00);
++    OLED_WriteCmd(0x40);
++    OLED_WriteCmd(0x8D); OLED_WriteCmd(0x14);
++    OLED_WriteCmd(0x20); OLED_WriteCmd(0x02); // page mode
++    OLED_WriteCmd(0xA1);
++    OLED_WriteCmd(0xC8);
++    OLED_WriteCmd(0xDA); OLED_WriteCmd(0x12);
++    OLED_WriteCmd(0x81); OLED_WriteCmd(0xCF);
++    OLED_WriteCmd(0xD9); OLED_WriteCmd(0xF1);
++    OLED_WriteCmd(0xDB); OLED_WriteCmd(0x30);
++    OLED_WriteCmd(0xA4);
++    OLED_WriteCmd(0xA6);
++    OLED_WriteCmd(0xAF); // display on
++
++    HAL_Delay(50);
++    OLED_Clear();
++}
++
++/* 只放测试字符：O L E D 空格 K */
++static const uint8_t font6x8[][6] =
++{
++    {0x00,0x00,0x00,0x00,0x00,0x00}, // ' '
++    {0x3E,0x41,0x41,0x41,0x3E,0x00}, // O
++    {0x7F,0x40,0x40,0x40,0x40,0x00}, // L
++    {0x7F,0x49,0x49,0x49,0x41,0x00}, // E
++    {0x7F,0x41,0x41,0x22,0x1C,0x00}, // D
++    {0x7F,0x08,0x14,0x22,0x41,0x00}, // K
++};
++
++static const uint8_t* font_get(char c)
++{
++    switch(c)
++    {
++        case ' ': return font6x8[0];
++        case 'O': return font6x8[1];
++        case 'L': return font6x8[2];
++        case 'E': return font6x8[3];
++        case 'D': return font6x8[4];
++        case 'K': return font6x8[5];
++        default:  return font6x8[0];
++    }
++}
++
++static void OLED_ShowChar(uint8_t x, uint8_t page, char c)
++{
++    const uint8_t *p = font_get(c);
++    OLED_SetPos(x, page);
++    for (uint8_t i = 0; i < 6; i++)
++    {
++        OLED_WriteData(p[i]);
++    }
++}
++
++static void OLED_ShowString(uint8_t x, uint8_t page, const char *s)
++{
++    while (*s)
++    {
++        OLED_ShowChar(x, page, *s++);
++        x += 6;
++        if (x > 122)
++        {
++            x = 0;
++            page++;
++            if (page > 7) break;
++        }
++    }
++}
++
++int main(void)
++{
++    HAL_Init();
++    SystemClock_Config();
++    MX_GPIO_Init();
++
++    OLED_Init();
++
++    /* 上电先全亮 1 秒，便于确认屏已被驱动 */
++    OLED_Fill(0xFF);
++    HAL_Delay(1000);
++
++    OLED_Clear();
++    OLED_ShowString(0, 0, "OLED OK");
++
++    while (1)
++    {
++        HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_5); // DS0继续闪
++        HAL_Delay(500);
++    }
++}
++
++static void MX_GPIO_Init(void)
++{
++    __HAL_RCC_GPIOB_CLK_ENABLE();
++    __HAL_RCC_GPIOD_CLK_ENABLE();
++    __HAL_RCC_GPIOG_CLK_ENABLE();
++    __HAL_RCC_AFIO_CLK_ENABLE();
++
++    GPIO_InitTypeDef GPIO_InitStruct = {0};
++
++    /* DS0 */
++    GPIO_InitStruct.Pin = GPIO_PIN_5;
++    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
++    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
++    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
++
++    /* SCL / RST1 */
++    GPIO_InitStruct.Pin = OLED_SCL_PIN | OLED_RST1_PIN;
++    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
++    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
++    HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
++
++    /* SDA / RST2 */
++    GPIO_InitStruct.Pin = OLED_SDA_PIN | OLED_RST2_PIN;
++    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
++    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
++    HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
++
++    OLED_SCL(1);
++    OLED_SDA(1);
++    OLED_RST1(1);
++    OLED_RST2(1);
++}
++
++void SystemClock_Config(void)
++{
++    RCC_OscInitTypeDef RCC_OscInitStruct = {0};
++    RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
++
++    RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
++    RCC_OscInitStruct.HSEState = RCC_HSE_ON;
++    RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
++    RCC_OscInitStruct.HSIState = RCC_HSI_ON;
++    RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
++    RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
++    RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
++    HAL_RCC_OscConfig(&RCC_OscInitStruct);
++
++    RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK |
++                                  RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
++    RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
++    RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
++    RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
++    RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
++    HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2);
++}再烧录这个
+
+# 2026-03-29 11:04:39.775331
++继续
+
+# 2026-03-29 11:14:45.117541
++#include "stm32f1xx_hal.h"
++#include <string.h>
++
++/* ================= OLED 引脚定义 =================
++   SCL  -> PD3   (OV_SCL)
++   SDA  -> PG13  (OV_SDA / DIN)
++   RES  -> PD6   (OV_WRST)
++   DC   -> PG14  (OV_RRST)
++   CS   -> PG15  (OV_OE)
++*/
++#define OLED_SCL_PORT   GPIOD
++#define OLED_SCL_PIN    GPIO_PIN_3
++
++#define OLED_SDA_PORT   GPIOG
++#define OLED_SDA_PIN    GPIO_PIN_13
++
++#define OLED_RES_PORT   GPIOD
++#define OLED_RES_PIN    GPIO_PIN_6
++
++#define OLED_DC_PORT    GPIOG
++#define OLED_DC_PIN     GPIO_PIN_14
++
++#define OLED_CS_PORT    GPIOG
++#define OLED_CS_PIN     GPIO_PIN_15
++
++#define OLED_SCL(x) HAL_GPIO_WritePin(OLED_SCL_PORT, OLED_SCL_PIN, (x) ? GPIO_PIN_SET : GPIO_PIN_RESET)
++#define OLED_SDA(x) HAL_GPIO_WritePin(OLED_SDA_PORT, OLED_SDA_PIN, (x) ? GPIO_PIN_SET : GPIO_PIN_RESET)
++#define OLED_RES(x) HAL_GPIO_WritePin(OLED_RES_PORT, OLED_RES_PIN, (x) ? GPIO_PIN_SET : GPIO_PIN_RESET)
++#define OLED_DC(x)  HAL_GPIO_WritePin(OLED_DC_PORT,  OLED_DC_PIN,  (x) ? GPIO_PIN_SET : GPIO_PIN_RESET)
++#define OLED_CS(x)  HAL_GPIO_WritePin(OLED_CS_PORT,  OLED_CS_PIN,  (x) ? GPIO_PIN_SET : GPIO_PIN_RESET)
++
++UART_HandleTypeDef huart1;
++
++void SystemClock_Config(void);
++static void MX_GPIO_Init(void);
++static void MX_USART1_UART_Init(void);
++
++static void delay_soft(volatile uint32_t t)
++{
++    while (t--) __NOP();
++}
++
++void HAL_UART_MspInit(UART_HandleTypeDef *huart)
++{
++    if (huart->Instance == USART1)
++    {
++        __HAL_RCC_USART1_CLK_ENABLE();
++        __HAL_RCC_GPIOA_CLK_ENABLE();
++
++        GPIO_InitTypeDef GPIO_InitStruct = {0};
++
++        /* PA9 -> TX */
++        GPIO_InitStruct.Pin = GPIO_PIN_9;
++        GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
++        GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
++        HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
++
++        /* PA10 -> RX */
++        GPIO_InitStruct.Pin = GPIO_PIN_10;
++        GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
++        GPIO_InitStruct.Pull = GPIO_NOPULL;
++        HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
++    }
++}
++
++static void MX_USART1_UART_Init(void)
++{
++    huart1.Instance = USART1;
++    huart1.Init.BaudRate = 115200;
++    huart1.Init.WordLength = UART_WORDLENGTH_8B;
++    huart1.Init.StopBits = UART_STOPBITS_1;
++    huart1.Init.Parity = UART_PARITY_NONE;
++    huart1.Init.Mode = UART_MODE_TX_RX;
++    huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
++    huart1.Init.OverSampling = UART_OVERSAMPLING_16;
++    HAL_UART_Init(&huart1);
++}
++
++static void Debug_Print(const char *s)
++{
++    HAL_UART_Transmit(&huart1, (uint8_t *)s, strlen(s), 1000);
++}
++
++/* ================= OLED 低层 ================= */
++
++static void OLED_WriteByte(uint8_t dat, uint8_t isData)
++{
++    OLED_CS(0);
++    OLED_DC(isData ? 1 : 0);
++
++    for (uint8_t i = 0; i < 8; i++)
++    {
++        OLED_SCL(0);
++
++        if (dat & 0x80) OLED_SDA(1);
++        else            OLED_SDA(0);
++
++        delay_soft(40);
++        OLED_SCL(1);
++        delay_soft(40);
++
++        dat <<= 1;
++    }
++
++    OLED_CS(1);
++}
++
++static void OLED_WriteCmd(uint8_t cmd)
++{
++    OLED_WriteByte(cmd, 0);
++}
++
++static void OLED_WriteData(uint8_t data)
++{
++    OLED_WriteByte(data, 1);
++}
++
++static void OLED_Reset(void)
++{
++    OLED_RES(1);
++    delay_soft(100000);
++
++    OLED_RES(0);
++    delay_soft(200000);
++
++    OLED_RES(1);
++    delay_soft(200000);
++}
++
++static void OLED_SetPos(uint8_t x, uint8_t page)
++{
++    OLED_WriteCmd(0xB0 + page);
++    OLED_WriteCmd(((x & 0xF0) >> 4) | 0x10);
++    OLED_WriteCmd((x & 0x0F) | 0x00);
++}
++
++static void OLED_Clear(void)
++{
++    for (uint8_t page = 0; page < 8; page++)
++    {
++        OLED_SetPos(0, page);
++        for (uint8_t x = 0; x < 128; x++)
++        {
++            OLED_WriteData(0x00);
++        }
++    }
++}
++
++static void OLED_Fill(uint8_t data)
++{
++    for (uint8_t page = 0; page < 8; page++)
++    {
++        OLED_SetPos(0, page);
++        for (uint8_t x = 0; x < 128; x++)
++        {
++            OLED_WriteData(data);
++        }
++    }
++}
++
++static void OLED_Init(void)
++{
++    OLED_Reset();
++
++    OLED_WriteCmd(0xAE); // display off
++
++    OLED_WriteCmd(0xD5);
++    OLED_WriteCmd(0x80);
++
++    OLED_WriteCmd(0xA8);
++    OLED_WriteCmd(0x3F);
++
++    OLED_WriteCmd(0xD3);
++    OLED_WriteCmd(0x00);
++
++    OLED_WriteCmd(0x40);
++
++    OLED_WriteCmd(0x8D);
++    OLED_WriteCmd(0x14);
++
++    OLED_WriteCmd(0x20);
++    OLED_WriteCmd(0x02); // page mode
++
++    OLED_WriteCmd(0xA1);
++    OLED_WriteCmd(0xC8);
++
++    OLED_WriteCmd(0xDA);
++    OLED_WriteCmd(0x12);
++
++    OLED_WriteCmd(0x81);
++    OLED_WriteCmd(0xCF);
++
++    OLED_WriteCmd(0xD9);
++    OLED_WriteCmd(0xF1);
++
++    OLED_WriteCmd(0xDB);
++    OLED_WriteCmd(0x30);
++
++    OLED_WriteCmd(0xA4);
++    OLED_WriteCmd(0xA6);
++
++    OLED_WriteCmd(0xAF); // display on
++
++    OLED_Clear();
++}
++
++/* ============== 极简 6x8 字模，只做 HELLO ============== */
++static const uint8_t FONT_H[6] = {0x7F,0x08,0x08,0x08,0x7F,0x00};
++static const uint8_t FONT_E[6] = {0x7F,0x49,0x49,0x49,0x41,0x00};
++static const uint8_t FONT_L[6] = {0x7F,0x40,0x40,0x40,0x40,0x00};
++static const uint8_t FONT_O[6] = {0x3E,0x41,0x41,0x41,0x3E,0x00};
++
++static void OLED_ShowGlyph6x8(uint8_t x, uint8_t page, const uint8_t *glyph)
++{
++    OLED_SetPos(x, page);
++    for (uint8_t i = 0; i < 6; i++)
++    {
++        OLED_WriteData(glyph[i]);
++    }
++}
++
++static void OLED_ShowHello(void)
++{
++    OLED_ShowGlyph6x8(0, 0, FONT_H);
++    OLED_ShowGlyph6x8(6, 0, FONT_E);
++    OLED_ShowGlyph6x8(12, 0, FONT_L);
++    OLED_ShowGlyph6x8(18, 0, FONT_L);
++    OLED_ShowGlyph6x8(24, 0, FONT_O);
++}
++
++int main(void)
++{
++    HAL_Init();
++    SystemClock_Config();
++    MX_GPIO_Init();
++    MX_USART1_UART_Init();
++
++    Debug_Print("Gary:BOOT\r\n");
++    Debug_Print("OLED SPI-STYLE TEST\r\n");
++
++    OLED_Init();
++    Debug_Print("OLED Init Done\r\n");
++
++    /* 先全亮一秒，便于观察 */
++    OLED_Fill(0xFF);
++    HAL_Delay(1000);
++
++    OLED_Clear();
++    OLED_ShowHello();
++    Debug_Print("Show HELLO\r\n");
++
++    while (1)
++    {
++        HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_5); // DS0
++        HAL_Delay(500);
++    }
++}
++
++static void MX_GPIO_Init(void)
++{
++    __HAL_RCC_GPIOB_CLK_ENABLE();
++    __HAL_RCC_GPIOD_CLK_ENABLE();
++    __HAL_RCC_GPIOG_CLK_ENABLE();
++    __HAL_RCC_AFIO_CLK_ENABLE();
++
++    GPIO_InitTypeDef GPIO_InitStruct = {0};
++
++    /* DS0: PB5 */
++    GPIO_InitStruct.Pin = GPIO_PIN_5;
++    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
++    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
++    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
++
++    /* PD3, PD6 */
++    GPIO_InitStruct.Pin = OLED_SCL_PIN | OLED_RES_PIN;
++    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
++    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
++    HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
++
++    /* PG13, PG14, PG15 */
++    GPIO_InitStruct.Pin = OLED_SDA_PIN | OLED_DC_PIN | OLED_CS_PIN;
++    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
++    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
++    HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
++
++    OLED_SCL(1);
++    OLED_SDA(1);
++    OLED_RES(1);
++    OLED_DC(1);
++    OLED_CS(1);
++}
++
++void SystemClock_Config(void)
++{
++    RCC_OscInitTypeDef RCC_OscInitStruct = {0};
++    RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
++
++    RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
++    RCC_OscInitStruct.HSIState = RCC_HSI_ON;
++    RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
++    RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
++    RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI_DIV2;
++    RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL16;   // 8/2*16 = 64MHz
++    HAL_RCC_OscConfig(&RCC_OscInitStruct);
++
++    RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK |
++                                  RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
++    RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
++    RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
++    RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
++    RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
++    HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2);
++}
++
++void SysTick_Handler(void)
++{
++    HAL_IncTick();
++}试试这个main文件能不能点oled
+
+# 2026-03-29 11:20:03.351016
++#include "stm32f1xx_hal.h"
++#include <string.h>
++
++/* ===== 引脚 =====
++SPI假设:
++SCL  -> PD3
++SDA  -> PG13
++RES  -> PD6
++DC   -> PG14
++CS   -> PG15
++
++I2C假设:
++SCL  -> PD3
++SDA  -> PG13
++RES  -> PD6
++*/
++
++#define OLED_SCL_PORT   GPIOD
++#define OLED_SCL_PIN    GPIO_PIN_3
++
++#define OLED_SDA_PORT   GPIOG
++#define OLED_SDA_PIN    GPIO_PIN_13
++
++#define OLED_RES_PORT   GPIOD
++#define OLED_RES_PIN    GPIO_PIN_6
++
++#define OLED_DC_PORT    GPIOG
++#define OLED_DC_PIN     GPIO_PIN_14
++
++#define OLED_CS_PORT    GPIOG
++#define OLED_CS_PIN     GPIO_PIN_15
++
++#define LED_PORT        GPIOB
++#define LED_PIN         GPIO_PIN_5
++
++#define OLED_SCL(x) HAL_GPIO_WritePin(OLED_SCL_PORT, OLED_SCL_PIN, (x)?GPIO_PIN_SET:GPIO_PIN_RESET)
++#define OLED_SDA(x) HAL_GPIO_WritePin(OLED_SDA_PORT, OLED_SDA_PIN, (x)?GPIO_PIN_SET:GPIO_PIN_RESET)
++#define OLED_RES(x) HAL_GPIO_WritePin(OLED_RES_PORT, OLED_RES_PIN, (x)?GPIO_PIN_SET:GPIO_PIN_RESET)
++#define OLED_DC(x)  HAL_GPIO_WritePin(OLED_DC_PORT,  OLED_DC_PIN,  (x)?GPIO_PIN_SET:GPIO_PIN_RESET)
++#define OLED_CS(x)  HAL_GPIO_WritePin(OLED_CS_PORT,  OLED_CS_PIN,  (x)?GPIO_PIN_SET:GPIO_PIN_RESET)
++
++UART_HandleTypeDef huart1;
++
++void SystemClock_Config(void);
++static void MX_GPIO_Init(void);
++static void MX_USART1_UART_Init(void);
++
++static void delay_soft(volatile uint32_t t)
++{
++    while (t--) __NOP();
++}
++
++static void Debug_Print(const char *s)
++{
++    HAL_UART_Transmit(&huart1, (uint8_t *)s, strlen(s), 1000);
++}
++
++void HAL_UART_MspInit(UART_HandleTypeDef *huart)
++{
++    if (huart->Instance == USART1)
++    {
++        __HAL_RCC_USART1_CLK_ENABLE();
++        __HAL_RCC_GPIOA_CLK_ENABLE();
++
++        GPIO_InitTypeDef GPIO_InitStruct = {0};
++
++        GPIO_InitStruct.Pin = GPIO_PIN_9;
++        GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
++        GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
++        HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
++
++        GPIO_InitStruct.Pin = GPIO_PIN_10;
++        GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
++        GPIO_InitStruct.Pull = GPIO_NOPULL;
++        HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
++    }
++}
++
++static void MX_USART1_UART_Init(void)
++{
++    huart1.Instance = USART1;
++    huart1.Init.BaudRate = 115200;
++    huart1.Init.WordLength = UART_WORDLENGTH_8B;
++    huart1.Init.StopBits = UART_STOPBITS_1;
++    huart1.Init.Parity = UART_PARITY_NONE;
++    huart1.Init.Mode = UART_MODE_TX_RX;
++    huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
++    huart1.Init.OverSampling = UART_OVERSAMPLING_16;
++    HAL_UART_Init(&huart1);
++}
++
++/* ================= SPI 5线模式 ================= */
++
++static void SPI_WriteByte(uint8_t dat, uint8_t isData)
++{
++    OLED_CS(0);
++    OLED_DC(isData ? 1 : 0);
++
++    for (uint8_t i = 0; i < 8; i++)
++    {
++        OLED_SCL(0);
++        OLED_SDA((dat & 0x80) ? 1 : 0);
++        delay_soft(50);
++        OLED_SCL(1);
++        delay_soft(50);
++        dat <<= 1;
++    }
++
++    OLED_CS(1);
++}
++
++static void SPI_WriteCmd(uint8_t cmd)
++{
++    SPI_WriteByte(cmd, 0);
++}
++
++static void SPI_WriteData(uint8_t dat)
++{
++    SPI_WriteByte(dat, 1);
++}
++
++static void OLED_Reset(void)
++{
++    OLED_RES(1);
++    HAL_Delay(10);
++    OLED_RES(0);
++    HAL_Delay(20);
++    OLED_RES(1);
++    HAL_Delay(20);
++}
++
++static void SPI_SetPos(uint8_t x, uint8_t page)
++{
++    SPI_WriteCmd(0xB0 + page);
++    SPI_WriteCmd(((x & 0xF0) >> 4) | 0x10);
++    SPI_WriteCmd((x & 0x0F) | 0x00);
++}
++
++static void SPI_Fill(uint8_t dat)
++{
++    for (uint8_t page = 0; page < 8; page++)
++    {
++        SPI_SetPos(0, page);
++        for (uint8_t x = 0; x < 128; x++)
++        {
++            SPI_WriteData(dat);
++        }
++    }
++}
++
++static void SPI_Init_OLED(void)
++{
++    OLED_Reset();
++
++    SPI_WriteCmd(0xAE);
++    SPI_WriteCmd(0xD5); SPI_WriteCmd(0x80);
++    SPI_WriteCmd(0xA8); SPI_WriteCmd(0x3F);
++    SPI_WriteCmd(0xD3); SPI_WriteCmd(0x00);
++    SPI_WriteCmd(0x40);
++    SPI_WriteCmd(0x8D); SPI_WriteCmd(0x14);
++    SPI_WriteCmd(0x20); SPI_WriteCmd(0x02);
++    SPI_WriteCmd(0xA1);
++    SPI_WriteCmd(0xC8);
++    SPI_WriteCmd(0xDA); SPI_WriteCmd(0x12);
++    SPI_WriteCmd(0x81); SPI_WriteCmd(0xCF);
++    SPI_WriteCmd(0xD9); SPI_WriteCmd(0xF1);
++    SPI_WriteCmd(0xDB); SPI_WriteCmd(0x30);
++    SPI_WriteCmd(0xA4);
++    SPI_WriteCmd(0xA6);
++    SPI_WriteCmd(0xAF);
++}
++
++/* ================= I2C 模式 ================= */
++
++#define OLED_ADDR1 0x78
++#define OLED_ADDR2 0x7A
++
++static void I2C_Start(void)
++{
++    OLED_SDA(1);
++    OLED_SCL(1);
++    delay_soft(40);
++    OLED_SDA(0);
++    delay_soft(40);
++    OLED_SCL(0);
++}
++
++static void I2C_Stop(void)
++{
++    OLED_SCL(0);
++    OLED_SDA(0);
++    delay_soft(40);
++    OLED_SCL(1);
++    delay_soft(40);
++    OLED_SDA(1);
++    delay_soft(40);
++}
++
++static void I2C_SendByte(uint8_t byte)
++{
++    for (uint8_t i = 0; i < 8; i++)
++    {
++        OLED_SCL(0);
++        OLED_SDA((byte & 0x80) ? 1 : 0);
++        delay_soft(30);
++        OLED_SCL(1);
++        delay_soft(30);
++        byte <<= 1;
++    }
++
++    /* 跳过ACK */
++    OLED_SCL(0);
++    OLED_SDA(1);
++    delay_soft(20);
++    OLED_SCL(1);
++    delay_soft(20);
++    OLED_SCL(0);
++}
++
++static void I2C_WriteCmd_Addr(uint8_t addr, uint8_t cmd)
++{
++    I2C_Start();
++    I2C_SendByte(addr);
++    I2C_SendByte(0x00);
++    I2C_SendByte(cmd);
++    I2C_Stop();
++}
++
++static void I2C_WriteData_Addr(uint8_t addr, uint8_t dat)
++{
++    I2C_Start();
++    I2C_SendByte(addr);
++    I2C_SendByte(0x40);
++    I2C_SendByte(dat);
++    I2C_Stop();
++}
++
++static void I2C_WriteCmd(uint8_t cmd)
++{
++    I2C_WriteCmd_Addr(OLED_ADDR1, cmd);
++    I2C_WriteCmd_Addr(OLED_ADDR2, cmd);
++}
++
++static void I2C_WriteData(uint8_t dat)
++{
++    I2C_WriteData_Addr(OLED_ADDR1, dat);
++    I2C_WriteData_Addr(OLED_ADDR2, dat);
++}
++
++static void I2C_SetPos(uint8_t x, uint8_t page)
++{
++    I2C_WriteCmd(0xB0 + page);
++    I2C_WriteCmd(((x & 0xF0) >> 4) | 0x10);
++    I2C_WriteCmd((x & 0x0F) | 0x00);
++}
++
++static void I2C_Fill(uint8_t dat)
++{
++    for (uint8_t page = 0; page < 8; page++)
++    {
++        I2C_SetPos(0, page);
++        for (uint8_t x = 0; x < 128; x++)
++        {
++            I2C_WriteData(dat);
++        }
++    }
++}
++
++static void I2C_Init_OLED(void)
++{
++    OLED_Reset();
++
++    I2C_WriteCmd(0xAE);
++    I2C_WriteCmd(0xD5); I2C_WriteCmd(0x80);
++    I2C_WriteCmd(0xA8); I2C_WriteCmd(0x3F);
++    I2C_WriteCmd(0xD3); I2C_WriteCmd(0x00);
++    I2C_WriteCmd(0x40);
++    I2C_WriteCmd(0x8D); I2C_WriteCmd(0x14);
++    I2C_WriteCmd(0x20); I2C_WriteCmd(0x02);
++    I2C_WriteCmd(0xA1);
++    I2C_WriteCmd(0xC8);
++    I2C_WriteCmd(0xDA); I2C_WriteCmd(0x12);
++    I2C_WriteCmd(0x81); I2C_WriteCmd(0xCF);
++    I2C_WriteCmd(0xD9); I2C_WriteCmd(0xF1);
++    I2C_WriteCmd(0xDB); I2C_WriteCmd(0x30);
++    I2C_WriteCmd(0xA4);
++    I2C_WriteCmd(0xA6);
++    I2C_WriteCmd(0xAF);
++}
++
++/* ================= 主流程 ================= */
++
++static void Blink_LED(uint32_t ms)
++{
++    HAL_GPIO_TogglePin(LED_PORT, LED_PIN);
++    HAL_Delay(ms);
++}
++
++int main(void)
++{
++    HAL_Init();
++    SystemClock_Config();
++    MX_GPIO_Init();
++    MX_USART1_UART_Init();
++
++    Debug_Print("Gary:BOOT\r\n");
++
++    while (1)
++    {
++        Debug_Print("\r\n=== TEST SPI MODE ===\r\n");
++        SPI_Init_OLED();
++        Debug_Print("SPI Init Done\r\n");
++        SPI_Fill(0xFF);
++        Debug_Print("SPI Fill FF\r\n");
++        HAL_Delay(1500);
++        SPI_Fill(0x00);
++        Debug_Print("SPI Clear\r\n");
++        HAL_Delay(1500);
++
++        for (int i = 0; i < 4; i++) Blink_LED(250);
++
++        Debug_Print("\r\n=== TEST I2C MODE ===\r\n");
++        I2C_Init_OLED();
++        Debug_Print("I2C Init Done\r\n");
++        I2C_Fill(0xFF);
++        Debug_Print("I2C Fill FF\r\n");
++        HAL_Delay(1500);
++        I2C_Fill(0x00);
++        Debug_Print("I2C Clear\r\n");
++        HAL_Delay(1500);
++
++        for (int i = 0; i < 4; i++) Blink_LED(250);
++    }
++}
++
++static void MX_GPIO_Init(void)
++{
++    __HAL_RCC_GPIOA_CLK_ENABLE();
++    __HAL_RCC_GPIOB_CLK_ENABLE();
++    __HAL_RCC_GPIOD_CLK_ENABLE();
++    __HAL_RCC_GPIOG_CLK_ENABLE();
++    __HAL_RCC_AFIO_CLK_ENABLE();
++
++    GPIO_InitTypeDef GPIO_InitStruct = {0};
++
++    GPIO_InitStruct.Pin = LED_PIN;
++    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
++    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
++    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
++
++    GPIO_InitStruct.Pin = OLED_SCL_PIN | OLED_RES_PIN;
++    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
++    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
++    HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
++
++    GPIO_InitStruct.Pin = OLED_SDA_PIN | OLED_DC_PIN | OLED_CS_PIN;
++    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
++    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
++    HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
++
++    OLED_SCL(1);
++    OLED_SDA(1);
++    OLED_RES(1);
++    OLED_DC(1);
++    OLED_CS(1);
++}
++
++void SystemClock_Config(void)
++{
++    RCC_OscInitTypeDef RCC_OscInitStruct = {0};
++    RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
++
++    RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
++    RCC_OscInitStruct.HSIState = RCC_HSI_ON;
++    RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
++    RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
++    RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI_DIV2;
++    RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL16;
++    HAL_RCC_OscConfig(&RCC_OscInitStruct);
++
++    RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK |
++                                  RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
++    RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
++    RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
++    RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
++    RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
++    HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2);
++}
++
++void SysTick_Handler(void)
++{
++    HAL_IncTick();
++}试试这个
+
+# 2026-03-29 11:30:51.175086
++我换了一个oled再次烧录试试
+
+# 2026-03-29 11:31:59.551924
++/connect STM32F103ZE
+
+# 2026-03-29 11:32:08.893047
++再次烧录
+
+# 2026-03-29 11:34:41.197915
++#include "stm32f1xx_hal.h"
++#include <stdio.h>
++#include <string.h>
++
++/* ===== 引脚定义 ===== */
++#define DHT11_PORT      GPIOG
++#define DHT11_PIN       GPIO_PIN_11     // PG11, 1WIRE_DQ
++
++#define LED_PORT        GPIOB
++#define LED_PIN         GPIO_PIN_5      // DS0
++
++UART_HandleTypeDef huart1;
++
++void SystemClock_Config(void);
++static void MX_GPIO_Init(void);
++static void MX_USART1_UART_Init(void);
++
++/* ================= 串口调试 ================= */
++void HAL_UART_MspInit(UART_HandleTypeDef *huart)
++{
++    if (huart->Instance == USART1)
++    {
++        __HAL_RCC_USART1_CLK_ENABLE();
++        __HAL_RCC_GPIOA_CLK_ENABLE();
++
++        GPIO_InitTypeDef GPIO_InitStruct = {0};
++
++        GPIO_InitStruct.Pin = GPIO_PIN_9;
++        GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
++        GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
++        HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
++
++        GPIO_InitStruct.Pin = GPIO_PIN_10;
++        GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
++        GPIO_InitStruct.Pull = GPIO_NOPULL;
++        HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
++    }
++}
++
++static void MX_USART1_UART_Init(void)
++{
++    huart1.Instance = USART1;
++    huart1.Init.BaudRate = 115200;
++    huart1.Init.WordLength = UART_WORDLENGTH_8B;
++    huart1.Init.StopBits = UART_STOPBITS_1;
++    huart1.Init.Parity = UART_PARITY_NONE;
++    huart1.Init.Mode = UART_MODE_TX_RX;
++    huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
++    huart1.Init.OverSampling = UART_OVERSAMPLING_16;
++    HAL_UART_Init(&huart1);
++}
++
++static void Debug_Print(const char *s)
++{
++    HAL_UART_Transmit(&huart1, (uint8_t *)s, strlen(s), 1000);
++}
++
++/* ================= 微秒延时 ================= */
++static void delay_us(uint16_t us)
++{
++    uint32_t start = DWT->CYCCNT;
++    uint32_t ticks = us * (HAL_RCC_GetHCLKFreq() / 1000000U);
++    while ((DWT->CYCCNT - start) < ticks);
++}
++
++static void DWT_Delay_Init(void)
++{
++    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
++    DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
++    DWT->CYCCNT = 0;
++}
++
++/* ================= DHT11 IO 模式切换 ================= */
++static void DHT11_Pin_Output(void)
++{
++    GPIO_InitTypeDef GPIO_InitStruct = {0};
++    GPIO_InitStruct.Pin = DHT11_PIN;
++    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;   // 开漏更稳
++    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
++    HAL_GPIO_Init(DHT11_PORT, &GPIO_InitStruct);
++}
++
++static void DHT11_Pin_Input(void)
++{
++    GPIO_InitTypeDef GPIO_InitStruct = {0};
++    GPIO_InitStruct.Pin = DHT11_PIN;
++    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
++    GPIO_InitStruct.Pull = GPIO_NOPULL;
++    HAL_GPIO_Init(DHT11_PORT, &GPIO_InitStruct);
++}
++
++/* ================= DHT11 底层 ================= */
++static uint8_t DHT11_ResetAndCheck(void)
++{
++    uint16_t retry = 0;
++
++    DHT11_Pin_Output();
++    HAL_GPIO_WritePin(DHT11_PORT, DHT11_PIN, GPIO_PIN_RESET);
++    HAL_Delay(20);                 // 主机拉低至少18ms
++    HAL_GPIO_WritePin(DHT11_PORT, DHT11_PIN, GPIO_PIN_SET);
++    delay_us(30);                  // 拉高 20~40us
++    DHT11_Pin_Input();
++
++    /* 等待 DHT11 拉低，响应开始 */
++    retry = 0;
++    while (HAL_GPIO_ReadPin(DHT11_PORT, DHT11_PIN) == GPIO_PIN_SET)
++    {
++        delay_us(1);
++        if (++retry > 100) return 1;
++    }
++
++    /* 等待 DHT11 拉高 */
++    retry = 0;
++    while (HAL_GPIO_ReadPin(DHT11_PORT, DHT11_PIN) == GPIO_PIN_RESET)
++    {
++        delay_us(1);
++        if (++retry > 100) return 2;
++    }
++
++    /* 等待 DHT11 准备发送数据（高电平结束） */
++    retry = 0;
++    while (HAL_GPIO_ReadPin(DHT11_PORT, DHT11_PIN) == GPIO_PIN_SET)
++    {
++        delay_us(1);
++        if (++retry > 100) return 3;
++    }
++
++    return 0;
++}
++
++static uint8_t DHT11_ReadBit(void)
++{
++    uint16_t retry = 0;
++
++    /* 等待低电平结束 */
++    while (HAL_GPIO_ReadPin(DHT11_PORT, DHT11_PIN) == GPIO_PIN_RESET)
++    {
++        delay_us(1);
++        if (++retry > 100) return 0;
++    }
++
++    /* 高电平开始后等待 40us，再判断 0/1 */
++    delay_us(40);
++
++    if (HAL_GPIO_ReadPin(DHT11_PORT, DHT11_PIN) == GPIO_PIN_SET)
++    {
++        /* 等待这个 bit 结束 */
++        retry = 0;
++        while (HAL_GPIO_ReadPin(DHT11_PORT, DHT11_PIN) == GPIO_PIN_SET)
++        {
++            delay_us(1);
++            if (++retry > 100) break;
++        }
++        return 1;
++    }
++    else
++    {
++        return 0;
++    }
++}
++
++static uint8_t DHT11_ReadByte(void)
++{
++    uint8_t i, data = 0;
++    for (i = 0; i < 8; i++)
++    {
++        data <<= 1;
++        data |= DHT11_ReadBit();
++    }
++    return data;
++}
++
++/* ================= DHT11 读数 ================= */
++static uint8_t DHT11_ReadData(uint8_t *humi_int, uint8_t *humi_dec,
++                              uint8_t *temp_int, uint8_t *temp_dec)
++{
++    uint8_t buf[5];
++
++    if (DHT11_ResetAndCheck() != 0)
++        return 1;
++
++    for (int i = 0; i < 5; i++)
++        buf[i] = DHT11_ReadByte();
++
++    if ((uint8_t)(buf[0] + buf[1] + buf[2] + buf[3]) != buf[4])
++        return 2;
++
++    *humi_int = buf[0];
++    *humi_dec = buf[1];
++    *temp_int = buf[2];
++    *temp_dec = buf[3];
++
++    return 0;
++}
++
++/* ================= 主函数 ================= */
++int main(void)
++{
++    uint8_t humi_int, humi_dec, temp_int, temp_dec;
++    uint8_t ret;
++    char msg[128];
++
++    HAL_Init();
++    SystemClock_Config();
++    MX_GPIO_Init();
++    MX_USART1_UART_Init();
++    DWT_Delay_Init();
++
++    Debug_Print("Gary:BOOT\r\n");
++    Debug_Print("DHT11 test on PG11\r\n");
++
++    while (1)
++    {
++        ret = DHT11_ReadData(&humi_int, &humi_dec, &temp_int, &temp_dec);
++
++        if (ret == 0)
++        {
++            snprintf(msg, sizeof(msg),
++                     "DHT11 OK: Temp=%d.%d C, Humi=%d.%d %%RH\r\n",
++                     temp_int, temp_dec, humi_int, humi_dec);
++        }
++        else if (ret == 1)
++        {
++            snprintf(msg, sizeof(msg),
++                     "DHT11 ERROR: no response\r\n");
++        }
++        else
++        {
++            snprintf(msg, sizeof(msg),
++                     "DHT11 ERROR: checksum fail\r\n");
++        }
++
++        Debug_Print(msg);
++
++        HAL_GPIO_TogglePin(LED_PORT, LED_PIN);
++        HAL_Delay(2000);
++    }
++}
++
++/* ================= GPIO 初始化 ================= */
++static void MX_GPIO_Init(void)
++{
++    __HAL_RCC_GPIOB_CLK_ENABLE();
++    __HAL_RCC_GPIOG_CLK_ENABLE();
++    __HAL_RCC_AFIO_CLK_ENABLE();
++
++    GPIO_InitTypeDef GPIO_InitStruct = {0};
++
++    /* DS0 */
++    GPIO_InitStruct.Pin = LED_PIN;
++    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
++    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
++    HAL_GPIO_Init(LED_PORT, &GPIO_InitStruct);
++
++    /* DHT11 默认先释放为输入 */
++    GPIO_InitStruct.Pin = DHT11_PIN;
++    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
++    GPIO_InitStruct.Pull = GPIO_NOPULL;
++    HAL_GPIO_Init(DHT11_PORT, &GPIO_InitStruct);
++}
++
++/* ================= 时钟：HSI 64MHz ================= */
++void SystemClock_Config(void)
++{
++    RCC_OscInitTypeDef RCC_OscInitStruct = {0};
++    RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
++
++    RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
++    RCC_OscInitStruct.HSIState = RCC_HSI_ON;
++    RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
++    RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
++    RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI_DIV2;
++    RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL16;   // 8/2*16 = 64MHz
++    HAL_RCC_OscConfig(&RCC_OscInitStruct);
++
++    RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK |
++                                  RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
++    RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
++    RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
++    RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
++    RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
++    HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2);
++}
++
++void SysTick_Handler(void)
++{
++    HAL_IncTick();
++}烧录这个，看下dht11正不正常
+
+# 2026-03-29 11:37:01.862982
++再试一下
+
+# 2026-03-29 11:38:59.706549
++int main(void)
++{
++    HAL_Init();
++    SystemClock_Config();
++    MX_GPIO_Init();
++    MX_USART1_UART_Init();
++
++    while (1)
++    {
++        Debug_Print("UART OK\r\n");
++        HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_5);
++        HAL_Delay(1000);
++    }
++}烧录这个看下串口输出正不正常
+
+# 2026-03-29 11:40:29.625070
++继续
+
+# 2026-03-29 11:41:25.061879
++再次回到之前的dht11的把数据给电脑发送试试
+
+# 2026-03-29 11:57:57.001465
++/再试试之前的oled显示
+
+# 2026-03-29 11:58:15.453534
++再试试之前的oled显示
+
+# 2026-03-29 11:59:20.692068
++/connect STM32F
+
+# 2026-03-29 11:59:32.242806
++/exit
+
+# 2026-03-29 12:00:07.413065
++/connect stm32f103zetb
+
+# 2026-03-29 12:00:14.151071
++再试试之前的oled显示
+
+# 2026-03-29 12:01:08.378846
++#include "stm32f1xx_hal.h"
++#include <string.h>
++
++/* ================= OLED 引脚定义 =================
++   SCL  -> PD3   (OV_SCL)
++   SDA  -> PG13  (OV_SDA / DIN)
++   RES  -> PD6   (OV_WRST)
++   DC   -> PG14  (OV_RRST)
++   CS   -> PG15  (OV_OE)
++*/
++#define OLED_SCL_PORT   GPIOD
++#define OLED_SCL_PIN    GPIO_PIN_3
++
++#define OLED_SDA_PORT   GPIOG
++#define OLED_SDA_PIN    GPIO_PIN_13
++
++#define OLED_RES_PORT   GPIOD
++#define OLED_RES_PIN    GPIO_PIN_6
++
++#define OLED_DC_PORT    GPIOG
++#define OLED_DC_PIN     GPIO_PIN_14
++
++#define OLED_CS_PORT    GPIOG
++#define OLED_CS_PIN     GPIO_PIN_15
++
++#define OLED_SCL(x) HAL_GPIO_WritePin(OLED_SCL_PORT, OLED_SCL_PIN, (x) ? GPIO_PIN_SET : GPIO_PIN_RESET)
++#define OLED_SDA(x) HAL_GPIO_WritePin(OLED_SDA_PORT, OLED_SDA_PIN, (x) ? GPIO_PIN_SET : GPIO_PIN_RESET)
++#define OLED_RES(x) HAL_GPIO_WritePin(OLED_RES_PORT, OLED_RES_PIN, (x) ? GPIO_PIN_SET : GPIO_PIN_RESET)
++#define OLED_DC(x)  HAL_GPIO_WritePin(OLED_DC_PORT,  OLED_DC_PIN,  (x) ? GPIO_PIN_SET : GPIO_PIN_RESET)
++#define OLED_CS(x)  HAL_GPIO_WritePin(OLED_CS_PORT,  OLED_CS_PIN,  (x) ? GPIO_PIN_SET : GPIO_PIN_RESET)
++
++UART_HandleTypeDef huart1;
++
++void SystemClock_Config(void);
++static void MX_GPIO_Init(void);
++static void MX_USART1_UART_Init(void);
++
++static void delay_soft(volatile uint32_t t)
++{
++    while (t--) __NOP();
++}
++
++void HAL_UART_MspInit(UART_HandleTypeDef *huart)
++{
++    if (huart->Instance == USART1)
++    {
++        __HAL_RCC_USART1_CLK_ENABLE();
++        __HAL_RCC_GPIOA_CLK_ENABLE();
++
++        GPIO_InitTypeDef GPIO_InitStruct = {0};
++
++        /* PA9 -> TX */
++        GPIO_InitStruct.Pin = GPIO_PIN_9;
++        GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
++        GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
++        HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
++
++        /* PA10 -> RX */
++        GPIO_InitStruct.Pin = GPIO_PIN_10;
++        GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
++        GPIO_InitStruct.Pull = GPIO_NOPULL;
++        HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
++    }
++}
++
++static void MX_USART1_UART_Init(void)
++{
++    huart1.Instance = USART1;
++    huart1.Init.BaudRate = 115200;
++    huart1.Init.WordLength = UART_WORDLENGTH_8B;
++    huart1.Init.StopBits = UART_STOPBITS_1;
++    huart1.Init.Parity = UART_PARITY_NONE;
++    huart1.Init.Mode = UART_MODE_TX_RX;
++    huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
++    huart1.Init.OverSampling = UART_OVERSAMPLING_16;
++    HAL_UART_Init(&huart1);
++}
++
++static void Debug_Print(const char *s)
++{
++    HAL_UART_Transmit(&huart1, (uint8_t *)s, strlen(s), 1000);
++}
++
++/* ================= OLED 低层 ================= */
++
++static void OLED_WriteByte(uint8_t dat, uint8_t isData)
++{
++    OLED_CS(0);
++    OLED_DC(isData ? 1 : 0);
++
++    for (uint8_t i = 0; i < 8; i++)
++    {
++        OLED_SCL(0);
++
++        if (dat & 0x80) OLED_SDA(1);
++        else            OLED_SDA(0);
++
++        delay_soft(40);
++        OLED_SCL(1);
++        delay_soft(40);
++
++        dat <<= 1;
++    }
++
++    OLED_CS(1);
++}
++
++static void OLED_WriteCmd(uint8_t cmd)
++{
++    OLED_WriteByte(cmd, 0);
++}
++
++static void OLED_WriteData(uint8_t data)
++{
++    OLED_WriteByte(data, 1);
++}
++
++static void OLED_Reset(void)
++{
++    OLED_RES(1);
++    delay_soft(100000);
++
++    OLED_RES(0);
++    delay_soft(200000);
++
++    OLED_RES(1);
++    delay_soft(200000);
++}
++
++static void OLED_SetPos(uint8_t x, uint8_t page)
++{
++    OLED_WriteCmd(0xB0 + page);
++    OLED_WriteCmd(((x & 0xF0) >> 4) | 0x10);
++    OLED_WriteCmd((x & 0x0F) | 0x00);
++}
++
++static void OLED_Clear(void)
++{
++    for (uint8_t page = 0; page < 8; page++)
++    {
++        OLED_SetPos(0, page);
++        for (uint8_t x = 0; x < 128; x++)
++        {
++            OLED_WriteData(0x00);
++        }
++    }
++}
++
++static void OLED_Fill(uint8_t data)
++{
++    for (uint8_t page = 0; page < 8; page++)
++    {
++        OLED_SetPos(0, page);
++        for (uint8_t x = 0; x < 128; x++)
++        {
++            OLED_WriteData(data);
++        }
++    }
++}
++
++static void OLED_Init(void)
++{
++    OLED_Reset();
++
++    OLED_WriteCmd(0xAE); // display off
++
++    OLED_WriteCmd(0xD5);
++    OLED_WriteCmd(0x80);
++
++    OLED_WriteCmd(0xA8);
++    OLED_WriteCmd(0x3F);
++
++    OLED_WriteCmd(0xD3);
++    OLED_WriteCmd(0x00);
++
++    OLED_WriteCmd(0x40);
++
++    OLED_WriteCmd(0x8D);
++    OLED_WriteCmd(0x14);
++
++    OLED_WriteCmd(0x20);
++    OLED_WriteCmd(0x02); // page mode
++
++    OLED_WriteCmd(0xA1);
++    OLED_WriteCmd(0xC8);
++
++    OLED_WriteCmd(0xDA);
++    OLED_WriteCmd(0x12);
++
++    OLED_WriteCmd(0x81);
++    OLED_WriteCmd(0xCF);
++
++    OLED_WriteCmd(0xD9);
++    OLED_WriteCmd(0xF1);
++
++    OLED_WriteCmd(0xDB);
++    OLED_WriteCmd(0x30);
++
++    OLED_WriteCmd(0xA4);
++    OLED_WriteCmd(0xA6);
++
++    OLED_WriteCmd(0xAF); // display on
++
++    OLED_Clear();
++}
++
++/* ============== 极简 6x8 字模，只做 HELLO ============== */
++static const uint8_t FONT_H[6] = {0x7F,0x08,0x08,0x08,0x7F,0x00};
++static const uint8_t FONT_E[6] = {0x7F,0x49,0x49,0x49,0x41,0x00};
++static const uint8_t FONT_L[6] = {0x7F,0x40,0x40,0x40,0x40,0x00};
++static const uint8_t FONT_O[6] = {0x3E,0x41,0x41,0x41,0x3E,0x00};
++
++static void OLED_ShowGlyph6x8(uint8_t x, uint8_t page, const uint8_t *glyph)
++{
++    OLED_SetPos(x, page);
++    for (uint8_t i = 0; i < 6; i++)
++    {
++        OLED_WriteData(glyph[i]);
++    }
++}
++
++static void OLED_ShowHello(void)
++{
++    OLED_ShowGlyph6x8(0, 0, FONT_H);
++    OLED_ShowGlyph6x8(6, 0, FONT_E);
++    OLED_ShowGlyph6x8(12, 0, FONT_L);
++    OLED_ShowGlyph6x8(18, 0, FONT_L);
++    OLED_ShowGlyph6x8(24, 0, FONT_O);
++}
++
++int main(void)
++{
++    HAL_Init();
++    SystemClock_Config();
++    MX_GPIO_Init();
++    MX_USART1_UART_Init();
++
++    Debug_Print("Gary:BOOT\r\n");
++    Debug_Print("OLED SPI-STYLE TEST\r\n");
++
++    OLED_Init();
++    Debug_Print("OLED Init Done\r\n");
++
++    /* 先全亮一秒，便于观察 */
++    OLED_Fill(0xFF);
++    HAL_Delay(1000);
++
++    OLED_Clear();
++    OLED_ShowHello();
++    Debug_Print("Show HELLO\r\n");
++
++    while (1)
++    {
++        HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_5); // DS0
++        HAL_Delay(500);
++    }
++}
++
++static void MX_GPIO_Init(void)
++{
++    __HAL_RCC_GPIOB_CLK_ENABLE();
++    __HAL_RCC_GPIOD_CLK_ENABLE();
++    __HAL_RCC_GPIOG_CLK_ENABLE();
++    __HAL_RCC_AFIO_CLK_ENABLE();
++
++    GPIO_InitTypeDef GPIO_InitStruct = {0};
++
++    /* DS0: PB5 */
++    GPIO_InitStruct.Pin = GPIO_PIN_5;
++    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
++    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
++    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
++
++    /* PD3, PD6 */
++    GPIO_InitStruct.Pin = OLED_SCL_PIN | OLED_RES_PIN;
++    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
++    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
++    HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
++
++    /* PG13, PG14, PG15 */
++    GPIO_InitStruct.Pin = OLED_SDA_PIN | OLED_DC_PIN | OLED_CS_PIN;
++    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
++    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
++    HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
++
++    OLED_SCL(1);
++    OLED_SDA(1);
++    OLED_RES(1);
++    OLED_DC(1);
++    OLED_CS(1);
++}
++
++void SystemClock_Config(void)
++{
++    RCC_OscInitTypeDef RCC_OscInitStruct = {0};
++    RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
++
++    RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
++    RCC_OscInitStruct.HSIState = RCC_HSI_ON;
++    RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
++    RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
++    RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI_DIV2;
++    RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL16;   // 8/2*16 = 64MHz
++    HAL_RCC_OscConfig(&RCC_OscInitStruct);
++
++    RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK |
++                                  RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
++    RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
++    RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
++    RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
++    RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
++    HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2);
++}
++
++void SysTick_Handler(void)
++{
++    HAL_IncTick();
++}试试这个烧录
+
+# 2026-03-29 12:05:11.049431
++试试dht11
+
+# 2026-03-29 12:05:57.624331
++pg11
+
+# 2026-03-29 12:08:07.585904
++继续
+
+# 2026-03-29 12:10:56.926806
++/exit
+
+# 2026-03-29 12:11:15.568095
++/connect
+
+# 2026-03-29 12:11:31.418690
++/connect STM32F103ZE
+
+# 2026-03-29 12:11:50.982135
++试试dht11 连接在PG11上 测试一下
+
+# 2026-03-29 12:17:25.110919
++再试试
+
+# 2026-03-29 13:27:53.287915
++不要更换，这是正点原子预留的gpd11口，再试一下代码
+
+# 2026-03-29 13:35:13.358043
++/connect STM32F103ZE
+
+# 2026-03-29 13:35:52.914774
++"F:\精英V2 硬件参考手册_V1.0.pdf"读一下这个文件
+
+# 2026-03-29 13:36:37.445641
++写一下dht11的代码，把测试内容发送给串口
+
+# 2026-03-29 13:38:56.063212
++现在我接入oled显示器，尝试把dht11的数据发生给oled
+
+# 2026-03-29 13:45:00.155840
++oled 引脚写错了，我发给你的文件上面写着，OV_SCL/OV_SDA/FIFO_WRST/OV_RRST/OV_OE 这 5 个信号是分别连接在 MCU
++的PD3/PG13/PD6/PG14/PG15 上面，OV_D0~OV_D7 则连接在PC0~7上面（放在连续的IO上，
++可以提高读写效率），OV_RCLK/OV_WEN/OV_VSYNC 这 3 个信号是分别连接在 MCU 的
++PB4/PB3/PA8 上面。其中 PB3 和 PB4 又是 JTAG 的 JTRST/JTDO 信号，所以在使用
++OV7725/OV7670 的时候，不要用 JTAG 仿真，要选择 SWD 模式（所以我们建议大家直接用
++SWD模式来连接我们的开发板，这样所有的实验都可以仿真！）
+
+# 2026-03-29 13:45:42.118447
++我发给你的就是oled显示，这是正点原子配套的oled
+
+# 2026-03-29 13:46:33.129815
++SCL (时钟)：PD3 (对应接口的 OV_SCL) 
++
++
++SDA/DIN (数据)：PG13 (对应接口的 OV_SDA) 
++
++
++RES/RST (复位)：PD6 (对应接口的 OV_WRST) 
++
++
++DC/RS (数据/命令选择)：PG14 (对应接口的 OV_RRST) 
++
++
++CS (片选)：PG15 (对应接口的 OV_OE)
+
+# 2026-03-29 13:58:36.517562
++CS=PD6、RS/DC=PD3、WR/SCL=PG14、RD/SDA=PG13、RST=PG15改下引脚试试
+
+# 2026-03-29 14:04:43.126150
++"F:\STM32F103 精英开发指南V1.3.pdf"你再读下这个文件检查一下，oled还是没有输出
+
+# 2026-03-29 14:19:38.891524
++试试现在的main代码
+
+# 2026-03-29 14:27:48.996831
++/exit
+
+# 2026-03-29 14:28:08.509347
++/connect STM32F103ZE
+
+# 2026-03-29 14:28:27.696181
++试试现在的main代码
+
+# 2026-03-29 14:29:07.527544
++/connect STM32F103ZE
+
+# 2026-03-29 14:29:14.666757
++试试现在的main代码
+
+# 2026-03-29 14:31:29.512269
++/exit
+
+# 2026-03-29 14:31:39.367029
++/connect STM32F103ZE
+
+# 2026-03-29 14:31:43.355584
++试试现在的main代码
+
+# 2026-03-29 14:36:26.932993
++/exit
+
+# 2026-03-29 14:36:33.647610
++/connect STM32F103ZE
+
+# 2026-03-29 14:36:37.804605
++试试现在的main代码
+
+# 2026-03-29 14:37:46.978502
++/exit
+
+# 2026-03-29 14:38:02.445149
++/connect STM32F103ZE
+
+# 2026-03-29 14:38:06.139130
++试试现在的main代码
+
+# 2026-03-29 14:39:48.184945
++/exit
+
+# 2026-03-29 14:39:53.798006
++/connect STM32F103ZE
+
+# 2026-03-29 14:39:57.261378
++试试现在的main代码
+
+# 2026-03-29 14:41:58.419354
++/exit
+
+# 2026-03-29 14:42:04.575302
++/connect STM32F103ZE
+
+# 2026-03-29 14:42:08.139252
++试试现在的main代码
+
+# 2026-03-29 14:44:39.045424
++/exit
+
+# 2026-03-29 14:44:47.621311
++/connect STM32F103ZE
+
+# 2026-03-29 14:44:52.732768
++试试现在的main代码
+
+# 2026-03-29 14:45:54.491887
++oled还是没有亮，写一个最小测试系统
+
+# 2026-03-29 14:48:40.885800
++"F:\STM32F103 精英开发指南V1.3.pdf" 读一下这个文件，看一下哪里出问题没有，oled还是没有显示
+
+# 2026-03-29 14:52:55.280962
++/connect STM32F103ZE
+
+# 2026-03-29 14:54:21.028535
++/exit
+
+# 2026-03-29 14:54:29.370689
++/connect STM32F103ZE
+
+# 2026-03-29 15:46:58.676822
++继续
+
+# 2026-03-29 15:47:58.496540
++加载我main.c的文件尝试一下烧录
+
+# 2026-03-29 15:53:11.511904
++把这套作为skills，记为正点原子stm32精英版的oled的8080模式并且可以调用这个skill在oled上生成任意图案
+
+# 2026-03-29 16:05:45.261930
++/connect STM32F103ZE
+
+# 2026-03-29 16:05:55.532759
++/exit
+
+# 2026-03-29 16:07:32.150943
++试下正点原子的oled8080的显示skill，显示一段话
+
+# 2026-03-29 16:12:41.725275
++显示正常，但是字符好像出问题了，有点乱码，优化一下skills至正常
+
+# 2026-03-29 16:15:25.648924
++、
+
+# 2026-03-29 16:17:46.616004
++正常了，更新skills
+
+# 2026-03-29 16:28:30.765468
++现在试试读dht11接在gpio g11上面，让oled显示dht11的读数
+
+# 2026-03-29 16:38:38.534740
++再试试烧录
+
+# 2026-03-29 16:50:13.894777
++再试试烧录一下
+
+# 2026-03-29 16:50:52.240983
++/connect STM32F103ZE
+
+# 2026-03-29 16:51:09.223180
++继续
+
+# 2026-03-29 16:52:41.073366
++dht11的数值没有显示再oled里面，修改下，看一下我这个文件的"F:\STM32F103 精英开发指南V1.3.pdf"645页的dht11
+
+# 2026-03-29 16:55:20.768801
++/connect STM32F103ZE
+
+# 2026-03-29 16:55:23.236168
++继续
+
+# 2026-03-29 17:00:31.599960
++/* DHT11 引脚 定义 */ 
++#define DHT11_DQ_GPIO_PORT                  GPIOG 
++#define DHT11_DQ_GPIO_PIN                   GPIO_PIN_11 
++#define DHT11_DQ_GPIO_CLK_ENABLE()         
++do{ __HAL_RCC_GPIOG_CLK_ENABLE(); }while(0)   /* PG口时钟使能 */ 
++/* IO操作函数 */ 
++#define DHT11_DQ_OUT(x)     do{ x ? \ 
++     HAL_GPIO_WritePin(DHT11_DQ_GPIO_PORT,DHT11_DQ_GPIO_PIN, GPIO_PIN_SET):\ 
++     HAL_GPIO_WritePin(DHT11_DQ_GPIO_PORT,DHT11_DQ_GPIO_PIN, GPIO_PIN_RESET); \ 
++                                }while(0)                 /* 数据端口输出 */ 
++/* 数据端口输入 */ 
++#define DHT11_DQ_IN     HAL_GPIO_ReadPin(DHT11_DQ_GPIO_PORT, DHT11_DQ_GPIO_PIN) 
++对DHT11的相关引脚以及IO操作进行宏定义，方便程序中调用。 
++下面我们直接介绍dht11.c的程序，首先先介绍一下DHT11传感器的初始化函数，其定义
++如下： 
++/** 
++ * @brief        初始化DHT11的IO口 DQ 同时检测DHT11的存在 
++ * @param        无 
++ * @retval      0, 正常 
++ *               1, 不存在/不正常 
++ */ 
++uint8_t dht11_init(void) 
++{ 
++    GPIO_InitTypeDef gpio_init_struct; 
++ 
++    DHT11_DQ_GPIO_CLK_ENABLE();     /* 开启DQ引脚时钟 */ 
++ 
++    gpio_init_struct.Pin = DHT11_DQ_GPIO_PIN; 
++    gpio_init_struct.Mode = GPIO_MODE_OUTPUT_OD;           /* 开漏输出 */ 
++    gpio_init_struct.Pull = GPIO_PULLUP;                      /* 上拉 */ 
++    gpio_init_struct.Speed = GPIO_SPEED_FREQ_HIGH;          /* 高速 */ 
++    HAL_GPIO_Init(DHT11_DQ_GPIO_PORT, &gpio_init_struct); /* 初始化DQ引脚 */ 
++/* DHT11_DQ引脚模式设置,开漏输出,上拉, 这样就不用再设置IO方向了,  
++开漏输出的时候(=1),也可以读取外部信号的高低电平 */ 
++ 
++    dht11_reset(); 
++    return dht11_check(); 
++} 
++在DHT11的初始化函数中，主要对用到的GPIO口进行初始化，同时在函数最后调用复位
++函数和自检函数，这两个函数在后面会解释到。 
++下面介绍的是复位DHT11函数和等待DHT11的回应函数，它们的定义如下： 
++/** 
++ * @brief      复位DHT11 
++ * @param      data: 要写入的数据 
++ * @retval      无 
++ */ 
++static void dht11_reset(void) 
++{ 
++    DHT11_DQ_OUT(0);   /* 拉低DQ */ 
++    delay_ms(20);        /* 拉低至少18ms */ 
++    DHT11_DQ_OUT(1);     /* DQ=1 */ 
++    delay_us(30);        /* 主机拉高10~35us */ 
++} 
++ 
++/** 
++ * @brief      等待DHT11的回应 
++ * @param        无 
++ * @retval       0, DHT11正常 
++ *                1, DHT11异常/不存在 
++ 
++ 646 
++正点原子精英STM32F103开发板教程 
++ 
++STM32F103开发指南 
++ */ 
++uint8_t dht11_check(void) 
++{ 
++    uint8_t retry = 0; 
++    uint8_t rval = 0; 
++ 
++    while (DHT11_DQ_IN && retry < 100)  /* DHT11会拉低83us */ 
++    { 
++        retry++; 
++        delay_us(1); 
++    } 
++    if (retry >= 100) 
++    { 
++        rval = 1; 
++    } 
++    else 
++    { 
++        retry = 0; 
++        while (!DHT11_DQ_IN && retry < 100) /* DHT11拉低后会再次拉高87us */ 
++        { 
++            retry++; 
++            delay_us(1); 
++        } 
++        if (retry >= 100) rval = 1; 
++    } 
++     
++    return rval; 
++} 
++以上两个函数分别代表着前面所说的复位脉冲与应答信号，大家可以对比前面的时序图进
++行理解。那么在上一章DS18B20的实验中，也对复位脉冲以及应答信号进行了详细的解释，大
++家也可以对比理解。 
++DHT11与DS18B20有所不同，DHT11是不需要写函数，只需要读函数即可，下面我们看
++一下读函数： 
++/** 
++ * @brief       从DHT11读取一个位 
++ * @param       无 
++ * @retval       读取到的位值: 0 / 1 
++ */ 
++uint8_t dht11_read_bit(void) 
++{ 
++uint8_t retry = 0; 
++ 
++    while (DHT11_DQ_IN && retry < 100)  /* 等待变为低电平 */ 
++    { 
++        retry++; 
++        delay_us(1); 
++} 
++ 
++retry = 0; 
++ 
++    while (!DHT11_DQ_IN && retry < 100) /* 等待变高电平 */ 
++    { 
++        retry++; 
++        delay_us(1); 
++} 
++ 
++delay_us(40);       /* 等待40us */ 
++ 
++    if (DHT11_DQ_IN)   /* 根据引脚状态返回 bit */ 
++    { 
++        return 1; 
++    } 
++    else  
++ 
++ 647 
++正点原子精英STM32F103开发板教程 
++ 
++STM32F103开发指南 
++    { 
++        return 0; 
++    } 
++} 
++ 
++/** 
++ * @brief     从DHT11读取一个字节 
++ * @param     无 
++ * @retval       读到的数据 
++ */ 
++static uint8_t dht11_read_byte(void) 
++{ 
++uint8_t i, data = 0; 
++ 
++    for (i = 0; i < 8; i++)          /* 循环读取8位数据 */ 
++    { 
++        data <<= 1;                    /* 高位数据先输出, 先左移一位 */ 
++        data |= dht11_read_bit();   /* 读取1bit数据 */ 
++    } 
++    return data; 
++} 
++在这里dht11_read_bit函数从DHT11处读取1位数据，大家可以对照前面的读时序图进行
++分析，读数字0和1的不同，在于高电平的持续时间，所以这个作为判断的依据。dht11_read_byte
++函数就是调用一字节读取函数进行实现。 
++下面介绍读取温湿度函数，其定义如下： 
++/** 
++ * @brief        从DHT11读取一次数据 
++ * @param        temp: 温度值(范围:-20~60°) 
++ * @param        humi: 湿度值(范围:5%~95%) 
++ * @retval       0, 正常. 
++ *                 1, 失败 
++ */ 
++uint8_t dht11_read_data(uint8_t *temp, uint8_t *humi) 
++{ 
++    uint8_t buf[5]; 
++uint8_t i; 
++ 
++dht11_reset(); 
++ 
++    if (dht11_check() == 0) 
++    { 
++        for (i = 0; i < 5; i++)     /* 读取40位数据 */ 
++        { 
++            buf[i] = dht11_read_byte(); 
++        } 
++ 
++        if ((buf[0] + buf[1] + buf[2] + buf[3]) == buf[4]) 
++        { 
++            *humi = buf[0]; 
++            *temp = buf[2]; 
++        } 
++    } 
++    else 
++    { 
++        return 1; 
++    } 
++     
++    return 0; 
++} 
++读取温湿度函数也是根据时序图进行实现的，在发送复位信号以及应答信号产生后，即可
++以读取5Byte数据进行处理，校验成功即读取数据有效成功。 
++ 
++ 648 
++正点原子精英STM32F103开发板教程 
++ 
++STM32F103开发指南 
++2. main.c代码 
++在main.c里面编写如下代码：  
++int main(void) 
++{ 
++    uint8_t t = 0; 
++    uint8_t temperature; 
++    uint8_t humidity; 
++ 
++    HAL_Init();                               /* 初始化HAL库 */ 
++    sys_stm32_clock_init(RCC_PLL_MUL9);  /* 设置时钟, 72Mhz */ 
++    delay_init(72);                          /* 延时初始化 */ 
++    usart_init(115200);                     /* 串口初始化为115200 */ 
++    led_init();                               /* 初始化LED */ 
++lcd_init();                               /* 初始化LCD */ 
++ 
++    lcd_show_string(30, 50, 200, 16, 16, "STM32", RED); 
++    lcd_show_string(30, 70, 200, 16, 16, "DHT11 TEST", RED); 
++    lcd_show_string(30, 90, 200, 16, 16, "ATOM@ALIENTEK", RED); 
++ 
++    while (dht11_init()) /* DHT11初始化 */ 
++    { 
++        lcd_show_string(30, 110, 200, 16, 16, "DHT11 Error", RED); 
++        delay_ms(200); 
++        lcd_fill(30, 110, 239, 130 + 16, WHITE); 
++        delay_ms(200); 
++} 
++ 
++    lcd_show_string(30, 110, 200, 16, 16, "DHT11 OK", RED); 
++    lcd_show_string(30, 130, 200, 16, 16, "Temp:  C", BLUE); 
++    lcd_show_string(30, 150, 200, 16, 16, "Humi:  %", BLUE); 
++ 
++    while (1) 
++    { 
++        if (t % 10 == 0) /* 每100ms读取一次 */ 
++        { 
++            dht11_read_data(&temperature, &humidity);              /* 读取温湿度值 */ 
++            lcd_show_num(30 + 40, 130, temperature, 2, 16, BLUE); /* 显示温度 */ 
++            lcd_show_num(30 + 40, 150, humidity, 2, 16, BLUE);     /* 显示湿度 */ 
++        } 
++ 
++        delay_ms(10); 
++ 
++        t++; 
++ 
++        if (t == 20) 
++        { 
++            t = 0; 
++            LED0_TOGGLE(); /* LED0闪烁 */ 
++        } 
++    } 
++} 
++看一下这个官方的内容，再修改一下，我要求是把dht11显示在oled上面
+
+# 2026-03-29 17:01:39.188258
++继续
+
+# 2026-03-29 17:02:06.073234
++/* DHT11 引脚 定义 */ 
++#define DHT11_DQ_GPIO_PORT                  GPIOG 
++#define DHT11_DQ_GPIO_PIN                   GPIO_PIN_11 
++#define DHT11_DQ_GPIO_CLK_ENABLE()         
++do{ __HAL_RCC_GPIOG_CLK_ENABLE(); }while(0)   /* PG口时钟使能 */ 
++/* IO操作函数 */ 
++#define DHT11_DQ_OUT(x)     do{ x ? \ 
++     HAL_GPIO_WritePin(DHT11_DQ_GPIO_PORT,DHT11_DQ_GPIO_PIN, GPIO_PIN_SET):\ 
++     HAL_GPIO_WritePin(DHT11_DQ_GPIO_PORT,DHT11_DQ_GPIO_PIN, GPIO_PIN_RESET); \ 
++                                }while(0)                 /* 数据端口输出 */ 
++/* 数据端口输入 */ 
++#define DHT11_DQ_IN     HAL_GPIO_ReadPin(DHT11_DQ_GPIO_PORT, DHT11_DQ_GPIO_PIN) 
++对DHT11的相关引脚以及IO操作进行宏定义，方便程序中调用。 
++下面我们直接介绍dht11.c的程序，首先先介绍一下DHT11传感器的初始化函数，其定义
++如下： 
++/** 
++ * @brief        初始化DHT11的IO口 DQ 同时检测DHT11的存在 
++ * @param        无 
++ * @retval      0, 正常 
++ *               1, 不存在/不正常 
++ */ 
++uint8_t dht11_init(void) 
++{ 
++    GPIO_InitTypeDef gpio_init_struct; 
++ 
++    DHT11_DQ_GPIO_CLK_ENABLE();     /* 开启DQ引脚时钟 */ 
++ 
++    gpio_init_struct.Pin = DHT11_DQ_GPIO_PIN; 
++    gpio_init_struct.Mode = GPIO_MODE_OUTPUT_OD;           /* 开漏输出 */ 
++    gpio_init_struct.Pull = GPIO_PULLUP;                      /* 上拉 */ 
++    gpio_init_struct.Speed = GPIO_SPEED_FREQ_HIGH;          /* 高速 */ 
++    HAL_GPIO_Init(DHT11_DQ_GPIO_PORT, &gpio_init_struct); /* 初始化DQ引脚 */ 
++/* DHT11_DQ引脚模式设置,开漏输出,上拉, 这样就不用再设置IO方向了,  
++开漏输出的时候(=1),也可以读取外部信号的高低电平 */ 
++ 
++    dht11_reset(); 
++    return dht11_check(); 
++} 
++在DHT11的初始化函数中，主要对用到的GPIO口进行初始化，同时在函数最后调用复位
++函数和自检函数，这两个函数在后面会解释到。 
++下面介绍的是复位DHT11函数和等待DHT11的回应函数，它们的定义如下： 
++/** 
++ * @brief      复位DHT11 
++ * @param      data: 要写入的数据 
++ * @retval      无 
++ */ 
++static void dht11_reset(void) 
++{ 
++    DHT11_DQ_OUT(0);   /* 拉低DQ */ 
++    delay_ms(20);        /* 拉低至少18ms */ 
++    DHT11_DQ_OUT(1);     /* DQ=1 */ 
++    delay_us(30);        /* 主机拉高10~35us */ 
++} 
++ 
++/** 
++ * @brief      等待DHT11的回应 
++ * @param        无 
++ * @retval       0, DHT11正常 
++ *                1, DHT11异常/不存在 
++ 
++ 646 
++正点原子精英STM32F103开发板教程 
++ 
++STM32F103开发指南 
++ */ 
++uint8_t dht11_check(void) 
++{ 
++    uint8_t retry = 0; 
++    uint8_t rval = 0; 
++ 
++    while (DHT11_DQ_IN && retry < 100)  /* DHT11会拉低83us */ 
++    { 
++        retry++; 
++        delay_us(1); 
++    } 
++    if (retry >= 100) 
++    { 
++        rval = 1; 
++    } 
++    else 
++    { 
++        retry = 0; 
++        while (!DHT11_DQ_IN && retry < 100) /* DHT11拉低后会再次拉高87us */ 
++        { 
++            retry++; 
++            delay_us(1); 
++        } 
++        if (retry >= 100) rval = 1; 
++    } 
++     
++    return rval; 
++} 
++以上两个函数分别代表着前面所说的复位脉冲与应答信号，大家可以对比前面的时序图进
++行理解。那么在上一章DS18B20的实验中，也对复位脉冲以及应答信号进行了详细的解释，大
++家也可以对比理解。 
++DHT11与DS18B20有所不同，DHT11是不需要写函数，只需要读函数即可，下面我们看
++一下读函数： 
++/** 
++ * @brief       从DHT11读取一个位 
++ * @param       无 
++ * @retval       读取到的位值: 0 / 1 
++ */ 
++uint8_t dht11_read_bit(void) 
++{ 
++uint8_t retry = 0; 
++ 
++    while (DHT11_DQ_IN && retry < 100)  /* 等待变为低电平 */ 
++    { 
++        retry++; 
++        delay_us(1); 
++} 
++ 
++retry = 0; 
++ 
++    while (!DHT11_DQ_IN && retry < 100) /* 等待变高电平 */ 
++    { 
++        retry++; 
++        delay_us(1); 
++} 
++ 
++delay_us(40);       /* 等待40us */ 
++ 
++    if (DHT11_DQ_IN)   /* 根据引脚状态返回 bit */ 
++    { 
++        return 1; 
++    } 
++    else  
++ 
++ 647 
++正点原子精英STM32F103开发板教程 
++ 
++STM32F103开发指南 
++    { 
++        return 0; 
++    } 
++} 
++ 
++/** 
++ * @brief     从DHT11读取一个字节 
++ * @param     无 
++ * @retval       读到的数据 
++ */ 
++static uint8_t dht11_read_byte(void) 
++{ 
++uint8_t i, data = 0; 
++ 
++    for (i = 0; i < 8; i++)          /* 循环读取8位数据 */ 
++    { 
++        data <<= 1;                    /* 高位数据先输出, 先左移一位 */ 
++        data |= dht11_read_bit();   /* 读取1bit数据 */ 
++    } 
++    return data; 
++} 
++在这里dht11_read_bit函数从DHT11处读取1位数据，大家可以对照前面的读时序图进行
++分析，读数字0和1的不同，在于高电平的持续时间，所以这个作为判断的依据。dht11_read_byte
++函数就是调用一字节读取函数进行实现。 
++下面介绍读取温湿度函数，其定义如下： 
++/** 
++ * @brief        从DHT11读取一次数据 
++ * @param        temp: 温度值(范围:-20~60°) 
++ * @param        humi: 湿度值(范围:5%~95%) 
++ * @retval       0, 正常. 
++ *                 1, 失败 
++ */ 
++uint8_t dht11_read_data(uint8_t *temp, uint8_t *humi) 
++{ 
++    uint8_t buf[5]; 
++uint8_t i; 
++ 
++dht11_reset(); 
++ 
++    if (dht11_check() == 0) 
++    { 
++        for (i = 0; i < 5; i++)     /* 读取40位数据 */ 
++        { 
++            buf[i] = dht11_read_byte(); 
++        } 
++ 
++        if ((buf[0] + buf[1] + buf[2] + buf[3]) == buf[4]) 
++        { 
++            *humi = buf[0]; 
++            *temp = buf[2]; 
++        } 
++    } 
++    else 
++    { 
++        return 1; 
++    } 
++     
++    return 0; 
++} 
++读取温湿度函数也是根据时序图进行实现的，在发送复位信号以及应答信号产生后，即可
++以读取5Byte数据进行处理，校验成功即读取数据有效成功。 
++ 
++ 648 
++正点原子精英STM32F103开发板教程 
++ 
++STM32F103开发指南 
++2. main.c代码 
++在main.c里面编写如下代码：  
++int main(void) 
++{ 
++    uint8_t t = 0; 
++    uint8_t temperature; 
++    uint8_t humidity; 
++ 
++    HAL_Init();                               /* 初始化HAL库 */ 
++    sys_stm32_clock_init(RCC_PLL_MUL9);  /* 设置时钟, 72Mhz */ 
++    delay_init(72);                          /* 延时初始化 */ 
++    usart_init(115200);                     /* 串口初始化为115200 */ 
++    led_init();                               /* 初始化LED */ 
++lcd_init();                               /* 初始化LCD */ 
++ 
++    lcd_show_string(30, 50, 200, 16, 16, "STM32", RED); 
++    lcd_show_string(30, 70, 200, 16, 16, "DHT11 TEST", RED); 
++    lcd_show_string(30, 90, 200, 16, 16, "ATOM@ALIENTEK", RED); 
++ 
++    while (dht11_init()) /* DHT11初始化 */ 
++    { 
++        lcd_show_string(30, 110, 200, 16, 16, "DHT11 Error", RED); 
++        delay_ms(200); 
++        lcd_fill(30, 110, 239, 130 + 16, WHITE); 
++        delay_ms(200); 
++} 
++ 
++    lcd_show_string(30, 110, 200, 16, 16, "DHT11 OK", RED); 
++    lcd_show_string(30, 130, 200, 16, 16, "Temp:  C", BLUE); 
++    lcd_show_string(30, 150, 200, 16, 16, "Humi:  %", BLUE); 
++ 
++    while (1) 
++    { 
++        if (t % 10 == 0) /* 每100ms读取一次 */ 
++        { 
++            dht11_read_data(&temperature, &humidity);              /* 读取温湿度值 */ 
++            lcd_show_num(30 + 40, 130, temperature, 2, 16, BLUE); /* 显示温度 */ 
++            lcd_show_num(30 + 40, 150, humidity, 2, 16, BLUE);     /* 显示湿度 */ 
++        } 
++ 
++        delay_ms(10); 
++ 
++        t++; 
++ 
++        if (t == 20) 
++        { 
++            t = 0; 
++            LED0_TOGGLE(); /* LED0闪烁 */ 
++        } 
++    } 
++} 
++看下这个官方内容再修改
+
+# 2026-03-29 17:02:55.248657
++"F:\STM32F103 精英开发指南V1.3.pdf"读一下645面的文件
+
+# 2026-03-29 17:03:46.813306
++读出645后面的dht11官方内容之后再修改
+
+# 2026-03-29 17:05:48.788449
++"F:\STM32F103 精英开发指南V1.3.pdf"读下645面以及后面页数的dht11内容，再对之前代码做出修正
+
+# 2026-03-29 17:12:10.207794
++把这个正点原子dht11数据读取作为skill封装
+
+# 2026-03-29 17:16:22.507528
++/EXIT
+
+# 2026-03-29 17:16:40.140166
++/connect STM32F103ZE
+
+# 2026-03-29 17:17:20.595423
++尝试用正点原子的oled和dht11的skills完成温湿度显示
+
+# 2026-03-29 17:20:37.343276
++有点乱码，修复skills中出现的乱码问题
+
+# 2026-03-29 17:24:13.395434
++temp等字母只出现了一个首字母，后面都是白屏，这个问题还没有被修复
+
+# 2026-03-29 17:26:56.188195
++/exit
+
+# 2026-03-29 17:27:05.162383
++/connect STM32F103ZE
+
+# 2026-03-29 17:27:11.297544
++尝试用正点原子的oled和dht11的skills完成温湿度显示
+
+# 2026-03-29 19:24:28.535011
++/connect STM32F103ZE
+
+# 2026-03-29 19:29:13.507697
++现在gpiog11换成ds18b20，试着使能它在oled上面显示
+
+# 2026-03-29 19:29:37.872210
++/exit
+
+# 2026-03-29 19:29:43.695175
++/connect STM32F103ZE
+
+# 2026-03-29 19:29:47.808545
++现在gpiog11换成ds18b20，试着使能它在oled上面显示
+
+# 2026-03-29 19:33:55.812085
++把ds18b20也作为正点原子的skill保存
+
+# 2026-03-29 19:38:27.798866
++现在有哪些skills
+
+# 2026-03-29 19:38:58.489989
++你有哪些记忆？
+
+# 2026-03-29 19:39:34.022423
++/exit
+
+# 2026-03-29 19:41:42.892273
++我正在使用正点原子的精英板 生成在oled上画一个随风飘扬的花，然后利用温湿度传感器显示当前的温度和气温，预测当前的天气和季节，这个随风飘扬的花请画在oled的左上角，显示文字部分在其余的地方 
+
+# 2026-03-29 19:49:42.118815
++/connect STM32F103ZE
+
+# 2026-03-29 19:49:47.173379
++继续
+
+# 2026-03-29 19:51:46.444762
++没有亮
+
+# 2026-03-29 20:23:56.364847
++/connect STM32F103ZE
+
+# 2026-03-29 20:25:02.814057
++/send
+
+# 2026-03-29 20:25:48.124853
++/file
+
+# 2026-03-29 20:28:38.097276
++"C:\Users\19899\Pictures\Screenshots\屏幕截图 2026-03-29 202758.png"读一下这个图片
+
+# 2026-03-29 20:38:29.749890
++/exit
+
+# 2026-03-29 20:38:43.274709
++"C:\Users\19899\Pictures\Screenshots\屏幕截图 2026-03-29 202758.png"分析一下
+
+# 2026-03-29 20:40:12.872471
++"C:\Users\19899\Pictures\Screenshots\屏幕截图 2026-03-29 202758.png"读图
+
+# 2026-03-29 20:43:38.915042
++/exit
+
+# 2026-03-29 20:43:57.320252
++看一下"C:\Users\19899\Desktop\2.png"这个图片是什么？
+
+# 2026-03-29 20:44:41.090108
++C:\Users\19899\Desktop\2.png
+
+# 2026-03-29 20:53:32.505421
++C:\Users\19899\Pictures\Screenshots\屏幕截图(2).png读图
+
+# 2026-03-29 20:54:27.672312
++C:\Users\19899\Desktop\2.png这个是什么
+
+# 2026-03-29 21:05:52.244237
++/exit
+
+# 2026-03-29 21:06:39.313340
++"C:\Users\19899\Pictures\Screenshots\屏幕截图 2026-03-20 130426.png"这个是什么
+
+# 2026-03-29 21:16:00.503019
++/exit
+
+# 2026-03-29 21:16:27.949310
++"F:\精英V2 硬件参考手册_V1.0.pdf"读下这个文件，告诉我这个是什么
+
+# 2026-03-29 21:17:25.838954
++C:\Users\19899\Desktop\2.pdf这个呢
+
+# 2026-03-29 21:17:42.815715
++C:\Users\19899\Desktop\1.pdf
+
+# 2026-03-29 21:18:02.992008
++C:\Users\19899\Desktop\Fibocom_FM650-CN_硬件指南_V1.1.pdf这个
+
+# 2026-03-29 21:19:40.667372
++C:\Users\19899\Desktop\2.pdf这个呢
+
+# 2026-03-29 21:19:46.095529
++/exit
+
+# 2026-03-29 21:19:51.551924
++C:\Users\19899\Desktop\2.pdf这个呢

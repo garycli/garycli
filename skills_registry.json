@@ -1,0 +1,17 @@
+{
+  "dht11_atomic": {
+    "enabled": true,
+    "install_time": "",
+    "version": "1.0.0"
+  },
+  "ds18b20_atomic": {
+    "enabled": true,
+    "install_time": "",
+    "version": "1.0.0"
+  },
+  "oled_8080_elite": {
+    "enabled": true,
+    "install_time": "",
+    "version": "1.0.0"
+  }
+}
