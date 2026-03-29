@@ -41,4 +41,3 @@ UART_READ_TIMEOUT = 3  # 串口读取超时（秒）
 # ================= 默认目标芯片 =================
 DEFAULT_CHIP = "STM32F103C8T6"
 DEFAULT_CLOCK = "HSI_internal"
-
