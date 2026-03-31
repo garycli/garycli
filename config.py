@@ -11,10 +11,32 @@ import os
 from pathlib import Path
 
 # ================= 网络代理 =================
-# 国内服务商（智谱/DeepSeek/通义千问）不需要代理，注释掉即可
-# os.environ["HTTP_PROXY"] = "http://127.0.0.1:7890"
-# os.environ["HTTPS_PROXY"] = "http://127.0.0.1:7890"
-# os.environ["GRPC_PROXY_EXP"] = "http://127.0.0.1:7890"
+# 默认不强制代理。Google/OpenAI 这类海外接口在当前网络环境下可能需要代理；
+# 需要时再填入 URL，或在启动前导出环境变量。
+HTTP_PROXY_URL = ""
+HTTPS_PROXY_URL = ""
+GRPC_PROXY_URL = ""
+_LEGACY_DEFAULT_PROXY_URLS = {
+    "http://127.0.0.1:7890",
+    "http://localhost:7890",
+}
+
+
+def _apply_optional_proxy(env_name: str, configured_value: str) -> None:
+    """Only export proxy variables when the user explicitly configured them."""
+
+    value = (configured_value or "").strip()
+    if value:
+        os.environ[env_name] = value
+        return
+    current = (os.environ.get(env_name) or "").strip()
+    if current in _LEGACY_DEFAULT_PROXY_URLS:
+        os.environ.pop(env_name, None)
+
+
+_apply_optional_proxy("HTTP_PROXY", HTTP_PROXY_URL)
+_apply_optional_proxy("HTTPS_PROXY", HTTPS_PROXY_URL or HTTP_PROXY_URL)
+_apply_optional_proxy("GRPC_PROXY_EXP", GRPC_PROXY_URL or HTTPS_PROXY_URL or HTTP_PROXY_URL)
 
 AI_TEMPERATURE = 1  # 低温度保证代码稳定性
 
@@ -41,3 +63,7 @@ UART_READ_TIMEOUT = 3  # 串口读取超时（秒）
 # ================= 默认目标芯片 =================
 DEFAULT_CHIP = "STM32F103C8T6"
 DEFAULT_CLOCK = "HSI_internal"
+
+AI_API_KEY = ""
+AI_BASE_URL = ""
+AI_MODEL = ""
