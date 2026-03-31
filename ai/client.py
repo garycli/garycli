@@ -328,8 +328,10 @@ def _provider_kind(base_url: str | None = None, model: str | None = None) -> str
 def provider_name(base_url: str | None = None, model: str | None = None) -> str:
     """Return a human-readable provider label."""
 
-    return "Google Gemini (official SDK)" if _provider_kind(base_url, model) == "gemini" else (
-        "OpenAI-compatible"
+    return (
+        "Google Gemini (official SDK)"
+        if _provider_kind(base_url, model) == "gemini"
+        else ("OpenAI-compatible")
     )
 
 
@@ -487,7 +489,9 @@ def _tool_message_to_gemini_parts(message: dict[str, Any], types_mod: Any) -> li
     return [types_mod.Part(function_response=response)]
 
 
-def _messages_to_gemini_payload(messages: list[dict[str, Any]], types_mod: Any) -> tuple[str, list[Any]]:
+def _messages_to_gemini_payload(
+    messages: list[dict[str, Any]], types_mod: Any
+) -> tuple[str, list[Any]]:
     """Convert Gary's OpenAI-style history into Gemini `contents` + `system_instruction`."""
 
     system_parts: list[str] = []
@@ -518,7 +522,9 @@ def _messages_to_gemini_payload(messages: list[dict[str, Any]], types_mod: Any) 
     return "\n\n".join(system_parts).strip(), contents
 
 
-def _openai_tools_to_gemini_tools(tools: Optional[list[dict[str, Any]]], types_mod: Any) -> list[Any]:
+def _openai_tools_to_gemini_tools(
+    tools: Optional[list[dict[str, Any]]], types_mod: Any
+) -> list[Any]:
     """Convert OpenAI function schemas into Gemini function declarations."""
 
     if not tools:
@@ -550,7 +556,7 @@ def _normalize_gemini_chunk(chunk: Any) -> _NormalizedChunk:
         parts = chunk.parts or []
     except Exception:
         try:
-            parts = ((chunk.candidates or [])[0].content.parts or [])
+            parts = (chunk.candidates or [])[0].content.parts or []
         except Exception:
             parts = []
 
@@ -601,7 +607,9 @@ def _normalize_gemini_chunk(chunk: Any) -> _NormalizedChunk:
         reasoning_content="".join(reasoning_parts) or None,
         tool_calls=tool_calls or None,
     )
-    return _NormalizedChunk(choices=[_NormalizedChoice(delta=delta)], _raw_tool_calls=raw_tool_calls)
+    return _NormalizedChunk(
+        choices=[_NormalizedChoice(delta=delta)], _raw_tool_calls=raw_tool_calls
+    )
 
 
 def _stream_chat_gemini(
