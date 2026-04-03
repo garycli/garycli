@@ -10,18 +10,19 @@ oled_8080_elite — 正点原子STM32精英板 OLED 8080并口驱动
 - RD   -> PG13
 - RST  -> PG15
 """
+
 from typing import Dict, Any, List, Optional
 
-
 # ═══ 工具函数 ═══
+
 
 def oled_8080_elite_get_driver_code() -> dict:
     """
     获取OLED 8080并口驱动完整代码
-    
+
     返回可直接使用的OLED初始化、显示函数代码
     """
-    code = '''/* OLED 8080并口驱动 - 正点原子精英板 */
+    code = """/* OLED 8080并口驱动 - 正点原子精英板 */
 
 /* 引脚定义 */
 #define OLED_CS_PORT      GPIOD
@@ -312,14 +313,14 @@ void OLED_DrawRect(uint8_t x, uint8_t y, uint8_t w, uint8_t h, uint8_t fill) {
         OLED_DrawLine(x + w - 1, y, x + w - 1, y + h - 1);
     }
 }
-'''
+"""
     return {"success": True, "code": code}
 
 
 def oled_8080_elite_draw_bitmap(bitmap_name: str, width: int = 128, height: int = 64) -> dict:
     """
     生成位图绘制代码
-    
+
     Args:
         bitmap_name: 位图名称或描述
         width: 位图宽度(像素)
@@ -328,49 +329,273 @@ def oled_8080_elite_draw_bitmap(bitmap_name: str, width: int = 128, height: int 
     # 预定义一些常用图案
     bitmaps = {
         "heart": [
-            0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-            0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-            0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-            0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-            0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-            0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-            0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-            0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-            0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-            0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-            0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-            0x00,0x18,0x3C,0x7E,0x7E,0x3C,0x18,0x00,
-            0x00,0x3C,0x7E,0xFF,0xFF,0x7E,0x3C,0x00,
-            0x00,0x7E,0xFF,0xFF,0xFF,0xFF,0x7E,0x00,
-            0x00,0x3C,0x7E,0xFF,0xFF,0x7E,0x3C,0x00,
-            0x00,0x18,0x3C,0x7E,0x7E,0x3C,0x18,0x00
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x18,
+            0x3C,
+            0x7E,
+            0x7E,
+            0x3C,
+            0x18,
+            0x00,
+            0x00,
+            0x3C,
+            0x7E,
+            0xFF,
+            0xFF,
+            0x7E,
+            0x3C,
+            0x00,
+            0x00,
+            0x7E,
+            0xFF,
+            0xFF,
+            0xFF,
+            0xFF,
+            0x7E,
+            0x00,
+            0x00,
+            0x3C,
+            0x7E,
+            0xFF,
+            0xFF,
+            0x7E,
+            0x3C,
+            0x00,
+            0x00,
+            0x18,
+            0x3C,
+            0x7E,
+            0x7E,
+            0x3C,
+            0x18,
+            0x00,
         ],
         "smile": [
-            0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-            0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-            0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-            0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-            0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-            0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-            0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-            0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-            0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-            0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-            0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-            0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-            0x00,0x00,0x66,0x00,0x00,0x66,0x00,0x00,
-            0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-            0x00,0x00,0x3C,0x42,0x42,0x3C,0x00,0x00,
-            0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
-        ]
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x66,
+            0x00,
+            0x00,
+            0x66,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x3C,
+            0x42,
+            0x42,
+            0x3C,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+        ],
     }
-    
-    code = f'''/* 绘制位图: {bitmap_name} ({width}x{height}) */
-'''
-    
+
+    code = f"""/* 绘制位图: {bitmap_name} ({width}x{height}) */
+"""
+
     if bitmap_name.lower() in bitmaps:
         data = bitmaps[bitmap_name.lower()]
-        code += f'''static const uint8_t BMP_{bitmap_name.upper()}[] = {{
+        code += f"""static const uint8_t BMP_{bitmap_name.upper()}[] = {{
     {', '.join([f'0x{b:02X}' for b in data])}
 }};
 
@@ -382,9 +607,9 @@ void OLED_Show{bitmap_name.capitalize()}(uint8_t x, uint8_t y) {{
         }}
     }}
 }}
-'''
+"""
     else:
-        code += f'''/* 自定义位图绘制函数模板 */
+        code += f"""/* 自定义位图绘制函数模板 */
 void OLED_DrawBitmap_{bitmap_name}(uint8_t x, uint8_t y, const uint8_t* data, uint8_t w, uint8_t h) {{
     uint8_t pages = (h + 7) / 8;
     for (uint8_t page = 0; page < pages; page++) {{
@@ -394,41 +619,38 @@ void OLED_DrawBitmap_{bitmap_name}(uint8_t x, uint8_t y, const uint8_t* data, ui
         }}
     }}
 }}
-'''
-    
+"""
+
     return {"success": True, "code": code, "bitmap": bitmap_name}
 
 
 def oled_8080_elite_get_full_main(demo: str = "string") -> dict:
     """
     获取完整可编译的 main.c 代码
-    
+
     Args:
         demo: 演示类型 (string/geometry/bitmap/clear)
     """
     driver = oled_8080_elite_get_driver_code()["code"]
-    
+
     demos = {
-        "string": '''    OLED_ShowString(0, 0, "Hello World!");
+        "string": """    OLED_ShowString(0, 0, "Hello World!");
     OLED_ShowString(0, 2, "STM32 OLED");
     OLED_ShowString(0, 4, "8080 Parallel");
-    OLED_ShowString(0, 6, "Test OK!");''',
-        
-        "geometry": '''    OLED_DrawLine(0, 0, 127, 63);
+    OLED_ShowString(0, 6, "Test OK!");""",
+        "geometry": """    OLED_DrawLine(0, 0, 127, 63);
     OLED_DrawLine(0, 63, 127, 0);
     OLED_DrawRect(10, 10, 50, 30, 0);
     OLED_DrawRect(70, 20, 40, 25, 1);
-    OLED_ShowString(0, 7, "Geometry Demo");''',
-        
-        "bitmap": '''    /* 显示预定义图案 */
+    OLED_ShowString(0, 7, "Geometry Demo");""",
+        "bitmap": """    /* 显示预定义图案 */
     OLED_ShowString(40, 0, "Heart:");
-    /* 这里可以调用图案显示函数 */''',
-        
-        "clear": '''    OLED_Clear();
-    OLED_ShowString(30, 3, "CLEARED!");'''
+    /* 这里可以调用图案显示函数 */""",
+        "clear": """    OLED_Clear();
+    OLED_ShowString(30, 3, "CLEARED!");""",
     }
-    
-    main_code = f'''#include "stm32f1xx_hal.h"
+
+    main_code = f"""#include "stm32f1xx_hal.h"
 #include <string.h>
 
 {driver}
@@ -503,7 +725,7 @@ int main(void) {{
         HAL_Delay(500);
     }}
 }}
-'''
+"""
     return {"success": True, "code": main_code, "demo": demo}
 
 

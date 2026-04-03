@@ -8,21 +8,22 @@ dht11_atomic - 正点原子标准DHT11温湿度传感器驱动
 - 自动校验和检查
 - 非阻塞读取，带超时保护
 """
+
 from typing import Dict, Any
 
 
 def dht11_atomic_get_driver_code(port: str = "GPIOG", pin: int = 11) -> dict:
     """
     获取正点原子标准DHT11驱动代码
-    
+
     Args:
         port: GPIO端口，如 GPIOA, GPIOB, GPIOC, GPIOD, GPIOE, GPIOF, GPIOG
         pin: GPIO引脚号，如 0-15
-    
+
     Returns:
         code: 可直接使用的DHT11驱动C代码
     """
-    code = f'''/* ==================== DHT11 驱动 ({port} Pin{pin}) - 正点原子标准版 ==================== */
+    code = f"""/* ==================== DHT11 驱动 ({port} Pin{pin}) - 正点原子标准版 ==================== */
 #define DHT11_PIN       GPIO_PIN_{pin}
 #define DHT11_PORT      {port}
 
@@ -168,31 +169,26 @@ uint8_t DHT11_Read(void) {{
 /* 获取温湿度值 */
 uint8_t DHT11_Get_Humi(void) {{ return DHT11_Data[0]; }}
 uint8_t DHT11_Get_Temp(void) {{ return DHT11_Data[2]; }}
-'''
-    return {
-        "success": True,
-        "code": code,
-        "port": port,
-        "pin": pin
-    }
+"""
+    return {"success": True, "code": code, "port": port, "pin": pin}
 
 
 def dht11_atomic_get_full_main(port: str = "GPIOG", pin: int = 11, display: str = "oled") -> dict:
     """
     获取完整的main.c示例代码（DHT11 + OLED显示）
-    
+
     Args:
         port: GPIO端口
         pin: GPIO引脚号
         display: 显示方式 (oled/uart/none)
-    
+
     Returns:
         code: 完整可编译的main.c代码
     """
     driver = dht11_atomic_get_driver_code(port, pin)["code"]
-    
+
     if display == "oled":
-        demo_code = '''    OLED_ShowString(0, 0, "DHT11 Sensor");
+        demo_code = """    OLED_ShowString(0, 0, "DHT11 Sensor");
     OLED_ShowString(0, 2, "Temp: -- C");
     OLED_ShowString(0, 4, "Humi: -- %");
     
@@ -207,9 +203,9 @@ def dht11_atomic_get_full_main(port: str = "GPIOG", pin: int = 11, display: str 
             OLED_ShowString(90, 6, "Err");
         }
         HAL_Delay(2000);
-    }'''
+    }"""
     elif display == "uart":
-        demo_code = '''    while (1) {
+        demo_code = """    while (1) {
         if (DHT11_Read() == 0) {
             Debug_Print("Temp: ");
             Debug_PrintInt(DHT11_Get_Temp());
@@ -220,14 +216,14 @@ def dht11_atomic_get_full_main(port: str = "GPIOG", pin: int = 11, display: str 
             Debug_Print("DHT11 Error\\r\\n");
         }
         HAL_Delay(2000);
-    }'''
+    }"""
     else:
-        demo_code = '''    while (1) {
+        demo_code = """    while (1) {
         DHT11_Read();
         HAL_Delay(2000);
-    }'''
-    
-    main_code = f'''#include "stm32f1xx_hal.h"
+    }"""
+
+    main_code = f"""#include "stm32f1xx_hal.h"
 #include <string.h>
 
 /* 简易调试输出 */
@@ -297,14 +293,8 @@ int main(void) {{
     
 {demo_code}
 }}
-'''
-    return {
-        "success": True,
-        "code": main_code,
-        "port": port,
-        "pin": pin,
-        "display": display
-    }
+"""
+    return {"success": True, "code": main_code, "port": port, "pin": pin, "display": display}
 
 
 # 工具注册表

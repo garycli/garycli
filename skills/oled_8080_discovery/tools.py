@@ -22,17 +22,18 @@ oled_8080_discovery - 正点原子STM32探索版OLED 8080并口驱动
 
 - DS18B20  -> PG9 (U19接口，与摄像头OV_PWDN复用)
 """
+
 from typing import Dict, Any
 
 
 def oled_8080_discovery_get_driver_code() -> dict:
     """
     获取正点原子探索版OLED 8080驱动代码核心片段
-    
+
     Returns:
         code: OLED驱动C代码（初始化、显示函数等）
     """
-    code = '''/* ==================== OLED 8080 驱动 - 探索版 ==================== */
+    code = """/* ==================== OLED 8080 驱动 - 探索版 ==================== */
 /* OLED 8080并口引脚定义 - STM32F407ZG探索版 */
 #define OLED_CS_PORT        GPIOB
 #define OLED_CS_PIN         GPIO_PIN_7
@@ -247,22 +248,22 @@ static void OLED_ShowTemp(uint8_t x, uint8_t y, int16_t temp) {
     OLED_ShowChar(pos, y, '.'); pos += 6;
     OLED_ShowChar(pos, y, '0' + decimal); pos += 6;
     OLED_ShowChar(pos, y, 'C');
-}'''
+}"""
     return {"success": True, "code": code}
 
 
 def oled_8080_discovery_get_ds18b20_code(port: str = "GPIOG", pin: int = 9) -> dict:
     """
     获取DS18B20驱动代码
-    
+
     Args:
         port: GPIO端口（默认GPIOG）
         pin: 引脚号（默认9，对应探索版U19接口）
-    
+
     Returns:
         code: DS18B20驱动C代码
     """
-    code = f'''/* ==================== DS18B20 驱动 ({port} Pin{pin}) ==================== */
+    code = f"""/* ==================== DS18B20 驱动 ({port} Pin{pin}) ==================== */
 #define DS18B20_PIN       GPIO_PIN_{pin}
 #define DS18B20_PORT      {port}
 #define DS18B20_HIGH()    HAL_GPIO_WritePin(DS18B20_PORT, DS18B20_PIN, GPIO_PIN_SET)
@@ -331,24 +332,24 @@ static int16_t DS18B20_ReadTemp(void) {{
     temp = (temp * 10) / 16; return temp;
 }}
 
-static uint8_t DS18B20_Check(void) {{ return DS18B20_Reset(); }}'''
+static uint8_t DS18B20_Check(void) {{ return DS18B20_Reset(); }}"""
     return {"success": True, "code": code, "port": port, "pin": pin}
 
 
 def oled_8080_discovery_get_full_main(display: str = "oled") -> dict:
     """
     获取完整可编译的main.c（DS18B20 + OLED显示）
-    
+
     Args:
         display: 显示方式 (oled/uart/none)
-    
+
     Returns:
         code: 完整main.c代码
     """
     oled_code = oled_8080_discovery_get_driver_code()["code"]
     ds18b20_code = oled_8080_discovery_get_ds18b20_code()["code"]
-    
-    demo_code = '''    OLED_ShowString(0, 0, "DS18B20 Sensor");
+
+    demo_code = """    OLED_ShowString(0, 0, "DS18B20 Sensor");
     OLED_ShowString(0, 2, "Status:");
     
     if (DS18B20_Check() != 0) {
@@ -367,9 +368,9 @@ def oled_8080_discovery_get_full_main(display: str = "oled") -> dict:
             OLED_ShowString(0, 6, "Read Error");
         }
         HAL_Delay(2000);
-    }'''
-    
-    main_code = f'''#include "stm32f4xx_hal.h"
+    }"""
+
+    main_code = f"""#include "stm32f4xx_hal.h"
 #include <string.h>
 
 UART_HandleTypeDef huart1;
@@ -447,7 +448,7 @@ int main(void) {{
     
 {demo_code}
 }}
-'''
+"""
     return {"success": True, "code": main_code, "display": display}
 
 

@@ -2,14 +2,15 @@
 """
 ds18b20_atomic — 正点原子DS18B20温度传感器驱动
 """
-from typing import Dict, Any, List
 
+from typing import Dict, Any, List
 
 # ═══ DS18B20 驱动代码模板 ═══
 
+
 def _get_driver_code(port: str = "GPIOG", pin: int = 11) -> str:
     """生成DS18B20驱动代码"""
-    return f'''/* =============== DS18B20驱动 ({port} Pin{pin}) =============== */
+    return f"""/* =============== DS18B20驱动 ({port} Pin{pin}) =============== */
 #define DS18B20_PIN       GPIO_PIN_{pin}
 #define DS18B20_PORT      {port}
 #define DS18B20_HIGH()    HAL_GPIO_WritePin(DS18B20_PORT, DS18B20_PIN, GPIO_PIN_SET)
@@ -130,12 +131,12 @@ int16_t DS18B20_ReadTemp(void) {{
 /* 检测DS18B20是否存在 */
 uint8_t DS18B20_Check(void) {{
     return DS18B20_Reset();  /* 0=存在, 1=不存在 */
-}}'''
+}}"""
 
 
 def _get_oled_driver_code() -> str:
     """获取OLED驱动代码"""
-    return '''/* =============== OLED 8080并口驱动 =============== */
+    return """/* =============== OLED 8080并口驱动 =============== */
 #define OLED_CS_PORT      GPIOD
 #define OLED_CS_PIN       GPIO_PIN_6
 #define OLED_DC_PORT      GPIOD
@@ -259,14 +260,14 @@ void OLED_Init(void) {{
     OLED_WriteCmd(0xDA); OLED_WriteCmd(0x12); OLED_WriteCmd(0xDB);
     OLED_WriteCmd(0x20); OLED_WriteCmd(0x8D); OLED_WriteCmd(0x14);
     OLED_WriteCmd(0xAF); OLED_Clear();
-}}'''
+}}"""
 
 
 def _get_full_main(port: str = "GPIOG", pin: int = 11, display: str = "oled") -> str:
     """生成完整main.c代码"""
-    
+
     # 基础头文件和调试输出
-    header = '''#include "stm32f1xx_hal.h"
+    header = """#include "stm32f1xx_hal.h"
 #include <string.h>
 #include <stdlib.h>
 
@@ -330,15 +331,16 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle) {
     }
 }
 void SysTick_Handler(void) { HAL_IncTick(); }
-'''
-    
+"""
+
     # DS18B20驱动代码
     ds18b20_code = _get_driver_code(port, pin)
-    
+
     # 主函数 - OLED显示版本
     if display == "oled":
         oled_code = _get_oled_driver_code()
-        main_code = '''
+        main_code = (
+            """
 /* =============== 主函数 =============== */
 int main(void) {
     HAL_Init();
@@ -347,7 +349,9 @@ int main(void) {
     Debug_Print("Gary:BOOT\\r\\n");
     
     /* 使能DS18B20 GPIO时钟 */
-    __HAL_RCC_''' + port + '''_CLK_ENABLE();
+    __HAL_RCC_"""
+            + port
+            + """_CLK_ENABLE();
     
     /* OLED初始化 */
     OLED_Init();
@@ -390,12 +394,14 @@ int main(void) {
         }
         HAL_Delay(1000);
     }
-}'''
-        return header + oled_code + '\n' + ds18b20_code + '\n' + main_code
-    
+}"""
+        )
+        return header + oled_code + "\n" + ds18b20_code + "\n" + main_code
+
     # UART显示版本
     else:
-        main_code = '''
+        main_code = (
+            """
 /* =============== 主函数 =============== */
 int main(void) {
     HAL_Init();
@@ -404,7 +410,9 @@ int main(void) {
     Debug_Print("Gary:BOOT\\r\\n");
     
     /* 使能DS18B20 GPIO时钟 */
-    __HAL_RCC_''' + port + '''_CLK_ENABLE();
+    __HAL_RCC_"""
+            + port
+            + """_CLK_ENABLE();
     
     /* 检测DS18B20 */
     if (DS18B20_Check() != 0) {
@@ -432,50 +440,41 @@ int main(void) {
         }
         HAL_Delay(1000);
     }
-}'''
-        return header + ds18b20_code + '\n' + main_code
+}"""
+        )
+        return header + ds18b20_code + "\n" + main_code
 
 
 # ═══ 工具函数 ═══
 
+
 def ds18b20_atomic_get_driver_code(port: str = "GPIOG", pin: int = 11) -> dict:
     """获取DS18B20驱动代码核心片段
-    
+
     参数：
         port: GPIO端口（默认GPIOG）
         pin: 引脚号（默认11）
-    
+
     返回：
         包含驱动代码的字典
     """
     code = _get_driver_code(port, pin)
-    return {
-        "success": True,
-        "code": code,
-        "port": port,
-        "pin": pin
-    }
+    return {"success": True, "code": code, "port": port, "pin": pin}
 
 
 def ds18b20_atomic_get_full_main(port: str = "GPIOG", pin: int = 11, display: str = "oled") -> dict:
     """获取完整可编译的main.c（含DS18B20 + 显示）
-    
+
     参数：
         port: GPIO端口
         pin: 引脚号
         display: 显示方式 (oled/uart/none)
-    
+
     返回：
         包含完整main.c的字典
     """
     code = _get_full_main(port, pin, display)
-    return {
-        "success": True,
-        "code": code,
-        "port": port,
-        "pin": pin,
-        "display": display
-    }
+    return {"success": True, "code": code, "port": port, "pin": pin, "display": display}
 
 
 # ═══ 工具注册表（必须导出）═══

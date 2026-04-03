@@ -4,23 +4,24 @@ dht11_discovery — 正点原子探索版DHT11温湿度传感器驱动
 硬件: STM32F407ZG 探索版
 默认引脚: PG9
 """
+
 from typing import Dict, Any, List
 
 
 def dht11_discovery_get_driver_code(port: str = "GPIOG", pin: int = 9) -> dict:
     """
     获取DHT11驱动代码核心片段
-    
+
     参数:
         port: GPIO端口，默认GPIOG
         pin: 引脚号，默认9
-    
+
     返回:
         code: 可直接嵌入main.c的驱动代码
         port: 使用的GPIO端口
         pin: 使用的引脚号
     """
-    code = f'''/* =============== DHT11驱动 ({port} Pin{pin}) =============== */
+    code = f"""/* =============== DHT11驱动 ({port} Pin{pin}) =============== */
 #define DHT11_PIN       GPIO_PIN_{pin}
 #define DHT11_PORT      {port}
 #define DHT11_HIGH()    HAL_GPIO_WritePin(DHT11_PORT, DHT11_PIN, GPIO_PIN_SET)
@@ -88,35 +89,30 @@ static uint8_t DHT11_Read(void) {{
 }}
 
 static uint8_t DHT11_Get_Humi(void) {{ return DHT11_Data[0]; }}
-static uint8_t DHT11_Get_Temp(void) {{ return DHT11_Data[2]; }}'''
-    
-    return {
-        "success": True,
-        "code": code,
-        "port": port,
-        "pin": pin
-    }
+static uint8_t DHT11_Get_Temp(void) {{ return DHT11_Data[2]; }}"""
+
+    return {"success": True, "code": code, "port": port, "pin": pin}
 
 
 def dht11_discovery_get_full_main(port: str = "GPIOG", pin: int = 9, display: str = "oled") -> dict:
     """
     获取完整可编译的main.c（含DHT11 + OLED/UART显示）
-    
+
     参数:
         port: GPIO端口，默认GPIOG
         pin: 引脚号，默认9
         display: 显示方式 (oled/uart/none)
-    
+
     返回:
         code: 完整的main.c代码
         display: 显示方式
     """
-    
+
     driver = dht11_discovery_get_driver_code(port, pin)
     driver_code = driver["code"]
-    
+
     # OLED显示相关代码
-    oled_code = '''/* OLED驱动 - 探索版8080并口 */
+    oled_code = """/* OLED驱动 - 探索版8080并口 */
 #define OLED_CS_PORT        GPIOB
 #define OLED_CS_PIN         GPIO_PIN_7
 #define OLED_WR_PORT        GPIOA
@@ -261,10 +257,10 @@ void OLED_Init(void) {{
     uint8_t cmds[] = {{0xAE,0xD5,0x80,0xA8,0x3F,0xD3,0x00,0x40,0x8D,0x14,0x20,0x02,0xA1,0xC8,0xDA,0x12,0x81,0xCF,0xD9,0xF1,0xDB,0x40,0xA4,0xA6,0x8D,0x14,0xAF}};
     for(uint8_t i = 0; i < sizeof(cmds); i++) OLED_Write_Byte(cmds[i], OLED_CMD);
     OLED_Clear();
-}}'''
+}}"""
 
     # UART初始化代码
-    uart_code = '''UART_HandleTypeDef huart1;
+    uart_code = """UART_HandleTypeDef huart1;
 void Debug_Print(const char* s) {
     HAL_UART_Transmit(&huart1, (uint8_t*)s, strlen(s), 100);
 }
@@ -328,11 +324,11 @@ void Debug_PrintInt(const char* prefix, int val) {
     else { while (val) { buf[i++] = '0' + val % 10; val /= 10; } }
     for (int j = i-1; j >= 0; j--) HAL_UART_Transmit(&huart1, (uint8_t*)&buf[j], 1, 100);
     HAL_UART_Transmit(&huart1, (uint8_t*)"\r\n", 2, 100);
-}'''
+}"""
 
     # 主函数 - OLED显示版本
     if display == "oled":
-        main_code = f'''
+        main_code = f"""
 {oled_code}
 
 {driver_code}
@@ -371,10 +367,10 @@ int main(void) {{
         }}
         HAL_Delay(2000);
     }}
-}}'''
+}}"""
     # 主函数 - 仅串口版本
     elif display == "uart":
-        main_code = f'''
+        main_code = f"""
 {driver_code}
 
 int main(void) {{
@@ -399,9 +395,9 @@ int main(void) {{
         }}
         HAL_Delay(2000);
     }}
-}}'''
+}}"""
     else:
-        main_code = f'''
+        main_code = f"""
 {driver_code}
 
 int main(void) {{
@@ -419,22 +415,16 @@ int main(void) {{
         }}
         HAL_Delay(2000);
     }}
-}}'''
+}}"""
 
-    full_code = f'''#include "stm32f4xx_hal.h"
+    full_code = f"""#include "stm32f4xx_hal.h"
 #include <string.h>
 
 {uart_code}
 
-{main_code}'''
+{main_code}"""
 
-    return {
-        "success": True,
-        "code": full_code,
-        "display": display,
-        "port": port,
-        "pin": pin
-    }
+    return {"success": True, "code": full_code, "display": display, "port": port, "pin": pin}
 
 
 # ═══ 工具注册表 ═══
