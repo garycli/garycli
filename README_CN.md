@@ -3,11 +3,11 @@
 # 🗡️ GARY CLI: The Spear Carrier
 
 **Piercing the Silicon with AI.**
-*专为 STM32 打造的 AI 原生命令行开发与调试智能体*
+*面向 STM32、RP2040 / Pico、ESP32 / ESP8266 等板卡的 AI 原生命令行开发与调试智能体*
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python](https://img.shields.io/badge/Python-3.8+-green.svg)](https://www.python.org/)
-[![STM32](https://img.shields.io/badge/STM32-F0%20F1%20F3%20F4-blue.svg)](#supported-chips)
+[![Boards](https://img.shields.io/badge/Boards-STM32%20%7C%20RP2040%20%7C%20ESP32%20%7C%20ESP8266-blue.svg)](#supported-chips)
 [![Website](https://img.shields.io/badge/Website-garycli.com-success)](https://www.garycli.com)
 [![Tests](https://github.com/PrettyMyGirlZyy4Embedded/garycli/actions/workflows/test.yml/badge.svg)](https://github.com/PrettyMyGirlZyy4Embedded/garycli/actions)
 [![Lint](https://github.com/PrettyMyGirlZyy4Embedded/garycli/actions/workflows/lint.yml/badge.svg)](https://github.com/PrettyMyGirlZyy4Embedded/garycli/actions)
@@ -23,7 +23,7 @@
    ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝
 ```
 
-**用自然语言对话，让 AI 直接参与 STM32 开发、编译、烧录与调试。**
+**用自然语言对话，让 AI 直接参与 STM32、RP2040 / Pico、ESP32 / ESP8266 等板卡的开发、部署与调试。**
 
 <p align="center">
   <a href="./README.md"><b>English</b></a>
@@ -42,7 +42,7 @@
 **需求理解 → 外设配置 → 代码生成 → 交叉编译 → 固件烧录 → 串口验证 → 寄存器排查 → 故障修复 → 再次烧录**
 
 **Gary（持矛者）** 不是另一个只会“生成代码”的聊天工具。
-它是一个面向 STM32 的 **AI 开发执行器**：你描述目标，它负责生成代码、调用工具链、连接硬件、收集运行反馈，并在可验证的范围内继续修复问题。
+它是一个面向多类嵌入式板卡的 **AI 开发执行器**：你描述目标，它负责生成代码、调用工具链、连接硬件、收集运行反馈，并在可验证的范围内继续修复问题。
 
 ```text
 你说：
@@ -60,7 +60,7 @@ Gary 自动执行：
 
 一句话概括：
 
-> **Gary 不是帮你“写一份 STM32 代码”，而是试图帮你完成一次 STM32 开发闭环。**
+> **Gary 不是帮你“写一份单片机代码”，而是试图帮你完成一次真实可验证的嵌入式开发闭环。**
 
 ---
 
@@ -540,16 +540,16 @@ TOOLS_MAP = {
 
 ## <a name="supported-chips"></a> 📟 支持的芯片
 
-当前重点支持以下 STM32 系列：
+当前支持以下板卡与工作流：
 
-| 系列          | 典型型号                         | Flash       | RAM       |
-| ----------- | ---------------------------- | ----------- | --------- |
-| **STM32F0** | F030F4, F030C8, F072CB       | 16-128 KB   | 4-16 KB   |
-| **STM32F1** | F103C8T6, F103RCT6, F103ZET6 | 64-512 KB   | 20-64 KB  |
-| **STM32F3** | F303CCT6, F303RCT6           | 256 KB      | 40 KB     |
-| **STM32F4** | F401CCU6, F407VET6, F411CEU6 | 256-1024 KB | 64-128 KB |
+| 平台 | 典型型号 / 板卡 | 当前工作流 |
+| --- | --- | --- |
+| **STM32F0 / F1 / F3 / F4** | F030F4, F103C8T6, F303RCT6, F407VET6, F411CEU6 | HAL C 代码生成、GCC 编译、pyOCD / SWD 烧录、寄存器调试 |
+| **RP2040** | RP2040, Pico, Pico W | MicroPython `main.py` 语法检查、USB 串口 raw REPL 同步、启动日志 / Traceback 调试 |
+| **ESP32 系列** | ESP32, ESP32-S2, ESP32-S3, ESP32-C3, ESP32-C6, LOLIN32, NodeMCU-32S | MicroPython `main.py` 语法检查、USB 串口 raw REPL 同步、启动日志 / Traceback 调试 |
+| **ESP8266 系列** | ESP8266, NodeMCU, D1 Mini, ESP-01 | MicroPython `main.py` 语法检查、USB 串口 raw REPL 同步、启动日志 / Traceback 调试 |
 
-> 其他型号可能可以通过补充 HAL / CMSIS 资源和模板继续适配，但当前 README 只对上述系列做明确承诺。
+> 其中 STM32 走 HAL / GCC / SWD 工作流；RP2040 与 ESP 系列走 MicroPython `main.py` + USB 串口工作流。
 
 ---
 
@@ -711,7 +711,7 @@ newgrp dialout
 <details>
 <summary><b>Q: 支持 Arduino / ESP32 吗？</b></summary>
 
-当前主目标是 STM32。其他平台计划后续扩展。
+支持。当前已经支持 STM32、RP2040 / Pico / Pico W，以及 ESP32 / ESP8266 系列板卡。
 
 </details>
 
@@ -728,7 +728,8 @@ newgrp dialout
 * [ ] 串口数据实时可视化
 * [ ] STM32CubeMX 项目导入
 * [ ] VS Code 扩展
-* [ ] ESP32 支持
+* [x] RP2040 / Pico / Pico W 支持
+* [x] ESP32 / ESP8266 MicroPython 支持
 
 ---
 
@@ -737,7 +738,7 @@ newgrp dialout
 欢迎 Issue 和 PR。尤其欢迎以下方向：
 
 * 新的 Skill 包
-* 更多 STM32 系列支持
+* 更多 STM32 / RP2040 / ESP 板卡与模板支持
 * 文档改进与翻译
 * 故障复现与修复
 * 示例工程与演示视频

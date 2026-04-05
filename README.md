@@ -3,11 +3,11 @@
 # 🗡️ GARY CLI: The Spear Carrier
 
 **Piercing the Silicon with AI.**
-*An AI-native command-line development and debugging agent built for STM32*
+*An AI-native command-line development and debugging agent for STM32, RP2040 / Pico, and ESP32 / ESP8266 boards*
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python](https://img.shields.io/badge/Python-3.8+-green.svg)](https://www.python.org/)
-[![STM32](https://img.shields.io/badge/STM32-F0%20F1%20F3%20F4-blue.svg)](#supported-chips)
+[![Boards](https://img.shields.io/badge/Boards-STM32%20%7C%20RP2040%20%7C%20ESP32%20%7C%20ESP8266-blue.svg)](#supported-chips)
 [![Website](https://img.shields.io/badge/Website-garycli.com-success)](https://www.garycli.com)
 [![Tests](https://github.com/PrettyMyGirlZyy4Embedded/garycli/actions/workflows/test.yml/badge.svg)](https://github.com/PrettyMyGirlZyy4Embedded/garycli/actions)
 
@@ -22,7 +22,7 @@
    ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝
 ```
 
-**Talk to it in natural language, and let AI directly participate in STM32 development, compilation, flashing, and debugging.**
+**Talk to it in natural language, and let AI directly participate in development, deployment, and debugging for STM32, RP2040 / Pico, and ESP32 / ESP8266 boards.**
 
 <p align="center">
   <a href="./README_CN.md"><b>中文</b></a>
@@ -41,7 +41,7 @@ In traditional embedded development, the real time sink is usually not just “w
 **Requirement understanding → Peripheral configuration → Code generation → Cross-compilation → Firmware flashing → Serial verification → Register inspection → Fault fixing → Reflashing**
 
 **Gary (The Spear Carrier)** is not just another chat tool that can only “generate code.”
-It is an **AI execution agent for STM32 development**: you describe the goal, and it generates code, invokes toolchains, connects to hardware, collects runtime feedback, and keeps fixing issues when the results are verifiable.
+It is an **AI execution agent for embedded boards across multiple workflows**: you describe the goal, and it generates code, invokes toolchains, connects to hardware, collects runtime feedback, and keeps fixing issues when the results are verifiable.
 
 ```text
 You say:
@@ -59,7 +59,7 @@ Gary automatically executes:
 
 In one sentence:
 
-> **Gary is not just trying to “write STM32 code for you” — it is trying to complete an STM32 development loop for you.**
+> **Gary is not just trying to “write MCU code for you” — it is trying to complete a real, verifiable embedded-development loop for you.**
 
 ---
 
@@ -539,16 +539,16 @@ When the user wants to control a motor, call motor_set_speed to set the target R
 
 ## <a name="supported-chips"></a> 📟 Supported Chips
 
-Gary currently focuses on the following STM32 series:
+Gary currently supports the following boards and workflows:
 
-| Series      | Typical models               | Flash       | RAM       |
-| ----------- | ---------------------------- | ----------- | --------- |
-| **STM32F0** | F030F4, F030C8, F072CB       | 16–128 KB   | 4–16 KB   |
-| **STM32F1** | F103C8T6, F103RCT6, F103ZET6 | 64–512 KB   | 20–64 KB  |
-| **STM32F3** | F303CCT6, F303RCT6           | 256 KB      | 40 KB     |
-| **STM32F4** | F401CCU6, F407VET6, F411CEU6 | 256–1024 KB | 64–128 KB |
+| Platform | Typical chips / boards | Current workflow |
+| -------- | ---------------------- | ---------------- |
+| **STM32F0 / F1 / F3 / F4** | F030F4, F103C8T6, F303RCT6, F407VET6, F411CEU6 | HAL C code generation, GCC compilation, pyOCD / SWD flashing, register-level debugging |
+| **RP2040** | RP2040, Pico, Pico W | MicroPython `main.py` syntax validation, USB serial raw REPL sync, boot-log / traceback debugging |
+| **ESP32 family** | ESP32, ESP32-S2, ESP32-S3, ESP32-C3, ESP32-C6, LOLIN32, NodeMCU-32S | MicroPython `main.py` syntax validation, USB serial raw REPL sync, boot-log / traceback debugging |
+| **ESP8266 family** | ESP8266, NodeMCU, D1 Mini, ESP-01 | MicroPython `main.py` syntax validation, USB serial raw REPL sync, boot-log / traceback debugging |
 
-> Other models may also work by adding HAL / CMSIS resources and templates, but this README only makes explicit commitments for the series listed above.
+> STM32 uses the HAL / GCC / SWD workflow, while RP2040 and ESP targets use the MicroPython `main.py` + USB serial workflow.
 
 ---
 
@@ -710,7 +710,7 @@ Yes. Run `gary config` and select Ollama. Models with more stable function-calli
 <details>
 <summary><b>Q: Does it support Arduino or ESP32?</b></summary>
 
-STM32 is the current primary target. Other platforms are planned for future expansion.
+Yes. Gary now supports STM32, RP2040 / Pico / Pico W, and ESP32 / ESP8266 boards.
 
 </details>
 
@@ -727,7 +727,8 @@ STM32 is the current primary target. Other platforms are planned for future expa
 * [ ] Real-time serial data visualization
 * [ ] STM32CubeMX project import
 * [ ] VS Code extension
-* [ ] ESP32 support
+* [x] RP2040 / Pico / Pico W support
+* [x] ESP32 / ESP8266 MicroPython support
 
 ---
 
@@ -736,7 +737,7 @@ STM32 is the current primary target. Other platforms are planned for future expa
 Issues and PRs are welcome. Contributions are especially appreciated in these areas:
 
 * New Skill packs
-* More STM32 family support
+* More STM32 / RP2040 / ESP board and template support
 * Documentation improvements and translations
 * Fault reproduction and fixes
 * Example projects and demo videos

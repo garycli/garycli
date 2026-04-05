@@ -27,7 +27,7 @@ die()   { echo -e "  ${RED}✗${RESET} $*" >&2; exit 1; }
 echo ""
 echo -e "${BOLD}  ╔══════════════════════════════════════════╗${RESET}"
 echo -e "${BOLD}  ║         Gary Dev Agent  安装程序         ║${RESET}"
-echo -e "${BOLD}  ║      STM32 AI 嵌入式开发助手             ║${RESET}"
+echo -e "${BOLD}  ║  STM32 / RP2040 / ESP 系列 AI 开发助手  ║${RESET}"
 echo -e "${BOLD}  ╚══════════════════════════════════════════╝${RESET}"
 echo ""
 

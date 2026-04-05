@@ -26,7 +26,7 @@ function die($msg)  { Write-Host "  [X] $msg"  -ForegroundColor Red; exit 1 }
 Write-Host ""
 Write-Host "  +==========================================+" -ForegroundColor Magenta
 Write-Host "  |      Gary Dev Agent  安装程序           |" -ForegroundColor Magenta
-Write-Host "  |   STM32 AI 嵌入式开发助手               |" -ForegroundColor Magenta
+Write-Host "  |  STM32 / RP2040 / ESP 系列 AI 开发助手  |" -ForegroundColor Magenta
 Write-Host "  +==========================================+" -ForegroundColor Magenta
 Write-Host ""
 
