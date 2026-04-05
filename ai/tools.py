@@ -142,10 +142,10 @@ TOOL_SCHEMAS = [
         "function": {
             "name": "stm32_recompile",
             "description": (
-                "直接从 latest_workspace/main.c 重新编译，无需传递代码字符串。"
+                "直接从 latest_workspace/main.c 或 main.py 重新编译，无需传递代码字符串。"
                 "str_replace_edit 修改文件后使用此工具代替 read_file + stm32_compile，"
                 "节省 token，避免代码传输中的幻觉。"
-                "mode='auto' 自动检测裸机或 RTOS；mode='bare' 强制裸机；mode='rtos' 强制 FreeRTOS。"
+                "STM32 下 mode='auto' 自动检测裸机或 RTOS；MicroPython 目标下会自动走 main.py 语法检查。"
             ),
             "parameters": {
                 "type": "object",
@@ -405,11 +405,11 @@ TOOL_SCHEMAS = [
         "type": "function",
         "function": {
             "name": "stm32_save_code",
-            "description": "将代码保存到项目目录（不编译，仅保存源码）。",
+            "description": "将代码保存到项目目录（不编译，仅保存源码；STM32 保存 main.c，MicroPython 目标保存 main.py）。",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "code": {"type": "string", "description": "main.c 代码内容"},
+                    "code": {"type": "string", "description": "主源码内容（STM32 为 main.c，MicroPython 目标为 main.py）"},
                     "request": {"type": "string", "description": "项目描述（作为目录名）"},
                 },
                 "required": ["code"],
@@ -428,7 +428,7 @@ TOOL_SCHEMAS = [
         "type": "function",
         "function": {
             "name": "stm32_read_project",
-            "description": "读取指定历史项目的 main.c 源码，用于查看或修改。",
+            "description": "读取指定历史项目的主源码，用于查看或修改（STM32 为 main.c，MicroPython 目标为 main.py）。",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -438,6 +438,196 @@ TOOL_SCHEMAS = [
                     },
                 },
                 "required": ["project_name"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "rp2040_connect",
+            "description": "通过 USB 串口连接 RP2040 / Pico / Pico W，并切到 MicroPython 工作流。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "chip": {
+                        "type": "string",
+                        "description": "可选：目标板名称，如 RP2040、PICO、PICO_W",
+                    },
+                    "port": {
+                        "type": "string",
+                        "description": "可选：串口设备路径，如 /dev/ttyACM0",
+                    },
+                    "baud": {"type": "integer", "description": "串口波特率，默认 115200"},
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "rp2040_hardware_status",
+            "description": "查询 RP2040 + MicroPython 当前状态：目标板、串口连接、候选串口、运行时类型。",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "rp2040_compile",
+            "description": "对完整 main.py 做 MicroPython 语法检查，并缓存到 workspace/projects/latest_workspace/main.py。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "code": {"type": "string", "description": "完整的 main.py 代码"},
+                    "chip": {"type": "string", "description": "可选：目标板名称，如 PICO_W"},
+                },
+                "required": ["code"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "rp2040_flash",
+            "description": "通过 MicroPython raw REPL 把 main.py 同步到 RP2040，并软复位执行。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "file_path": {
+                        "type": "string",
+                        "description": "可选：本地 .py 文件路径；不填则使用 workspace/projects/latest_workspace/main.py",
+                    },
+                    "port": {"type": "string", "description": "可选：串口设备路径"},
+                    "baud": {"type": "integer", "description": "串口波特率，默认 115200"},
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "rp2040_auto_sync_cycle",
+            "description": "RP2040 推荐闭环：语法检查 main.py → 同步到设备 → 软复位 → 读取启动日志/Traceback。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "code": {"type": "string", "description": "完整的 main.py 代码"},
+                    "request": {"type": "string", "description": "项目描述（用于保存项目，可选）"},
+                },
+                "required": ["code"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "rp2040_list_files",
+            "description": "列出当前 MicroPython 设备上的文件，检查 main.py、库文件和资源是否已经同步。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "设备目录路径，默认 ."},
+                    "port": {"type": "string", "description": "可选：串口设备路径"},
+                    "baud": {"type": "integer", "description": "串口波特率，默认 115200"},
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "esp_connect",
+            "description": "通过 USB 串口连接 ESP32 / ESP8266 / ESP32-S3 等开发板，并切到 MicroPython 工作流。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "chip": {
+                        "type": "string",
+                        "description": "可选：目标板名称，如 ESP32、ESP8266、ESP32-S3、ESP32-C3、NodeMCU、D1 Mini、LOLIN32",
+                    },
+                    "port": {
+                        "type": "string",
+                        "description": "可选：串口设备路径，如 /dev/ttyUSB0",
+                    },
+                    "baud": {"type": "integer", "description": "串口波特率，默认 115200"},
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "esp_hardware_status",
+            "description": "查询 ESP 系列 + MicroPython 当前状态：目标板、串口连接、候选串口、运行时类型。",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "esp_compile",
+            "description": "对完整 main.py 做 MicroPython 语法检查，并缓存到 workspace/projects/latest_workspace/main.py。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "code": {"type": "string", "description": "完整的 main.py 代码"},
+                    "chip": {"type": "string", "description": "可选：目标板名称，如 ESP32-S3、ESP32-C3、ESP8266、NodeMCU"},
+                },
+                "required": ["code"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "esp_flash",
+            "description": "通过 MicroPython raw REPL 把 main.py 同步到 ESP 系列开发板，并软复位执行。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "file_path": {
+                        "type": "string",
+                        "description": "可选：本地 .py 文件路径；不填则使用 workspace/projects/latest_workspace/main.py",
+                    },
+                    "port": {"type": "string", "description": "可选：串口设备路径"},
+                    "baud": {"type": "integer", "description": "串口波特率，默认 115200"},
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "esp_auto_sync_cycle",
+            "description": "ESP 系列推荐闭环：语法检查 main.py → 同步到设备 → 软复位 → 读取启动日志/Traceback。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "code": {"type": "string", "description": "完整的 main.py 代码"},
+                    "request": {"type": "string", "description": "项目描述（用于保存项目，可选）"},
+                },
+                "required": ["code"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "esp_list_files",
+            "description": "列出当前 ESP MicroPython 设备上的文件，检查 main.py、库文件和资源是否已经同步。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "设备目录路径，默认 ."},
+                    "port": {"type": "string", "description": "可选：串口设备路径"},
+                    "baud": {"type": "integer", "description": "串口波特率，默认 115200"},
+                },
+                "required": [],
             },
         },
     },
@@ -473,6 +663,38 @@ TOOL_SCHEMAS = [
                     },
                 },
                 "required": ["title", "experience"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "gary_delete_member_memory",
+            "description": (
+                "从 member.md 删除错误、过时或无用的动态经验。"
+                "默认只删除非 pinned 经验；建议先用精确 query，避免一次删太多。"
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "用于匹配标题或正文的关键词，如“编译成功模板”或某条错误经验标题",
+                    },
+                    "dry_run": {
+                        "type": "boolean",
+                        "description": "是否只预览匹配结果而不真正删除，默认 false",
+                    },
+                    "include_pinned": {
+                        "type": "boolean",
+                        "description": "是否允许删除 pinned 经验，默认 false",
+                    },
+                    "max_matches": {
+                        "type": "integer",
+                        "description": "允许删除的最大匹配数，默认 10；匹配过多时工具会要求更精确的 query",
+                    },
+                },
+                "required": ["query"],
             },
         },
     },
@@ -868,62 +1090,6 @@ TOOL_SCHEMAS = [
                     "style": {"type": "string", "description": "Word 样式（可选）"},
                 },
                 "required": ["file_path", "heading_text", "content"],
-            },
-        },
-    },
-    # ── 电脑控制工具 ──────────────────────────────────────────
-    {
-        "type": "function",
-        "function": {
-            "name": "computer_screenshot",
-            "description": "截取当前桌面截图，返回保存路径。",
-            "parameters": {"type": "object", "properties": {}, "required": []},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "computer_mouse_move",
-            "description": "移动鼠标到指定坐标（x, y）。",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "x": {"type": "integer", "description": "X 坐标"},
-                    "y": {"type": "integer", "description": "Y 坐标"},
-                },
-                "required": ["x", "y"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "computer_mouse_click",
-            "description": "在当前鼠标位置点击（left/right/double）。",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "button": {
-                        "type": "string",
-                        "enum": ["left", "right", "double"],
-                        "description": "点击类型（默认 left）",
-                    },
-                },
-                "required": [],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "computer_keyboard_type",
-            "description": "向当前焦点窗口输入文本。",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "text": {"type": "string", "description": "要输入的文本"},
-                },
-                "required": ["text"],
             },
         },
     },
