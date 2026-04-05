@@ -3,6 +3,7 @@
 
 # ── 必需依赖 ──────────────────────────────────────────────────
 openai
+google-genai
 rich
 prompt_toolkit
 pyocd

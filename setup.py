@@ -408,19 +408,50 @@ def _extract_zip(zip_path: Path, dest_dir: Path, sub_paths: List[str]) -> bool:
 # STEP 0: AI 接口配置
 # ─────────────────────────────────────────────────────────────────────────────
 _AI_PRESETS = [
-    ("OpenAI", "https://api.openai.com/v1", "gpt-4o"),
-    ("DeepSeek", "https://api.deepseek.com/v1", "deepseek-chat"),
-    ("Kimi / Moonshot", "https://api.moonshot.cn/v1", "kimi-k2.5"),
+    ("OpenAI", "https://api.openai.com/v1", "gpt-4o", "openai"),
+    ("DeepSeek", "https://api.deepseek.com/v1", "deepseek-chat", "openai"),
+    ("Kimi / Moonshot", "https://api.moonshot.cn/v1", "kimi-k2.5", "openai"),
     (
         "Google Gemini",
-        "https://generativelanguage.googleapis.com/v1beta/openai/",
-        "gemini-2.0-flash",
+        "https://generativelanguage.googleapis.com/v1beta",
+        "gemini-2.5-flash",
+        "gemini",
     ),
-    ("通义千问 (阿里云)", "https://dashscope.aliyuncs.com/compatible-mode/v1", "qwen-plus"),
-    ("智谱 GLM", "https://open.bigmodel.cn/api/paas/v4/", "glm-4-flash"),
-    ("Ollama (本地无需Key)", "http://127.0.0.1:11434/v1", "qwen2.5-coder:14b"),
-    ("自定义 / Other", "", ""),
+    ("通义千问 (阿里云)", "https://dashscope.aliyuncs.com/compatible-mode/v1", "qwen-plus", "openai"),
+    ("智谱 GLM", "https://open.bigmodel.cn/api/paas/v4/", "glm-4-flash", "openai"),
+    ("Ollama (本地无需Key)", "http://127.0.0.1:11434/v1", "qwen2.5-coder:14b", "openai"),
+    ("自定义 / Other", "", "", ""),
 ]
+_API_STYLE_OPTIONS = [
+    ("openai", "OpenAI Compatible", "兼容 /v1/chat/completions 等 OpenAI 风格接口"),
+    ("anthropic", "Anthropic Messages", "兼容 /v1/messages 的 Anthropic / Claude 风格接口"),
+    ("gemini", "Gemini Official SDK", "Google Gemini 官方 SDK / generativelanguage.googleapis.com"),
+]
+
+
+def _normalize_api_style(value: str, default: str = "") -> str:
+    raw = str(value or "").strip().lower()
+    aliases = {
+        "openai": "openai",
+        "openai-compatible": "openai",
+        "compatible": "openai",
+        "anthropic": "anthropic",
+        "claude": "anthropic",
+        "messages": "anthropic",
+        "gemini": "gemini",
+        "google": "gemini",
+        "google-gemini": "gemini",
+    }
+    return aliases.get(raw, default)
+
+
+def _provider_label(api_style: str) -> str:
+    normalized = _normalize_api_style(api_style, "openai")
+    if normalized == "gemini":
+        return "Google Gemini (official SDK)"
+    if normalized == "anthropic":
+        return "Anthropic Messages API"
+    return "OpenAI-compatible"
 
 
 def _read_current_ai_config() -> tuple:
@@ -428,7 +459,7 @@ def _read_current_ai_config() -> tuple:
 
     p = SCRIPT_DIR / "config.py"
     if not p.exists():
-        return "", "", ""
+        return "", "", "", ""
     text = p.read_text(encoding="utf-8")
 
     def _get(pattern):
@@ -439,17 +470,26 @@ def _read_current_ai_config() -> tuple:
         _get(r'^AI_API_KEY\s*=\s*["\']([^"\']*)["\']'),
         _get(r'^AI_BASE_URL\s*=\s*["\']([^"\']*)["\']'),
         _get(r'^AI_MODEL\s*=\s*["\']([^"\']*)["\']'),
+        _normalize_api_style(_get(r'^AI_API_STYLE\s*=\s*["\']([^"\']*)["\']')),
     )
 
 
-def _write_ai_config(api_key: str, base_url: str, model: str) -> bool:
+def _write_ai_config(api_key: str, base_url: str, model: str, api_style: str) -> bool:
     import re as _re
 
     p = SCRIPT_DIR / "config.py"
     if not p.exists():
-        p.write_text('AI_API_KEY = ""\nAI_BASE_URL = ""\nAI_MODEL = ""\n', encoding="utf-8")
+        p.write_text(
+            'AI_API_KEY = ""\nAI_BASE_URL = ""\nAI_MODEL = ""\nAI_API_STYLE = ""\n',
+            encoding="utf-8",
+        )
     text = p.read_text(encoding="utf-8")
-    for key, val in [("AI_API_KEY", api_key), ("AI_BASE_URL", base_url), ("AI_MODEL", model)]:
+    for key, val in [
+        ("AI_API_KEY", api_key),
+        ("AI_BASE_URL", base_url),
+        ("AI_MODEL", model),
+        ("AI_API_STYLE", _normalize_api_style(api_style)),
+    ]:
         pattern = rf"^({key}\s*=\s*).*$"
         if _re.search(pattern, text, flags=_re.MULTILINE):
             text = _re.sub(pattern, f'{key} = "{val}"', text, flags=_re.MULTILINE)
@@ -475,12 +515,13 @@ def configure_ai(auto: bool):
     import getpass as _gp
 
     header("配置  AI 后端接口")
-    cur_key, cur_url, cur_model = _read_current_ai_config()
+    cur_key, cur_url, cur_model, cur_style = _read_current_ai_config()
     placeholder = ("YOUR_API_KEY", "sk-YOUR")
     is_configured = bool(cur_key and not any(cur_key.startswith(p) for p in placeholder))
 
     if is_configured:
         ok(f"API Key  : {_mask_key(cur_key)}")
+        ok(f"Interface : {_provider_label(cur_style)}")
         ok(f"Base URL : {cur_url}")
         ok(f"Model    : {cur_model}")
         if auto:
@@ -490,9 +531,9 @@ def configure_ai(auto: bool):
 
     print()
     print(f"  {_c('1;36', '请选择 AI 服务提供商：')}")
-    for i, (name, url, _) in enumerate(_AI_PRESETS, 1):
+    for i, (name, url, _, style) in enumerate(_AI_PRESETS, 1):
         url_hint = _c("2", f"  {url[:52]}") if url else ""
-        print(f"    {_c('33', str(i))}.  {name:<24}{url_hint}")
+        print(f"    {_c('33', str(i))}.  {name:<24}{_c('2', _provider_label(style))}{url_hint}")
     print()
 
     choice = ""
@@ -508,16 +549,51 @@ def configure_ai(auto: bool):
             return
 
     idx = int(choice) - 1
-    preset_name, preset_url, preset_model = _AI_PRESETS[idx]
+    preset_name, preset_url, preset_model, preset_style = _AI_PRESETS[idx]
 
-    base_url = (
-        preset_url
-        if preset_url
-        else input(f"  {_c('33', '?')} Base URL (例: https://api.openai.com/v1): ").strip()
-    )
+    api_style = _normalize_api_style(preset_style, "openai")
+    if not preset_url:
+        print(f"  {_c('1;36', '请选择接口协议类型：')}")
+        for i, (_, label, desc) in enumerate(_API_STYLE_OPTIONS, 1):
+            print(f"    {_c('33', str(i))}.  {label:<24}{_c('2', desc)}")
+        print()
+        style_choice = ""
+        style_valid = [str(i) for i in range(1, len(_API_STYLE_OPTIONS) + 1)]
+        while style_choice not in style_valid:
+            try:
+                style_choice = input(
+                    f"  {_c('33', '?')} 输入协议类型 [1-{len(_API_STYLE_OPTIONS)}]: "
+                ).strip()
+            except (EOFError, KeyboardInterrupt):
+                print()
+                warn("已跳过 AI 配置，请稍后手动修改 config.py")
+                return
+            if not style_choice and is_configured:
+                return
+        api_style = _API_STYLE_OPTIONS[int(style_choice) - 1][0]
 
+    if preset_url:
+        base_url = preset_url
+    else:
+        default_base_urls = {
+            "openai": "https://api.openai.com/v1",
+            "anthropic": "https://api.anthropic.com/v1",
+            "gemini": "https://generativelanguage.googleapis.com/v1beta",
+        }
+        example = default_base_urls.get(api_style, "https://api.openai.com/v1")
+        entered = input(f"  {_c('33', '?')} Base URL (例: {example}): ").strip()
+        base_url = entered or (cur_url if cur_url and cur_style == api_style else example)
+
+    default_models = {
+        "openai": "gpt-4o",
+        "anthropic": "claude-3-7-sonnet-latest",
+        "gemini": "gemini-2.5-flash",
+    }
+    current_model_for_style = cur_model if cur_style == api_style else ""
     default_model = (
-        preset_model if preset_model else (cur_model if cur_model else "gemini-2.0-flash")
+        preset_model
+        if preset_model
+        else (current_model_for_style if current_model_for_style else default_models.get(api_style, "gpt-4o"))
     )
     hint = f" [{_c('36', default_model)}]"
 
@@ -542,10 +618,11 @@ def configure_ai(auto: bool):
                 warn("未输入 API Key，请稍后手动修改 config.py")
                 return
 
-    if _write_ai_config(api_key, base_url, model):
+    if _write_ai_config(api_key, base_url, model, api_style):
         print()
         ok(f"AI 配置已写入 config.py")
         ok(f"  服务商 : {preset_name}")
+        ok(f"  接口类型: {_provider_label(api_style)}")
         ok(f"  API Key: {_mask_key(api_key)}")
         ok(f"  Base URL: {base_url}")
         ok(f"  Model  : {model}")
@@ -921,6 +998,7 @@ def _add_to_path(new_path: str):
 # ─────────────────────────────────────────────────────────────────────────────
 PYTHON_PKGS = [
     ("openai", "openai", True),
+    ("google.genai", "google-genai", True),
     ("rich", "rich", True),
     ("prompt_toolkit", "prompt_toolkit", True),
     ("pyocd", "pyocd", True),
@@ -1458,11 +1536,11 @@ def verify():
     status = {}
 
     # AI
-    cur_key, cur_url, cur_model = _read_current_ai_config()
+    cur_key, cur_url, cur_model, cur_style = _read_current_ai_config()
     placeholder = ("YOUR_API_KEY", "sk-YOUR")
     ai_ok = bool(cur_key and not any(cur_key.startswith(p) for p in placeholder))
     if ai_ok:
-        ok(f"AI 接口: {cur_model}  ({cur_url[:50]})")
+        ok(f"AI 接口: {_provider_label(cur_style)} / {cur_model}  ({cur_url[:50]})")
         ok(f"API Key: {_mask_key(cur_key)}")
     else:
         err("AI 接口: 未配置 API Key -> 请运行 python setup.py 重新配置")
