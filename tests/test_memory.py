@@ -63,3 +63,49 @@ def test_split_member_content_distinguishes_pinned_and_dynamic():
     assert dynamic
     assert all(entry.startswith("### [Pinned]") for entry in pinned)
     assert any("动态经验" in entry for entry in dynamic)
+
+
+def test_compile_success_is_not_auto_written_to_member(tmp_path, monkeypatch):
+    """Automatic success hooks should not create member entries."""
+
+    member_path = tmp_path / "member.md"
+    monkeypatch.setattr(memory, "MEMBER_MD_PATH", member_path)
+
+    memory._record_success_memory(
+        "compile_success",
+        code="print('Gary:BOOT')\n",
+        result={"bin_size": 123},
+        chip="PICO_W",
+    )
+    memory._record_success_memory(
+        "runtime_success",
+        code="print('Gary:BOOT')\n",
+        result={"bin_size": 123},
+        request="blink",
+        chip="PICO_W",
+    )
+
+    content = memory._ensure_member_file().read_text(encoding="utf-8")
+    assert "编译成功模板" not in content
+    assert "运行成功闭环" not in content
+    assert "PICO_W" not in content
+
+
+def test_gary_delete_member_memory_removes_matching_dynamic_entries(tmp_path, monkeypatch):
+    """Gary should be able to delete wrong or useless dynamic memories by query."""
+
+    member_path = tmp_path / "member.md"
+    monkeypatch.setattr(memory, "MEMBER_MD_PATH", member_path)
+
+    memory.gary_save_member_memory(
+        title="错误经验",
+        experience="这个经验已经过时，需要删掉",
+        tags=["obsolete"],
+    )
+    result = memory.gary_delete_member_memory("错误经验")
+
+    content = member_path.read_text(encoding="utf-8")
+    assert result["success"] is True
+    assert result["deleted_count"] == 1
+    assert "错误经验" not in content
+    assert "启动标记优先" in content
