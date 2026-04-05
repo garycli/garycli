@@ -63,7 +63,4 @@ UART_READ_TIMEOUT = 3  # 串口读取超时（秒）
 # ================= 默认目标芯片 =================
 DEFAULT_CHIP = "STM32F103C8T6"
 DEFAULT_CLOCK = "HSI_internal"
-AI_API_KEY = "sk-cp--vPKC6EET8bY7XTJPFHv392dlwii5josJoBjdp1d-8y8Bg84cFz5Xd28w_KAKtx0p7lsH8Njthq9BgJGDb9IvfP6TA0QSXyFLAeZyHYZ5bJBgdSjS9yQlXE"
-AI_BASE_URL = "https://www.minimaxi.com/v1"
-AI_MODEL = "MiniMax-M2.7"
-AI_API_STYLE = "openai"
+
