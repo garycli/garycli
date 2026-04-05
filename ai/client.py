@@ -12,25 +12,37 @@ from typing import Any, Iterator, Optional
 from urllib.parse import urlparse
 
 import config as _cfg
+import requests
 
 _ROOT = Path(__file__).resolve().parent.parent
 _CONFIG_PATH = _ROOT / "config.py"
 
 _AI_PRESETS = [
-    ("OpenAI", "https://api.openai.com/v1", "gpt-4o"),
-    ("DeepSeek", "https://api.deepseek.com/v1", "deepseek-chat"),
-    ("Kimi / Moonshot", "https://api.moonshot.cn/v1", "kimi-k2.5"),
-    ("Google Gemini (官方 SDK)", "https://generativelanguage.googleapis.com/", "gemini-2.5-flash"),
-    ("通义千问 (阿里云)", "https://dashscope.aliyuncs.com/compatible-mode/v1", "qwen-plus"),
-    ("智谱 GLM", "https://open.bigmodel.cn/api/paas/v4/", "glm-4-flash"),
-    ("Ollama (本地)", "http://127.0.0.1:11434/v1", "qwen2.5-coder:14b"),
-    ("自定义 / Other", "", ""),
+    ("OpenAI", "https://api.openai.com/v1", "gpt-4o", "openai"),
+    ("DeepSeek", "https://api.deepseek.com/v1", "deepseek-chat", "openai"),
+    ("Kimi / Moonshot", "https://api.moonshot.cn/v1", "kimi-k2.5", "openai"),
+    (
+        "Google Gemini (官方 SDK)",
+        "https://generativelanguage.googleapis.com/v1beta",
+        "gemini-2.5-flash",
+        "gemini",
+    ),
+    ("通义千问 (阿里云)", "https://dashscope.aliyuncs.com/compatible-mode/v1", "qwen-plus", "openai"),
+    ("智谱 GLM", "https://open.bigmodel.cn/api/paas/v4/", "glm-4-flash", "openai"),
+    ("Ollama (本地)", "http://127.0.0.1:11434/v1", "qwen2.5-coder:14b", "openai"),
+    ("自定义 / Other", "", "", ""),
 ]
+_API_STYLE_OPTIONS = (
+    ("openai", "OpenAI Compatible", "兼容 /v1/chat/completions 等 OpenAI 风格接口"),
+    ("anthropic", "Anthropic Messages", "兼容 /v1/messages 的 Anthropic / Claude 风格接口"),
+    ("gemini", "Gemini Official SDK", "Google Gemini 官方 SDK / generativelanguage.googleapis.com"),
+)
 
 _CONFIG_KEYS_TO_RELOAD = (
     "AI_API_KEY",
     "AI_BASE_URL",
     "AI_MODEL",
+    "AI_API_STYLE",
     "AI_TEMPERATURE",
     "DEFAULT_CHIP",
     "DEFAULT_CLOCK",
@@ -44,6 +56,7 @@ _CONFIG_KEYS_TO_RELOAD = (
 AI_API_KEY = getattr(_cfg, "AI_API_KEY", "")
 AI_BASE_URL = getattr(_cfg, "AI_BASE_URL", "https://api.openai.com/v1")
 AI_MODEL = getattr(_cfg, "AI_MODEL", "gpt-4o")
+AI_API_STYLE = getattr(_cfg, "AI_API_STYLE", "")
 AI_TEMPERATURE = getattr(_cfg, "AI_TEMPERATURE", 1)
 DEFAULT_CHIP = getattr(_cfg, "DEFAULT_CHIP", "")
 DEFAULT_CLOCK = getattr(_cfg, "DEFAULT_CLOCK", "HSI_internal")
@@ -151,6 +164,7 @@ def _current_settings() -> dict[str, Any]:
         "AI_API_KEY": AI_API_KEY,
         "AI_BASE_URL": AI_BASE_URL,
         "AI_MODEL": AI_MODEL,
+        "AI_API_STYLE": AI_API_STYLE,
         "AI_TEMPERATURE": AI_TEMPERATURE,
         "DEFAULT_CHIP": DEFAULT_CHIP,
         "DEFAULT_CLOCK": DEFAULT_CLOCK,
@@ -174,11 +188,34 @@ def _upsert_config_assignment(text: str, key: str, value: Any) -> str:
     return text + line + "\n"
 
 
-def _read_ai_config() -> tuple[str, str, str]:
-    """Read `(api_key, base_url, model)` from `config.py`."""
+def _normalize_api_style(value: Any, default: Optional[str] = None) -> Optional[str]:
+    """Normalize API style aliases to `openai`, `anthropic`, or `gemini`."""
+
+    raw = str(value or "").strip().lower()
+    if not raw:
+        return default
+    aliases = {
+        "openai": "openai",
+        "openai-compatible": "openai",
+        "compatible": "openai",
+        "chat-completions": "openai",
+        "anthropic": "anthropic",
+        "claude": "anthropic",
+        "messages": "anthropic",
+        "anthropic-messages": "anthropic",
+        "gemini": "gemini",
+        "google": "gemini",
+        "google-gemini": "gemini",
+        "gemini-sdk": "gemini",
+    }
+    return aliases.get(raw, default)
+
+
+def _read_ai_config() -> tuple[str, str, str, str]:
+    """Read `(api_key, base_url, model, api_style)` from `config.py`."""
 
     if not _CONFIG_PATH.exists():
-        return AI_API_KEY, AI_BASE_URL, AI_MODEL
+        return AI_API_KEY, AI_BASE_URL, AI_MODEL, _normalize_api_style(AI_API_STYLE, default="") or ""
     text = _CONFIG_PATH.read_text(encoding="utf-8")
 
     def _get(pattern: str) -> str:
@@ -189,6 +226,11 @@ def _read_ai_config() -> tuple[str, str, str]:
         _get(r'^AI_API_KEY\s*=\s*["\']([^"\']*)["\']') or AI_API_KEY,
         _get(r'^AI_BASE_URL\s*=\s*["\']([^"\']*)["\']') or AI_BASE_URL,
         _get(r'^AI_MODEL\s*=\s*["\']([^"\']*)["\']') or AI_MODEL,
+        _normalize_api_style(
+            _get(r'^AI_API_STYLE\s*=\s*["\']([^"\']*)["\']') or AI_API_STYLE,
+            default="",
+        )
+        or "",
     )
 
 
@@ -204,7 +246,7 @@ def _write_config_assignments(updates: dict[str, Any]) -> bool:
     return True
 
 
-def _write_ai_config(api_key: str, base_url: str, model: str) -> bool:
+def _write_ai_config(api_key: str, base_url: str, model: str, api_style: str = "") -> bool:
     """Persist the core AI settings to `config.py`."""
 
     return _write_config_assignments(
@@ -212,6 +254,7 @@ def _write_ai_config(api_key: str, base_url: str, model: str) -> bool:
             "AI_API_KEY": api_key,
             "AI_BASE_URL": base_url,
             "AI_MODEL": model,
+            "AI_API_STYLE": _normalize_api_style(api_style, default="") or "",
         }
     )
 
@@ -228,6 +271,7 @@ def _reload_ai_globals() -> dict[str, Any]:
     global AI_API_KEY
     global AI_BASE_URL
     global AI_MODEL
+    global AI_API_STYLE
     global AI_TEMPERATURE
     global DEFAULT_CHIP
     global DEFAULT_CLOCK
@@ -239,12 +283,13 @@ def _reload_ai_globals() -> dict[str, Any]:
     global _AI_CLIENT
     global _AI_CLIENT_SIGNATURE
 
-    previous_signature = (AI_API_KEY, AI_BASE_URL, AI_MODEL)
+    previous_signature = (AI_API_KEY, AI_BASE_URL, AI_MODEL, AI_API_STYLE)
     importlib.reload(_cfg)
     defaults = {
         "AI_API_KEY": "",
         "AI_BASE_URL": "https://api.openai.com/v1",
         "AI_MODEL": "gpt-4o",
+        "AI_API_STYLE": "",
         "AI_TEMPERATURE": 1,
         "DEFAULT_CHIP": "",
         "DEFAULT_CLOCK": "HSI_internal",
@@ -256,8 +301,9 @@ def _reload_ai_globals() -> dict[str, Any]:
     }
     for name in _CONFIG_KEYS_TO_RELOAD:
         globals()[name] = getattr(_cfg, name, defaults[name])
+    AI_API_STYLE = _normalize_api_style(AI_API_STYLE, default="") or ""
     CLI_LANGUAGE = _normalize_cli_language(CLI_LANGUAGE)
-    if (AI_API_KEY, AI_BASE_URL, AI_MODEL) != previous_signature:
+    if (AI_API_KEY, AI_BASE_URL, AI_MODEL, AI_API_STYLE) != previous_signature:
         _AI_CLIENT = None
         _AI_CLIENT_SIGNATURE = None
     return _current_settings()
@@ -290,7 +336,7 @@ def _api_key_is_placeholder(api_key: str) -> bool:
 def _ai_is_configured() -> bool:
     """Return whether the runtime has a usable AI configuration."""
 
-    api_key, base_url, model = _read_ai_config()
+    api_key, base_url, model, _ = _read_ai_config()
     return bool(api_key and base_url and model and not _api_key_is_placeholder(api_key))
 
 
@@ -319,27 +365,52 @@ def _is_gemini_provider(base_url: str | None = None, model: str | None = None) -
     return target_url in {"gemini", "gemini://official", "google-gemini"}
 
 
-def _provider_kind(base_url: str | None = None, model: str | None = None) -> str:
+def _resolve_api_style(
+    *,
+    base_url: str | None = None,
+    model: str | None = None,
+    api_style: str | None = None,
+) -> str:
+    """Resolve the effective runtime API style with backward-compatible inference."""
+
+    explicit = _normalize_api_style(api_style if api_style is not None else AI_API_STYLE)
+    if explicit:
+        return explicit
+    if _is_gemini_provider(base_url=base_url, model=model):
+        return "gemini"
+    return "openai"
+
+
+def _provider_kind(
+    base_url: str | None = None,
+    model: str | None = None,
+    api_style: str | None = None,
+) -> str:
     """Return the active provider kind."""
 
-    return "gemini" if _is_gemini_provider(base_url=base_url, model=model) else "openai"
+    return _resolve_api_style(base_url=base_url, model=model, api_style=api_style)
 
 
-def provider_name(base_url: str | None = None, model: str | None = None) -> str:
+def provider_name(
+    base_url: str | None = None,
+    model: str | None = None,
+    api_style: str | None = None,
+) -> str:
     """Return a human-readable provider label."""
 
-    return (
-        "Google Gemini (official SDK)"
-        if _provider_kind(base_url, model) == "gemini"
-        else ("OpenAI-compatible")
-    )
+    kind = _provider_kind(base_url, model, api_style)
+    if kind == "gemini":
+        return "Google Gemini (official SDK)"
+    if kind == "anthropic":
+        return "Anthropic Messages API"
+    return "OpenAI-compatible"
 
 
 def _build_gemini_http_options(timeout: float) -> dict[str, Any]:
     """Build HTTP options for the Gemini SDK from current runtime config."""
 
     http_options: dict[str, Any] = {"timeout": int(max(timeout, 1.0) * 1000)}
-    if _is_gemini_provider(AI_BASE_URL, AI_MODEL):
+    if _provider_kind(AI_BASE_URL, AI_MODEL, AI_API_STYLE) == "gemini":
         parsed = urlparse(AI_BASE_URL)
         if parsed.scheme and parsed.netloc:
             http_options["base_url"] = f"{parsed.scheme}://{parsed.netloc}/"
@@ -382,8 +453,8 @@ def get_ai_client(timeout: float = 180.0, force_reload: bool = False) -> Any | N
     global _AI_CLIENT
     global _AI_CLIENT_SIGNATURE
 
-    kind = _provider_kind(AI_BASE_URL, AI_MODEL)
-    signature = (kind, AI_API_KEY, AI_BASE_URL, float(timeout))
+    kind = _provider_kind(AI_BASE_URL, AI_MODEL, AI_API_STYLE)
+    signature = (kind, AI_API_KEY, AI_BASE_URL, f"{AI_MODEL}|{AI_API_STYLE}", float(timeout))
     if force_reload:
         _AI_CLIENT = None
         _AI_CLIENT_SIGNATURE = None
@@ -402,6 +473,16 @@ def get_ai_client(timeout: float = 180.0, force_reload: bool = False) -> Any | N
         _AI_CLIENT_SIGNATURE = signature
         return _AI_CLIENT
 
+    if kind == "anthropic":
+        _AI_CLIENT = {
+            "provider": "anthropic",
+            "base_url": AI_BASE_URL,
+            "model": AI_MODEL,
+            "api_style": AI_API_STYLE,
+        }
+        _AI_CLIENT_SIGNATURE = signature
+        return _AI_CLIENT
+
     openai_class = _load_openai_class()
     if openai_class is None:
         return None
@@ -413,18 +494,262 @@ def get_ai_client(timeout: float = 180.0, force_reload: bool = False) -> Any | N
 def probe_ai_connection(client: Any | None = None, timeout: float = 8.0) -> None:
     """Perform a minimal provider-specific connectivity probe."""
 
+    kind = _provider_kind(AI_BASE_URL, AI_MODEL, AI_API_STYLE)
     active_client = client or get_ai_client(timeout=timeout)
-    if active_client is None:
-        if _provider_kind(AI_BASE_URL, AI_MODEL) == "gemini":
+    if active_client is None and kind != "anthropic":
+        if kind == "gemini":
             raise RuntimeError("google-genai 未安装: pip install google-genai")
         raise RuntimeError("openai 未安装: pip install openai")
 
-    if _provider_kind(AI_BASE_URL, AI_MODEL) == "gemini":
+    if kind == "gemini":
         pager = active_client.models.list(config={"page_size": 1})
         next(iter(pager), None)
         return
 
+    if kind == "anthropic":
+        base = (AI_BASE_URL or "https://api.anthropic.com/v1").rstrip("/")
+        if base.endswith("/messages"):
+            base = base[: -len("/messages")]
+        if base.endswith("/models"):
+            base = base[: -len("/models")]
+        headers = {
+            "x-api-key": AI_API_KEY,
+            "anthropic-version": "2023-06-01",
+        }
+        response = requests.get(f"{base}/models?limit=1", headers=headers, timeout=timeout)
+        if response.status_code >= 400:
+            try:
+                payload = response.json()
+                message = (payload.get("error") or {}).get("message") or response.text
+            except Exception:
+                message = response.text
+            raise RuntimeError(f"Anthropic probe failed: HTTP {response.status_code}: {message[:200]}")
+        return
+
     active_client.models.list()
+
+
+def _assistant_message_to_anthropic_blocks(message: dict[str, Any]) -> list[dict[str, Any]]:
+    """Convert an assistant history message into Anthropic content blocks."""
+
+    blocks: list[dict[str, Any]] = []
+    content = str(message.get("content") or "")
+    if content:
+        blocks.append({"type": "text", "text": content})
+
+    for tool_call in message.get("tool_calls") or []:
+        func = tool_call.get("function") or {}
+        args_text = str(func.get("arguments") or "").strip()
+        try:
+            tool_input = json.loads(args_text) if args_text else {}
+        except Exception:
+            tool_input = {"raw_arguments": args_text}
+        blocks.append(
+            {
+                "type": "tool_use",
+                "id": tool_call.get("id") or func.get("name") or "tool_use",
+                "name": func.get("name") or "",
+                "input": tool_input if isinstance(tool_input, dict) else {"input": tool_input},
+            }
+        )
+    return blocks
+
+
+def _tool_message_to_anthropic_result_block(message: dict[str, Any]) -> dict[str, Any]:
+    """Convert one tool response message into an Anthropic `tool_result` block."""
+
+    payload = _coerce_tool_payload(message.get("content"))
+    if isinstance(payload, (dict, list)):
+        content = json.dumps(payload, ensure_ascii=False)
+    else:
+        content = str(payload)
+    result = {
+        "type": "tool_result",
+        "tool_use_id": message.get("tool_call_id") or "",
+        "content": content,
+    }
+    if isinstance(payload, dict) and payload.get("success") is False:
+        result["is_error"] = True
+    return result
+
+
+def _messages_to_anthropic_payload(messages: list[dict[str, Any]]) -> tuple[str, list[dict[str, Any]]]:
+    """Convert Gary's OpenAI-style history into Anthropic `system` + `messages`."""
+
+    system_parts: list[str] = []
+    converted: list[dict[str, Any]] = []
+    idx = 0
+
+    while idx < len(messages):
+        message = messages[idx]
+        role = str(message.get("role") or "").strip().lower()
+        if role in {"system", "developer"}:
+            text = str(message.get("content") or "").strip()
+            if text:
+                system_parts.append(text)
+            idx += 1
+            continue
+
+        if role == "assistant":
+            blocks = _assistant_message_to_anthropic_blocks(message)
+            if blocks:
+                converted.append({"role": "assistant", "content": blocks})
+            idx += 1
+            continue
+
+        if role == "tool":
+            blocks: list[dict[str, Any]] = []
+            while idx < len(messages) and str(messages[idx].get("role") or "").strip().lower() == "tool":
+                blocks.append(_tool_message_to_anthropic_result_block(messages[idx]))
+                idx += 1
+            if blocks:
+                converted.append({"role": "user", "content": blocks})
+            continue
+
+        text = str(message.get("content") or "")
+        if text:
+            converted.append({"role": "user", "content": [{"type": "text", "text": text}]})
+        idx += 1
+
+    return "\n\n".join(system_parts).strip(), converted
+
+
+def _openai_tools_to_anthropic_tools(tools: Optional[list[dict[str, Any]]]) -> list[dict[str, Any]]:
+    """Convert OpenAI function schemas into Anthropic tool definitions."""
+
+    if not tools:
+        return []
+
+    converted: list[dict[str, Any]] = []
+    for tool in tools:
+        if tool.get("type") != "function":
+            continue
+        func = tool.get("function") or {}
+        converted.append(
+            {
+                "name": func.get("name") or "",
+                "description": func.get("description") or "",
+                "input_schema": func.get("parameters")
+                or {"type": "object", "properties": {}, "required": []},
+            }
+        )
+    return converted
+
+
+def _normalize_anthropic_response(data: dict[str, Any]) -> _NormalizedChunk:
+    """Project one Anthropic Messages response into an OpenAI-like delta shape."""
+
+    content_parts: list[str] = []
+    tool_calls: list[_NormalizedToolCallDelta] = []
+    raw_tool_calls: list[dict[str, Any]] = []
+
+    for index, block in enumerate(data.get("content") or []):
+        block_type = block.get("type")
+        if block_type == "text":
+            text = str(block.get("text") or "")
+            if text:
+                content_parts.append(text)
+            continue
+        if block_type != "tool_use":
+            continue
+        arguments = json.dumps(block.get("input") or {}, ensure_ascii=False)
+        func = _NormalizedFunctionDelta(
+            name=block.get("name") or "",
+            arguments=arguments,
+        )
+        tool_call = _NormalizedToolCallDelta(
+            index=index,
+            id=block.get("id") or f"anthropic-tool-{index}",
+            function=func,
+        )
+        tool_calls.append(tool_call)
+        raw_tool_calls.append(
+            {
+                "id": tool_call.id,
+                "function": {
+                    "name": func.name,
+                    "arguments": func.arguments,
+                },
+            }
+        )
+
+    delta = _NormalizedDelta(
+        content="".join(content_parts) or None,
+        tool_calls=tool_calls or None,
+    )
+    return _NormalizedChunk(
+        choices=[_NormalizedChoice(delta=delta)],
+        _raw_tool_calls=raw_tool_calls,
+    )
+
+
+def _anthropic_request_headers(api_key: str) -> dict[str, str]:
+    """Build the standard Anthropic request headers."""
+
+    return {
+        "content-type": "application/json",
+        "x-api-key": api_key,
+        "anthropic-version": "2023-06-01",
+    }
+
+
+def _anthropic_messages_endpoint(base_url: str) -> str:
+    """Return the Anthropic Messages endpoint for the configured base URL."""
+
+    normalized = (base_url or "https://api.anthropic.com/v1").rstrip("/")
+    if normalized.endswith("/messages"):
+        return normalized
+    return f"{normalized}/messages"
+
+
+def _stream_chat_anthropic(
+    *,
+    messages: list[dict[str, Any]],
+    tools: Optional[list[dict[str, Any]]] = None,
+    tool_choice: str | dict[str, Any] = "auto",
+    model: Optional[str] = None,
+    temperature: Optional[float] = None,
+    client: Any | None = None,
+    timeout: float = 180.0,
+) -> Iterator[_NormalizedChunk]:
+    """Call an Anthropic-style `/v1/messages` endpoint and normalize the result."""
+
+    del client
+    system_prompt, anthropic_messages = _messages_to_anthropic_payload(messages)
+    payload: dict[str, Any] = {
+        "model": model or AI_MODEL,
+        "max_tokens": 8192,
+        "messages": anthropic_messages,
+        "temperature": min(1.0, max(0.0, AI_TEMPERATURE if temperature is None else temperature)),
+    }
+    if system_prompt:
+        payload["system"] = system_prompt
+    converted_tools = _openai_tools_to_anthropic_tools(tools)
+    if converted_tools:
+        payload["tools"] = converted_tools
+        if tool_choice == "none":
+            payload["tool_choice"] = {"type": "none"}
+        elif isinstance(tool_choice, dict):
+            func = tool_choice.get("function") or {}
+            name = func.get("name")
+            if name:
+                payload["tool_choice"] = {"type": "tool", "name": name}
+
+    response = requests.post(
+        _anthropic_messages_endpoint(AI_BASE_URL),
+        headers=_anthropic_request_headers(AI_API_KEY),
+        json=payload,
+        timeout=timeout,
+    )
+    if response.status_code >= 400:
+        try:
+            data = response.json()
+            message = (data.get("error") or {}).get("message") or response.text
+        except Exception:
+            message = response.text
+        raise RuntimeError(f"Anthropic API error {response.status_code}: {message[:400]}")
+    data = response.json()
+    yield _normalize_anthropic_response(data)
 
 
 def _coerce_tool_payload(raw_content: Any) -> dict[str, Any]:
@@ -658,10 +983,21 @@ def stream_chat(
 ) -> Any:
     """Create a streaming chat request using the active provider runtime config."""
 
-    if _provider_kind(AI_BASE_URL, AI_MODEL) == "gemini":
+    kind = _provider_kind(AI_BASE_URL, AI_MODEL, AI_API_STYLE)
+    if kind == "gemini":
         return _stream_chat_gemini(
             messages=messages,
             tools=tools,
+            model=model,
+            temperature=temperature,
+            client=client,
+            timeout=timeout,
+        )
+    if kind == "anthropic":
+        return _stream_chat_anthropic(
+            messages=messages,
+            tools=tools,
+            tool_choice=tool_choice,
             model=model,
             temperature=temperature,
             client=client,
@@ -687,7 +1023,9 @@ __all__ = [
     "AI_API_KEY",
     "AI_BASE_URL",
     "AI_MODEL",
+    "AI_API_STYLE",
     "AI_TEMPERATURE",
+    "_API_STYLE_OPTIONS",
     "CLI_LANGUAGE",
     "DEFAULT_CHIP",
     "DEFAULT_CLOCK",
@@ -700,7 +1038,9 @@ __all__ = [
     "_api_key_is_placeholder",
     "_is_gemini_provider",
     "_mask_key",
+    "_normalize_api_style",
     "_provider_kind",
+    "_resolve_api_style",
     "_read_ai_config",
     "_reload_ai_globals",
     "_write_ai_config",
