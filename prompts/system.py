@@ -5,6 +5,12 @@ from __future__ import annotations
 from pathlib import Path
 
 from config import DEFAULT_CLOCK
+from core.platforms import (
+    canonical_target_name,
+    detect_target_platform,
+    source_filename_for_target,
+    target_runtime_label,
+)
 
 _TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 
@@ -19,9 +25,15 @@ def build_system_prompt(chip: str, language: str, hw_connected: bool) -> str:
     """Build the base system prompt with dynamic runtime context."""
 
     normalized_language = "en" if str(language).strip().lower().startswith("en") else "zh"
-    template_name = "system_en.md" if normalized_language == "en" else "system_zh.md"
+    chip_name = canonical_target_name(chip)
+    platform = detect_target_platform(chip_name)
+    if platform == "rp2040":
+        template_name = "rp2040_en.md" if normalized_language == "en" else "rp2040_zh.md"
+    elif platform == "esp":
+        template_name = "esp_en.md" if normalized_language == "en" else "esp_zh.md"
+    else:
+        template_name = "system_en.md" if normalized_language == "en" else "system_zh.md"
     prompt = _load_template(template_name)
-    chip_name = (chip or "").strip().upper() or "UNKNOWN"
     if normalized_language == "en":
         prompt += (
             "\n\n## Reply Language\n"
@@ -37,21 +49,47 @@ def build_system_prompt(chip: str, language: str, hw_connected: bool) -> str:
             "- 若用户明确要求英文，或全程使用英文交流，再切换为英文。"
         )
     if normalized_language == "en":
-        dynamic = (
-            "\n\n## Runtime Context\n"
-            f"- Current chip: `{chip_name}`\n"
-            f"- Clock source: `{DEFAULT_CLOCK}`\n"
-            f"- CLI language: `{normalized_language}`\n"
-            f"- Hardware connected: `{str(bool(hw_connected)).lower()}`\n"
-            "- If hardware is disconnected, prefer compile-first guidance and state the verification limit clearly."
-        )
+        if platform in {"rp2040", "esp"}:
+            dynamic = (
+                "\n\n## Runtime Context\n"
+                f"- Current target: `{chip_name}`\n"
+                f"- Runtime: `{target_runtime_label(chip_name)}`\n"
+                f"- Source file: `{source_filename_for_target(chip_name)}`\n"
+                f"- CLI language: `{normalized_language}`\n"
+                f"- Hardware connected: `{str(bool(hw_connected)).lower()}`\n"
+                "- Deployment transport: `USB serial raw REPL`\n"
+                "- If hardware is disconnected, prefer syntax validation and explain that runtime verification is limited."
+            )
+        else:
+            dynamic = (
+                "\n\n## Runtime Context\n"
+                f"- Current chip: `{chip_name}`\n"
+                f"- Clock source: `{DEFAULT_CLOCK}`\n"
+                f"- Runtime: `{target_runtime_label(chip_name)}`\n"
+                f"- CLI language: `{normalized_language}`\n"
+                f"- Hardware connected: `{str(bool(hw_connected)).lower()}`\n"
+                "- If hardware is disconnected, prefer compile-first guidance and state the verification limit clearly."
+            )
     else:
-        dynamic = (
-            "\n\n## 当前运行上下文\n"
-            f"- 当前芯片：`{chip_name}`\n"
-            f"- 当前时钟源：`{DEFAULT_CLOCK}`\n"
-            f"- 当前 CLI 语言：`{normalized_language}`\n"
-            f"- 当前硬件连接状态：`{str(bool(hw_connected)).lower()}`\n"
-            "- 若硬件未连接，优先走可编译路径，并明确说明无法做运行时验证。"
-        )
+        if platform in {"rp2040", "esp"}:
+            dynamic = (
+                "\n\n## 当前运行上下文\n"
+                f"- 当前目标板：`{chip_name}`\n"
+                f"- 当前运行时：`{target_runtime_label(chip_name)}`\n"
+                f"- 当前主源码：`{source_filename_for_target(chip_name)}`\n"
+                f"- 当前 CLI 语言：`{normalized_language}`\n"
+                f"- 当前硬件连接状态：`{str(bool(hw_connected)).lower()}`\n"
+                "- 当前部署通道：`USB 串口 raw REPL`\n"
+                "- 若硬件未连接，优先走语法检查和缓存路径，并明确说明无法做运行时验证。"
+            )
+        else:
+            dynamic = (
+                "\n\n## 当前运行上下文\n"
+                f"- 当前芯片：`{chip_name}`\n"
+                f"- 当前时钟源：`{DEFAULT_CLOCK}`\n"
+                f"- 当前运行时：`{target_runtime_label(chip_name)}`\n"
+                f"- 当前 CLI 语言：`{normalized_language}`\n"
+                f"- 当前硬件连接状态：`{str(bool(hw_connected)).lower()}`\n"
+                "- 若硬件未连接，优先走可编译路径，并明确说明无法做运行时验证。"
+            )
     return prompt.rstrip() + dynamic

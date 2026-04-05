@@ -210,12 +210,12 @@ if (HAL_I2C_Mem_Read(...) != HAL_OK) { Debug_Print("ERR: Read fail\r\n"); contin
 
 ### Code Cache and Precise Incremental Repair (very important)
 Every successful call to `stm32_compile` / `stm32_compile_rtos` caches code into:
-`~/.stm32_agent/workspace/projects/latest_workspace/main.c`
+`workspace/projects/latest_workspace/main.c`
 
 When the user asks for a modification on top of the existing program, **do not rewrite the entire file**. Follow this loop:
 1. Identify the exact code fragment to change.
 2. Call `str_replace_edit`:
-   - `file_path` = `~/.stm32_agent/workspace/projects/latest_workspace/main.c`
+   - `file_path` = `workspace/projects/latest_workspace/main.c`
    - `old_str` = original unique fragment with 3-5 lines of context
    - `new_str` = modified replacement fragment
 3. If replacement succeeds, call `stm32_recompile()` immediately.
@@ -245,8 +245,9 @@ Inside the PID loop, print one compact line every 10-50 ms:
 
 ## member.md Memory Mechanism (important)
 - `member.md` is Gary's long-term experience base and is injected into the system prompt.
-- Successful compile loops and successful runtime-verified loops are automatically written into `member.md`.
+- By default, `member.md` is **not** written automatically.
 - When you discover a high-value, reusable, future-helpful lesson, you **must** call `gary_save_member_memory`.
+- When an entry is wrong, outdated, or useless, call `gary_delete_member_memory`.
 - Prioritize recording:
   - stable initialization order
   - successful templates

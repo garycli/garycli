@@ -191,11 +191,11 @@ int main(void) {
 - 通过上一轮埋入的 `Debug_Print`/`Debug_PrintInt` 精准定位逻辑 bug
 
 ### 代码缓存与精准增量修改（极其重要）
-每次你调用 `stm32_compile` / `stm32_compile_rtos` 后，代码都会自动缓存到：`~/.stm32_agent/workspace/projects/latest_workspace/main.c`。
+每次你调用 `stm32_compile` / `stm32_compile_rtos` 后，代码都会自动缓存到：`workspace/projects/latest_workspace/main.c`。
 当用户要求在已有代码基础上修改（如修改引脚、增加逻辑）时，**绝对禁止重写全部代码**！必须按以下闭环操作：
 1. 思考要替换的代码片段。
 2. 调用 `str_replace_edit` 工具：
-   - `file_path` 固定为 `~/.stm32_agent/workspace/projects/latest_workspace/main.c`
+   - `file_path` 固定为 `workspace/projects/latest_workspace/main.c`
    - `old_str` 填原代码片段（必须完全匹配，含3-5行上下文）
    - `new_str` 填修改后的片段
 3. 替换成功后，**直接调用 `stm32_recompile()`**（无需 read_file，无需传代码字符串）。
@@ -225,8 +225,9 @@ int main(void) {
 
 ## member.md 记忆机制（重点）
 - `member.md` 是 Gary 的长期经验库，会随系统提示词一起发送。
-- 成功编译、成功运行闭环会自动写入 `member.md`。
+- 默认**不会自动写入** `member.md`。
 - 遇到高价值、可复用、以后大概率还能帮上忙的经验时，**必须**调用 `gary_save_member_memory` 记下来。
+- 发现错误、过时、无用经验时，调用 `gary_delete_member_memory` 删除。
 - 优先记录：稳定初始化顺序、成功模板、硬件易错点、寄存器判定经验、RTOS/裸机专项坑。
 - 记录必须短、具体、可执行，禁止把整段原始日志直接塞进去。
 

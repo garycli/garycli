@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from core.platforms import detect_target_platform
+
 _TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 
 _COMPILE_ERROR_PROMPT = """## 编译失败专项诊断
@@ -19,6 +21,17 @@ _I2C_FAILURE_PROMPT = """## I2C 失败专项诊断
 - 先确认 `HAL_I2C_IsDeviceReady()` 是否存在，传感器地址是否使用 7-bit 左移规则。
 - 若串口无 `Gary:BOOT`，怀疑初始化顺序不对，UART 打印必须早于 I2C/OLED/传感器初始化。
 - 若外设未接，直接说明是硬件问题，停止继续修改业务逻辑。"""
+
+_MICROPYTHON_COMPILE_PROMPT = """## MicroPython 语法诊断
+- 优先修复工具返回的 `line` / `offset` / `snippet`，不要做无关重构。
+- 常见问题：缩进不一致、缺冒号、括号不配对、字符串未闭合、`try/except` 结构错误。
+- 若是增量修改造成的错误，优先 `str_replace_edit` + `stm32_recompile`，不要整文件重写。"""
+
+_MICROPYTHON_RUNTIME_PROMPT = """## MicroPython 运行诊断
+- 优先阅读串口里的 `Traceback`，按最后一层报错直接修复。
+- 若没有任何输出，先确认 USB 串口连接，再确认 `print("Gary:BOOT")` 是否放在文件顶部附近。
+- 涉及 I2C / OLED / 传感器时，先 `scan()` 或先探测，再进入主循环。
+- 若工具只完成了语法检查而没有检测到串口，必须明确告诉用户当前没有运行时验证。"""
 
 
 def _load_template(name: str) -> str:
@@ -47,7 +60,13 @@ def get_debug_prompt(error_type: str, context: dict[str, Any]) -> str:
     """Return a specialized debug prompt fragment for the requested error type."""
 
     normalized = (error_type or "").strip().lower()
-    if normalized in {"hardfault", "fault", "crash"}:
+    platform = detect_target_platform(context.get("chip"))
+    if platform in {"rp2040", "esp"}:
+        if normalized in {"compile", "compile_error", "build_error"}:
+            prompt = _MICROPYTHON_COMPILE_PROMPT
+        else:
+            prompt = _MICROPYTHON_RUNTIME_PROMPT
+    elif normalized in {"hardfault", "fault", "crash"}:
         prompt = _load_template("debug_hardfault.md")
     elif normalized in {"i2c", "i2c_failure", "sensor_i2c"}:
         prompt = _I2C_FAILURE_PROMPT

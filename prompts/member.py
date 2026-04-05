@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from core.platforms import detect_target_platform
 from core.memory import (
     MEMBER_PROMPT_CHAR_LIMIT,
     MEMBER_PROMPT_MAX_DYNAMIC,
@@ -11,7 +12,27 @@ from core.memory import (
 )
 
 
-def get_member_prompt_section() -> str:
+def _entry_matches_platform(entry: str, chip: str | None) -> bool:
+    """Return whether one memory entry should be injected for the current platform."""
+
+    if detect_target_platform(chip) not in {"rp2040", "esp"}:
+        return True
+    text = entry.lower()
+    blocked_keywords = (
+        "stm32",
+        "hal_",
+        "haldelay",
+        "systick_handler",
+        "hardfault",
+        "cfsr",
+        "pyocd",
+        "_sbrk",
+        "main.c",
+    )
+    return not any(keyword in text for keyword in blocked_keywords)
+
+
+def get_member_prompt_section(chip: str | None = None) -> str:
     """Return the trimmed member-memory section injected into the system prompt."""
 
     # `core.memory` owns persistence and pruning rules. This formatter only
@@ -20,8 +41,16 @@ def get_member_prompt_section() -> str:
         path = _ensure_member_file()
         current = path.read_text(encoding="utf-8")
     header, entries = _split_member_content(current)
-    pinned = [entry for entry in entries if entry.startswith("### [Pinned]")]
-    dynamic = [entry for entry in entries if not entry.startswith("### [Pinned]")]
+    pinned = [
+        entry
+        for entry in entries
+        if entry.startswith("### [Pinned]") and _entry_matches_platform(entry, chip)
+    ]
+    dynamic = [
+        entry
+        for entry in entries
+        if not entry.startswith("### [Pinned]") and _entry_matches_platform(entry, chip)
+    ]
 
     selected: list[str] = []
     total = len(header)
@@ -50,6 +79,7 @@ def get_member_prompt_section() -> str:
     return (
         "## Gary Member Memory（重点）\n"
         "以下内容来自 member.md，是 Gary 的长期经验库。优先复用这些成功经验；"
-        "遇到新的高价值经验时，调用 `gary_save_member_memory` 写进去。\n\n"
+        "遇到新的高价值经验时，调用 `gary_save_member_memory` 写进去；"
+        "发现错误、过时、无用经验时，调用 `gary_delete_member_memory` 删除。\n\n"
         f"{excerpt.strip()}"
     )
