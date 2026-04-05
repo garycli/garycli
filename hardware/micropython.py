@@ -69,7 +69,9 @@ def _enter_raw_repl(ser: Any, *, console: Any = None) -> dict[str, Any]:
     banner = _read_until_any(ser, [b"raw REPL; CTRL-B to exit", b"\n>"], timeout=2.0)
     ok = b"raw REPL" in banner or banner.rstrip().endswith(b">")
     if not ok:
-        _console_print(console, f"[yellow]  MicroPython raw REPL 响应异常: {_decode(banner)[:120]}[/]")
+        _console_print(
+            console, f"[yellow]  MicroPython raw REPL 响应异常: {_decode(banner)[:120]}[/]"
+        )
         return {"success": False, "message": f"进入 raw REPL 失败: {_decode(banner)[:160]}"}
     return {"success": True, "banner": _decode(banner)}
 
@@ -203,7 +205,11 @@ def upload_text_file(
     try:
         raw = _enter_raw_repl(ser, console=console)
         if not raw.get("success"):
-            return {"success": False, "message": raw.get("message", "进入 raw REPL 失败"), "port": port}
+            return {
+                "success": False,
+                "message": raw.get("message", "进入 raw REPL 失败"),
+                "port": port,
+            }
 
         result = _exec_raw(ser, _build_write_script(device_path, content), timeout=12.0)
         if not result.get("success"):
@@ -268,7 +274,11 @@ def list_remote_files(
     try:
         raw = _enter_raw_repl(ser, console=console)
         if not raw.get("success"):
-            return {"success": False, "message": raw.get("message", "进入 raw REPL 失败"), "port": port}
+            return {
+                "success": False,
+                "message": raw.get("message", "进入 raw REPL 失败"),
+                "port": port,
+            }
         result = _exec_raw(ser, script, timeout=6.0)
         if not result.get("success"):
             return {
@@ -367,8 +377,17 @@ def scan_micropython_boards(
         "success": bool(boards),
         "ports": ports or [],
         "boards": boards,
-        "message": f"检测到 {len(boards)} 个可识别的 MicroPython 设备" if boards else "未检测到可识别的 MicroPython 设备",
+        "message": (
+            f"检测到 {len(boards)} 个可识别的 MicroPython 设备"
+            if boards
+            else "未检测到可识别的 MicroPython 设备"
+        ),
     }
 
 
-__all__ = ["list_remote_files", "probe_micropython_board", "scan_micropython_boards", "upload_text_file"]
+__all__ = [
+    "list_remote_files",
+    "probe_micropython_board",
+    "scan_micropython_boards",
+    "upload_text_file",
+]
