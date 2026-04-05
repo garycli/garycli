@@ -24,13 +24,13 @@ TOOL_SCHEMAS = [
         "type": "function",
         "function": {
             "name": "stm32_connect",
-            "description": "连接 STM32 硬件（pyocd 探针 + UART 串口）。烧录前必须先调用。",
+            "description": "连接目标硬件。STM32 走 pyocd 探针 + UART；MicroPython 目标走 USB 串口。传 MICROPYTHON / MIRCOPYTHON 时会自动扫描并识别板子。",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "chip": {
                         "type": "string",
-                        "description": "芯片型号，如 STM32F103C8T6（可选，不填用当前设置）",
+                        "description": "芯片型号，如 STM32F103C8T6、PICO_W、ESP32；也可传 MICROPYTHON 自动扫描识别（可选，不填用当前设置）",
                     },
                 },
                 "required": [],
@@ -409,10 +409,7 @@ TOOL_SCHEMAS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "code": {
-                        "type": "string",
-                        "description": "主源码内容（STM32 为 main.c，MicroPython 目标为 main.py）",
-                    },
+                    "code": {"type": "string", "description": "主源码内容（STM32 为 main.c，MicroPython 目标为 main.py）"},
                     "request": {"type": "string", "description": "项目描述（作为目录名）"},
                 },
                 "required": ["code"],
@@ -578,10 +575,7 @@ TOOL_SCHEMAS = [
                 "type": "object",
                 "properties": {
                     "code": {"type": "string", "description": "完整的 main.py 代码"},
-                    "chip": {
-                        "type": "string",
-                        "description": "可选：目标板名称，如 ESP32-S3、ESP32-C3、ESP8266、NodeMCU",
-                    },
+                    "chip": {"type": "string", "description": "可选：目标板名称，如 ESP32-S3、ESP32-C3、ESP8266、NodeMCU"},
                 },
                 "required": ["code"],
             },
