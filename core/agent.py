@@ -593,9 +593,7 @@ def esp_list_files(path: str = ".", port: str = None, baud: int = None) -> dict:
     )
 
 
-def _micropython_connect_for_target(
-    chip: str, port: str | None = None, baud: int | None = None
-) -> dict:
+def _micropython_connect_for_target(chip: str, port: str | None = None, baud: int | None = None) -> dict:
     platform = detect_target_platform(chip)
     if platform == "rp2040":
         return rp2040_connect(chip, port=port, baud=baud)
@@ -837,9 +835,7 @@ def stm32_compile_rtos(code: str, chip: str = None) -> dict:
     target_chip = _current_target(chip)
     ctx.chip = target_chip
     if is_micropython_target(target_chip):
-        return _micropython_not_supported(
-            "stm32_compile_rtos", "请改用对应的 MicroPython compile 或 auto_sync_cycle 工具"
-        )
+        return _micropython_not_supported("stm32_compile_rtos", "请改用对应的 MicroPython compile 或 auto_sync_cycle 工具")
     compiler = _get_compiler()
     if chip:
         compiler.set_chip(target_chip)
@@ -894,9 +890,7 @@ def stm32_recompile(mode: str = "auto") -> dict:
     code = source_path.read_text(encoding="utf-8")
     if source_path.suffix == ".py" or is_micropython_target(ctx.chip):
         if mode == "rtos":
-            return _micropython_not_supported(
-                "stm32_recompile(mode='rtos')", "MicroPython 目标不支持 FreeRTOS 编译"
-            )
+            return _micropython_not_supported("stm32_recompile(mode='rtos')", "MicroPython 目标不支持 FreeRTOS 编译")
         target_chip = ctx.chip if is_micropython_target(ctx.chip) else "ESP32"
         return _micropython_compile_for_target(code, target_chip)
     if mode == "auto":
@@ -1116,9 +1110,7 @@ def stm32_rtos_check_code(code: str) -> dict:
     检查 SysTick 冲突、HAL_Delay 陷阱、缺少 hook 函数、栈大小、ISR 安全等。
     """
     if is_micropython_target(_current_target()):
-        return _micropython_not_supported(
-            "stm32_rtos_check_code", "MicroPython 目标不使用 FreeRTOS C 工程"
-        )
+        return _micropython_not_supported("stm32_rtos_check_code", "MicroPython 目标不使用 FreeRTOS C 工程")
     import re
 
     errors = []
@@ -1266,9 +1258,7 @@ def stm32_rtos_task_stats() -> dict:
     需要先编译（有 ELF 文件）并连接硬件。
     """
     if is_micropython_target(_current_target()):
-        return _micropython_not_supported(
-            "stm32_rtos_task_stats", "MicroPython 目标没有这套 FreeRTOS 任务统计接口"
-        )
+        return _micropython_not_supported("stm32_rtos_task_stats", "MicroPython 目标没有这套 FreeRTOS 任务统计接口")
     if not get_context().hw_connected:
         return {"success": False, "message": "硬件未连接"}
 
@@ -2378,7 +2368,7 @@ class STM32Agent:
                     continue
 
                 pending = self._partial_think_tag_suffix(source, (close_tag,))
-                chunk = source[: -len(pending)] if pending else source
+                chunk = source[:-len(pending)] if pending else source
                 if chunk:
                     segments.append(("think", chunk))
                 state["pending"] = pending
@@ -2401,7 +2391,7 @@ class STM32Agent:
                 continue
 
             pending = self._partial_think_tag_suffix(source, (open_tag, close_tag))
-            chunk = source[: -len(pending)] if pending else source
+            chunk = source[:-len(pending)] if pending else source
             if chunk:
                 segments.append(("content", chunk))
             state["pending"] = pending
@@ -2420,7 +2410,7 @@ class STM32Agent:
         kind = "think" if state.get("inside_think", False) else "content"
         return [(kind, pending)]
 
-    def _request_final_reply_after_tools(self, stream_to_console: bool = True) -> str:
+    def _request_final_reply_after_tools(self, stream_to_console: bool = True) -> dict[str, Any] | None:
         """部分模型在工具执行后会停在空回复，这里补一次只求最终答复的请求。"""
         if stream_to_console:
             CONSOLE.print(
@@ -2449,16 +2439,20 @@ class STM32Agent:
                     f"\n[red]{_cli_text('最终答复请求失败', 'Final reply request failed')}: {e}[/]"
                 )
             telegram_log(f"chat final_reply_request error={str(e)[:160]}")
-            return ""
+            return None
 
         content = ""
         thinking = ""
+        anthropic_thinking_blocks = None
         in_think = False
         think_tag_state = {"inside_think": False, "pending": ""}
         try:
             for chunk in stream:
                 if not chunk.choices:
                     continue
+                chunk_thinking_blocks = getattr(chunk, "anthropic_thinking_blocks", None)
+                if chunk_thinking_blocks is not None:
+                    anthropic_thinking_blocks = chunk_thinking_blocks
                 delta = chunk.choices[0].delta
 
                 rc = getattr(delta, "reasoning_content", None)
@@ -2518,10 +2512,17 @@ class STM32Agent:
                     f"\n[red]{_cli_text('最终答复流式读取错误', 'Final reply stream error')}: {e}[/]"
                 )
             telegram_log(f"chat final_reply_stream error={str(e)[:160]}")
-            return ""
+            return None
 
         telegram_log(f"chat final_reply_request done len={len(content.strip())}")
-        return content.strip()
+        if not content.strip():
+            return None
+        assistant_msg: dict[str, Any] = {"role": "assistant", "content": content.strip()}
+        if thinking:
+            assistant_msg["reasoning_content"] = thinking
+        if anthropic_thinking_blocks:
+            assistant_msg["anthropic_thinking_blocks"] = anthropic_thinking_blocks
+        return assistant_msg
 
     def _summarize_tool_result(self, tool_name: str, result_obj, preview: str) -> str:
         text = (preview or "").replace("\n", " ").strip()
@@ -2597,6 +2598,7 @@ class STM32Agent:
             content = ""
             tool_calls_raw: Dict[int, dict] = {}
             thinking = ""
+            anthropic_thinking_blocks = None
             in_think = False
             think_tag_state = {"inside_think": False, "pending": ""}
 
@@ -2604,6 +2606,9 @@ class STM32Agent:
                 for chunk in stream:
                     if not chunk.choices:
                         continue
+                    chunk_thinking_blocks = getattr(chunk, "anthropic_thinking_blocks", None)
+                    if chunk_thinking_blocks is not None:
+                        anthropic_thinking_blocks = chunk_thinking_blocks
                     delta = chunk.choices[0].delta
 
                     # Reasoning (deepseek-r1 style)
@@ -2618,9 +2623,7 @@ class STM32Agent:
 
                     # 文本内容
                     if delta.content:
-                        for kind, piece in self._extract_think_segments(
-                            delta.content, think_tag_state
-                        ):
+                        for kind, piece in self._extract_think_segments(delta.content, think_tag_state):
                             if not piece:
                                 continue
                             if kind == "think":
@@ -2727,16 +2730,18 @@ class STM32Agent:
                     assistant_msg = {"role": "assistant", "content": content or ""}
                     if thinking:  # 如果有思考内容，带上它
                         assistant_msg["reasoning_content"] = thinking
+                    if anthropic_thinking_blocks:
+                        assistant_msg["anthropic_thinking_blocks"] = anthropic_thinking_blocks
                     self.messages.append(assistant_msg)
                     reply_parts.append(content.strip())
                     break
                 if used_tools:
-                    final_reply = self._request_final_reply_after_tools(
+                    final_reply_msg = self._request_final_reply_after_tools(
                         stream_to_console=stream_to_console
                     )
-                    if final_reply:
-                        self.messages.append({"role": "assistant", "content": final_reply})
-                        reply_parts.append(final_reply)
+                    if final_reply_msg:
+                        self.messages.append(final_reply_msg)
+                        reply_parts.append(str(final_reply_msg.get("content") or ""))
                         break
                     fallback_reply = self._build_tool_only_reply(tool_summaries, reply_parts)
                     self.messages.append({"role": "assistant", "content": fallback_reply})
@@ -2745,6 +2750,8 @@ class STM32Agent:
                 assistant_msg = {"role": "assistant", "content": content or ""}
                 if thinking:  # 如果有思考内容，带上它
                     assistant_msg["reasoning_content"] = thinking
+                if anthropic_thinking_blocks:
+                    assistant_msg["anthropic_thinking_blocks"] = anthropic_thinking_blocks
                 self.messages.append(assistant_msg)
                 break
 
@@ -2769,6 +2776,8 @@ class STM32Agent:
             }
             if thinking:  # 关键修复：把之前收集的 thinking 塞进来
                 assistant_tool_msg["reasoning_content"] = thinking
+            if anthropic_thinking_blocks:
+                assistant_tool_msg["anthropic_thinking_blocks"] = anthropic_thinking_blocks
 
             self.messages.append(assistant_tool_msg)
             used_tools = True
@@ -2963,9 +2972,7 @@ def _print_startup_checks() -> None:
         try:
             import pyocd as _pyocd  # type: ignore
 
-            CONSOLE.print(
-                f"[dim]  pyocd: {_pyocd.__version__} ({_cli_text('可选，调试时备用', 'optional fallback for low-level debug')})[/]"
-            )
+            CONSOLE.print(f"[dim]  pyocd: {_pyocd.__version__} ({_cli_text('可选，调试时备用', 'optional fallback for low-level debug')})[/]")
         except ImportError:
             CONSOLE.print(
                 f"[dim]  pyocd: {_cli_text('未安装（MicroPython 目标不强依赖）', 'not installed (not required for MicroPython targets)')}[/]"
