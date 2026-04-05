@@ -186,7 +186,10 @@ def canonical_target_name_from_micropython_info(info: dict[str, str] | None) -> 
         ("ESP32", ("esp32", "lolin32", "nodemcu-32s", "wroom32")),
     )
     for chip_name, patterns in esp_patterns:
-        if any(pattern in text or pattern.replace("-", "").replace(" ", "") in compact for pattern in patterns):
+        if any(
+            pattern in text or pattern.replace("-", "").replace(" ", "") in compact
+            for pattern in patterns
+        ):
             return chip_name
     return None
 
