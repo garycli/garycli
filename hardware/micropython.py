@@ -1,9 +1,12 @@
-"""MicroPython serial transport helpers for RP2040-class boards."""
+"""MicroPython serial transport helpers for serial-connected boards."""
 
 from __future__ import annotations
 
+import json
 import time
 from typing import Any
+
+_PROBE_MARKER = "GARY_BOARD_INFO:"
 
 
 def _console_print(console: Any, message: str) -> None:
@@ -66,7 +69,7 @@ def _enter_raw_repl(ser: Any, *, console: Any = None) -> dict[str, Any]:
     banner = _read_until_any(ser, [b"raw REPL; CTRL-B to exit", b"\n>"], timeout=2.0)
     ok = b"raw REPL" in banner or banner.rstrip().endswith(b">")
     if not ok:
-        _console_print(console, f"[yellow]  RP2040 raw REPL 响应异常: {_decode(banner)[:120]}[/]")
+        _console_print(console, f"[yellow]  MicroPython raw REPL 响应异常: {_decode(banner)[:120]}[/]")
         return {"success": False, "message": f"进入 raw REPL 失败: {_decode(banner)[:160]}"}
     return {"success": True, "banner": _decode(banner)}
 
@@ -136,6 +139,50 @@ def _build_write_script(device_path: str, content: str) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _build_probe_script() -> str:
+    return "\n".join(
+        [
+            "try:",
+            " import sys",
+            "except ImportError:",
+            " sys = None",
+            "try:",
+            " import os",
+            "except ImportError:",
+            " import uos as os",
+            "try:",
+            " import ujson as json",
+            "except ImportError:",
+            " import json",
+            "u = os.uname()",
+            "info = {",
+            " 'sysname': getattr(u, 'sysname', ''),",
+            " 'machine': getattr(u, 'machine', ''),",
+            " 'release': getattr(u, 'release', ''),",
+            " 'version': getattr(u, 'version', ''),",
+            " 'platform': getattr(sys, 'platform', '') if sys else '',",
+            " 'implementation': getattr(getattr(sys, 'implementation', None), 'name', '') if sys else '',",
+            "}",
+            f"print({_PROBE_MARKER!r} + json.dumps(info))",
+            "",
+        ]
+    )
+
+
+def _parse_probe_output(stdout: str) -> dict[str, Any] | None:
+    for line in (stdout or "").splitlines():
+        text = line.strip()
+        if not text.startswith(_PROBE_MARKER):
+            continue
+        payload = text[len(_PROBE_MARKER) :]
+        try:
+            parsed = json.loads(payload)
+        except Exception:
+            return None
+        return parsed if isinstance(parsed, dict) else None
+    return None
+
+
 def upload_text_file(
     *,
     port: str,
@@ -156,11 +203,7 @@ def upload_text_file(
     try:
         raw = _enter_raw_repl(ser, console=console)
         if not raw.get("success"):
-            return {
-                "success": False,
-                "message": raw.get("message", "进入 raw REPL 失败"),
-                "port": port,
-            }
+            return {"success": False, "message": raw.get("message", "进入 raw REPL 失败"), "port": port}
 
         result = _exec_raw(ser, _build_write_script(device_path, content), timeout=12.0)
         if not result.get("success"):
@@ -225,11 +268,7 @@ def list_remote_files(
     try:
         raw = _enter_raw_repl(ser, console=console)
         if not raw.get("success"):
-            return {
-                "success": False,
-                "message": raw.get("message", "进入 raw REPL 失败"),
-                "port": port,
-            }
+            return {"success": False, "message": raw.get("message", "进入 raw REPL 失败"), "port": port}
         result = _exec_raw(ser, script, timeout=6.0)
         if not result.get("success"):
             return {
@@ -249,4 +288,87 @@ def list_remote_files(
             pass
 
 
-__all__ = ["list_remote_files", "upload_text_file"]
+def probe_micropython_board(
+    *,
+    port: str,
+    baud: int = 115200,
+    console: Any = None,
+) -> dict[str, Any]:
+    """Probe one serial port and extract MicroPython runtime board information."""
+
+    try:
+        ser = _open_serial(port, baud)
+    except Exception as exc:
+        return {"success": False, "message": f"打开串口失败: {exc}", "port": port}
+
+    try:
+        raw = _enter_raw_repl(ser, console=console)
+        if not raw.get("success"):
+            return {
+                "success": False,
+                "message": raw.get("message", "进入 raw REPL 失败"),
+                "port": port,
+            }
+        result = _exec_raw(ser, _build_probe_script(), timeout=6.0)
+        if not result.get("success"):
+            return {
+                "success": False,
+                "message": "读取板子信息失败",
+                "port": port,
+                "stderr": result.get("stderr", ""),
+            }
+        info = _parse_probe_output(result.get("stdout", ""))
+        if not info:
+            return {
+                "success": False,
+                "message": "未识别到有效的 MicroPython 板子信息",
+                "port": port,
+                "stdout": result.get("stdout", ""),
+            }
+        return {
+            "success": True,
+            "port": port,
+            "baud": baud,
+            "info": info,
+            "message": f"已读取板子信息: {info.get('machine') or info.get('platform') or port}",
+        }
+    except Exception as exc:
+        return {"success": False, "message": str(exc), "port": port}
+    finally:
+        try:
+            _exit_raw_repl(ser)
+        except Exception:
+            pass
+        try:
+            ser.close()
+        except Exception:
+            pass
+
+
+def scan_micropython_boards(
+    *,
+    ports: list[str] | None = None,
+    baud: int = 115200,
+    console: Any = None,
+) -> dict[str, Any]:
+    """Scan candidate serial ports and return all successfully probed MicroPython boards."""
+
+    if ports is None:
+        from hardware.serial_mon import detect_serial_ports
+
+        ports = detect_serial_ports(verbose=False)
+
+    boards = []
+    for port in ports or []:
+        result = probe_micropython_board(port=port, baud=baud, console=console)
+        if result.get("success"):
+            boards.append(result)
+    return {
+        "success": bool(boards),
+        "ports": ports or [],
+        "boards": boards,
+        "message": f"检测到 {len(boards)} 个可识别的 MicroPython 设备" if boards else "未检测到可识别的 MicroPython 设备",
+    }
+
+
+__all__ = ["list_remote_files", "probe_micropython_board", "scan_micropython_boards", "upload_text_file"]
