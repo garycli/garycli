@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import copy
 import importlib
 import json
 import re
@@ -27,12 +28,7 @@ _AI_PRESETS = [
         "gemini-2.5-flash",
         "gemini",
     ),
-    (
-        "通义千问 (阿里云)",
-        "https://dashscope.aliyuncs.com/compatible-mode/v1",
-        "qwen-plus",
-        "openai",
-    ),
+    ("通义千问 (阿里云)", "https://dashscope.aliyuncs.com/compatible-mode/v1", "qwen-plus", "openai"),
     ("智谱 GLM", "https://open.bigmodel.cn/api/paas/v4/", "glm-4-flash", "openai"),
     ("Ollama (本地)", "http://127.0.0.1:11434/v1", "qwen2.5-coder:14b", "openai"),
     ("自定义 / Other", "", "", ""),
@@ -106,6 +102,7 @@ class _NormalizedChoice:
 class _NormalizedChunk:
     choices: list[_NormalizedChoice]
     _raw_tool_calls: list[dict[str, Any]] = field(default_factory=list)
+    anthropic_thinking_blocks: list[dict[str, Any]] | None = None
 
     def model_dump(self) -> dict[str, Any]:
         return {
@@ -220,12 +217,7 @@ def _read_ai_config() -> tuple[str, str, str, str]:
     """Read `(api_key, base_url, model, api_style)` from `config.py`."""
 
     if not _CONFIG_PATH.exists():
-        return (
-            AI_API_KEY,
-            AI_BASE_URL,
-            AI_MODEL,
-            _normalize_api_style(AI_API_STYLE, default="") or "",
-        )
+        return AI_API_KEY, AI_BASE_URL, AI_MODEL, _normalize_api_style(AI_API_STYLE, default="") or ""
     text = _CONFIG_PATH.read_text(encoding="utf-8")
 
     def _get(pattern: str) -> str:
@@ -533,9 +525,7 @@ def probe_ai_connection(client: Any | None = None, timeout: float = 8.0) -> None
                 message = (payload.get("error") or {}).get("message") or response.text
             except Exception:
                 message = response.text
-            raise RuntimeError(
-                f"Anthropic probe failed: HTTP {response.status_code}: {message[:200]}"
-            )
+            raise RuntimeError(f"Anthropic probe failed: HTTP {response.status_code}: {message[:200]}")
         return
 
     active_client.models.list()
@@ -545,6 +535,9 @@ def _assistant_message_to_anthropic_blocks(message: dict[str, Any]) -> list[dict
     """Convert an assistant history message into Anthropic content blocks."""
 
     blocks: list[dict[str, Any]] = []
+    for block in message.get("anthropic_thinking_blocks") or []:
+        if isinstance(block, dict):
+            blocks.append(copy.deepcopy(block))
     content = str(message.get("content") or "")
     if content:
         blocks.append({"type": "text", "text": content})
@@ -585,9 +578,7 @@ def _tool_message_to_anthropic_result_block(message: dict[str, Any]) -> dict[str
     return result
 
 
-def _messages_to_anthropic_payload(
-    messages: list[dict[str, Any]],
-) -> tuple[str, list[dict[str, Any]]]:
+def _messages_to_anthropic_payload(messages: list[dict[str, Any]]) -> tuple[str, list[dict[str, Any]]]:
     """Convert Gary's OpenAI-style history into Anthropic `system` + `messages`."""
 
     system_parts: list[str] = []
@@ -613,10 +604,7 @@ def _messages_to_anthropic_payload(
 
         if role == "tool":
             blocks: list[dict[str, Any]] = []
-            while (
-                idx < len(messages)
-                and str(messages[idx].get("role") or "").strip().lower() == "tool"
-            ):
+            while idx < len(messages) and str(messages[idx].get("role") or "").strip().lower() == "tool":
                 blocks.append(_tool_message_to_anthropic_result_block(messages[idx]))
                 idx += 1
             if blocks:
@@ -657,11 +645,22 @@ def _normalize_anthropic_response(data: dict[str, Any]) -> _NormalizedChunk:
     """Project one Anthropic Messages response into an OpenAI-like delta shape."""
 
     content_parts: list[str] = []
+    reasoning_parts: list[str] = []
     tool_calls: list[_NormalizedToolCallDelta] = []
     raw_tool_calls: list[dict[str, Any]] = []
+    thinking_blocks: list[dict[str, Any]] = []
 
     for index, block in enumerate(data.get("content") or []):
         block_type = block.get("type")
+        if block_type == "thinking":
+            thinking_text = str(block.get("thinking") or "")
+            signature = str(block.get("signature") or "")
+            reasoning_parts.append(thinking_text)
+            thinking_block = {"type": "thinking", "thinking": thinking_text}
+            if signature:
+                thinking_block["signature"] = signature
+            thinking_blocks.append(thinking_block)
+            continue
         if block_type == "text":
             text = str(block.get("text") or "")
             if text:
@@ -692,11 +691,13 @@ def _normalize_anthropic_response(data: dict[str, Any]) -> _NormalizedChunk:
 
     delta = _NormalizedDelta(
         content="".join(content_parts) or None,
+        reasoning_content="".join(reasoning_parts) or None,
         tool_calls=tool_calls or None,
     )
     return _NormalizedChunk(
         choices=[_NormalizedChoice(delta=delta)],
         _raw_tool_calls=raw_tool_calls,
+        anthropic_thinking_blocks=thinking_blocks or None,
     )
 
 
@@ -719,6 +720,102 @@ def _anthropic_messages_endpoint(base_url: str) -> str:
     return f"{normalized}/messages"
 
 
+def _anthropic_error_message(response: requests.Response) -> str:
+    """Extract a readable Anthropic error message from a failed response."""
+
+    try:
+        data = response.json()
+        return str((data.get("error") or {}).get("message") or response.text or "")
+    except Exception:
+        return str(response.text or "")
+
+
+def _anthropic_should_retry_without_thinking(response: requests.Response) -> bool:
+    """Return whether a failed request should transparently retry without thinking."""
+
+    message = _anthropic_error_message(response).lower()
+    if response.status_code not in {400, 404, 422}:
+        return False
+    thinking_markers = (
+        "thinking",
+        "budget_tokens",
+        "extended thinking",
+        "not supported",
+        "unsupported",
+    )
+    return any(marker in message for marker in thinking_markers)
+
+
+def _anthropic_tool_choice_payload(tool_choice: str | dict[str, Any]) -> dict[str, Any] | None:
+    """Translate OpenAI-style tool choice into Anthropic format."""
+
+    if tool_choice == "none":
+        return {"type": "none"}
+    if tool_choice == "required":
+        return {"type": "any"}
+    if isinstance(tool_choice, dict):
+        func = tool_choice.get("function") or {}
+        name = func.get("name")
+        if name:
+            return {"type": "tool", "name": name}
+    return None
+
+
+def _iter_sse_events(response: requests.Response) -> Iterator[tuple[str, str]]:
+    """Yield `(event, data)` pairs from a server-sent events response."""
+
+    event_name = "message"
+    data_lines: list[str] = []
+    for raw_line in response.iter_lines(decode_unicode=True):
+        line = raw_line if isinstance(raw_line, str) else raw_line.decode("utf-8", errors="replace")
+        if line == "":
+            if data_lines:
+                yield event_name, "\n".join(data_lines)
+            event_name = "message"
+            data_lines = []
+            continue
+        if line.startswith(":"):
+            continue
+        if line.startswith("event:"):
+            event_name = line.split(":", 1)[1].strip() or "message"
+            continue
+        if line.startswith("data:"):
+            data_lines.append(line.split(":", 1)[1].lstrip())
+    if data_lines:
+        yield event_name, "\n".join(data_lines)
+
+
+def _anthropic_chunk_from_delta(
+    *,
+    content: str | None = None,
+    reasoning_content: str | None = None,
+    tool_call: _NormalizedToolCallDelta | None = None,
+    thinking_blocks: list[dict[str, Any]] | None = None,
+) -> _NormalizedChunk:
+    """Create one normalized chunk from Anthropic delta fragments."""
+
+    delta = _NormalizedDelta(
+        content=content,
+        reasoning_content=reasoning_content,
+        tool_calls=[tool_call] if tool_call is not None else None,
+    )
+    raw_tool_calls: list[dict[str, Any]] = []
+    if tool_call is not None:
+        raw = {
+            "id": tool_call.id,
+            "function": {
+                "name": tool_call.function.name,
+                "arguments": tool_call.function.arguments,
+            },
+        }
+        raw_tool_calls.append(raw)
+    return _NormalizedChunk(
+        choices=[_NormalizedChoice(delta=delta)],
+        _raw_tool_calls=raw_tool_calls,
+        anthropic_thinking_blocks=thinking_blocks or None,
+    )
+
+
 def _stream_chat_anthropic(
     *,
     messages: list[dict[str, Any]],
@@ -729,44 +826,171 @@ def _stream_chat_anthropic(
     client: Any | None = None,
     timeout: float = 180.0,
 ) -> Iterator[_NormalizedChunk]:
-    """Call an Anthropic-style `/v1/messages` endpoint and normalize the result."""
+    """Call an Anthropic-style `/v1/messages` endpoint with SSE streaming."""
 
     del client
     system_prompt, anthropic_messages = _messages_to_anthropic_payload(messages)
-    payload: dict[str, Any] = {
-        "model": model or AI_MODEL,
-        "max_tokens": 8192,
-        "messages": anthropic_messages,
-        "temperature": min(1.0, max(0.0, AI_TEMPERATURE if temperature is None else temperature)),
-    }
-    if system_prompt:
-        payload["system"] = system_prompt
+    target_model = model or AI_MODEL
     converted_tools = _openai_tools_to_anthropic_tools(tools)
-    if converted_tools:
-        payload["tools"] = converted_tools
-        if tool_choice == "none":
-            payload["tool_choice"] = {"type": "none"}
-        elif isinstance(tool_choice, dict):
-            func = tool_choice.get("function") or {}
-            name = func.get("name")
-            if name:
-                payload["tool_choice"] = {"type": "tool", "name": name}
+
+    def _build_payload(enable_thinking: bool) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "model": target_model,
+            "max_tokens": 8192,
+            "messages": anthropic_messages,
+            "stream": True,
+        }
+        if system_prompt:
+            payload["system"] = system_prompt
+        if enable_thinking:
+            payload["thinking"] = {"type": "enabled", "budget_tokens": 2048}
+        else:
+            payload["temperature"] = min(
+                1.0,
+                max(0.0, AI_TEMPERATURE if temperature is None else temperature),
+            )
+        if converted_tools:
+            payload["tools"] = converted_tools
+            tool_choice_payload = _anthropic_tool_choice_payload(tool_choice)
+            if tool_choice_payload is not None:
+                payload["tool_choice"] = tool_choice_payload
+        return payload
 
     response = requests.post(
         _anthropic_messages_endpoint(AI_BASE_URL),
         headers=_anthropic_request_headers(AI_API_KEY),
-        json=payload,
+        json=_build_payload(True),
         timeout=timeout,
+        stream=True,
     )
+    if response.status_code >= 400 and _anthropic_should_retry_without_thinking(response):
+        response.close()
+        response = requests.post(
+            _anthropic_messages_endpoint(AI_BASE_URL),
+            headers=_anthropic_request_headers(AI_API_KEY),
+            json=_build_payload(False),
+            timeout=timeout,
+            stream=True,
+        )
     if response.status_code >= 400:
-        try:
-            data = response.json()
-            message = (data.get("error") or {}).get("message") or response.text
-        except Exception:
-            message = response.text
+        message = _anthropic_error_message(response)
         raise RuntimeError(f"Anthropic API error {response.status_code}: {message[:400]}")
-    data = response.json()
-    yield _normalize_anthropic_response(data)
+    block_state: dict[int, dict[str, Any]] = {}
+    final_thinking_blocks: list[dict[str, Any]] = []
+    try:
+        for event_name, data_text in _iter_sse_events(response):
+            if not data_text or data_text == "[DONE]":
+                continue
+            try:
+                event = json.loads(data_text)
+            except Exception:
+                continue
+
+            event_type = event.get("type") or event_name
+            if event_type == "error":
+                err_payload = event.get("error") or {}
+                raise RuntimeError(
+                    f"Anthropic streaming error: {err_payload.get('message') or data_text}"
+                )
+
+            if event_type == "content_block_start":
+                index = int(event.get("index", 0))
+                block = event.get("content_block") or {}
+                block_type = block.get("type")
+                if block_type == "tool_use":
+                    block_state[index] = {
+                        "type": "tool_use",
+                        "id": block.get("id") or f"anthropic-tool-{index}",
+                        "name": block.get("name") or "",
+                        "input_json": "",
+                    }
+                    yield _anthropic_chunk_from_delta(
+                        tool_call=_NormalizedToolCallDelta(
+                            index=index,
+                            id=block_state[index]["id"],
+                            function=_NormalizedFunctionDelta(
+                                name=block_state[index]["name"],
+                                arguments="",
+                            ),
+                        )
+                    )
+                    continue
+                if block_type == "thinking":
+                    block_state[index] = {
+                        "type": "thinking",
+                        "thinking": str(block.get("thinking") or ""),
+                        "signature": str(block.get("signature") or ""),
+                    }
+                    if block_state[index]["thinking"]:
+                        yield _anthropic_chunk_from_delta(
+                            reasoning_content=block_state[index]["thinking"]
+                        )
+                    continue
+                if block_type == "text":
+                    block_state[index] = {"type": "text"}
+                    text = str(block.get("text") or "")
+                    if text:
+                        yield _anthropic_chunk_from_delta(content=text)
+                    continue
+                block_state[index] = {"type": block_type or "unknown"}
+                continue
+
+            if event_type == "content_block_delta":
+                index = int(event.get("index", 0))
+                delta = event.get("delta") or {}
+                delta_type = delta.get("type")
+                current = block_state.setdefault(index, {"type": "unknown"})
+                if delta_type == "text_delta":
+                    text = str(delta.get("text") or "")
+                    if text:
+                        yield _anthropic_chunk_from_delta(content=text)
+                    continue
+                if delta_type == "thinking_delta":
+                    text = str(delta.get("thinking") or "")
+                    current["thinking"] = str(current.get("thinking") or "") + text
+                    if text:
+                        yield _anthropic_chunk_from_delta(reasoning_content=text)
+                    continue
+                if delta_type == "signature_delta":
+                    current["signature"] = str(current.get("signature") or "") + str(
+                        delta.get("signature") or ""
+                    )
+                    continue
+                if delta_type == "input_json_delta":
+                    partial = str(delta.get("partial_json") or "")
+                    current["input_json"] = str(current.get("input_json") or "") + partial
+                    yield _anthropic_chunk_from_delta(
+                        tool_call=_NormalizedToolCallDelta(
+                            index=index,
+                            id=current.get("id") or f"anthropic-tool-{index}",
+                            function=_NormalizedFunctionDelta(
+                                name=current.get("name") or "",
+                                arguments=partial,
+                            ),
+                        )
+                    )
+                    continue
+                continue
+
+            if event_type == "content_block_stop":
+                index = int(event.get("index", 0))
+                current = block_state.get(index) or {}
+                if current.get("type") == "thinking":
+                    block = {
+                        "type": "thinking",
+                        "thinking": str(current.get("thinking") or ""),
+                    }
+                    if current.get("signature"):
+                        block["signature"] = str(current.get("signature") or "")
+                    final_thinking_blocks.append(block)
+                continue
+
+            if event_type == "message_stop":
+                if final_thinking_blocks:
+                    yield _anthropic_chunk_from_delta(thinking_blocks=final_thinking_blocks)
+                break
+    finally:
+        response.close()
 
 
 def _coerce_tool_payload(raw_content: Any) -> dict[str, Any]:
