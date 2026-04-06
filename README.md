@@ -31,6 +31,70 @@
 
 </div>
 
+### Manual installation
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/garycli/garycli.git
+cd garycli
+
+# 2. Run environment install
+python3 setup.py --auto
+
+# 3. Run environment diagnostics
+python3 stm32_agent.py --doctor
+```
+
+### First-time configuration
+
+```bash
+gary config
+```
+
+Follow the prompts to configure:
+
+* API Key
+* Base URL
+* Model
+* Default chip model
+* Default serial parameters (optional)
+
+### Environment diagnostics
+
+```bash
+gary doctor
+```
+
+Example output:
+
+```text
+■ AI Interface
+  ✓ API Key   sk-abc...xyz
+  ✓ Base URL  https://api.deepseek.com/v1
+  ✓ Model     deepseek-chat
+  ✓ API connectivity  OK
+
+■ Compilation Toolchain
+  ✓ arm-none-eabi-gcc  arm-none-eabi-gcc (15.1.0)
+  ✓ HAL resources      STM32F0xx, STM32F1xx, STM32F3xx, STM32F4xx
+  ✓ CMSIS Core
+
+■ Python Dependencies
+  ✓ openai
+  ✓ rich
+  ✓ prompt_toolkit
+  ✓ pyserial      (optional)
+  ✓ pyocd         (optional)
+  ✓ stm32loader   (optional)
+
+■ Hardware Probes
+  ✓ ST-Link V2
+  ✓ Serial port /dev/ttyUSB0
+
+✅ All core components are ready. Gary is good to go.
+```
+
+
 ---
 
 ## ⚡ What is Gary?
@@ -192,89 +256,6 @@ The install script will attempt to complete:
 * Python dependency installation
 * Serial and debug tool installation
 * CLI launcher command setup
-
-### Manual installation
-
-```bash
-# 1. Clone the repository
-git clone https://github.com/PrettyMyGirlZyy4Embedded/garycli.git
-cd garycli
-
-# 2. Install Python dependencies
-pip install -r requirements.txt
-
-# 3. Install the cross compiler
-# Ubuntu / Debian:
-sudo apt install gcc-arm-none-eabi
-
-# macOS:
-brew install --cask gcc-arm-embedded
-
-# Windows:
-# Install gcc-arm-none-eabi from ARM official sources or a suitable distribution
-
-# 4. Optional: install UART ISP flashing tool
-pip install stm32loader
-
-# 5. Optional: install SWD debugging tool
-pip install pyocd
-
-# 6. Download HAL resources
-python3 setup.py --hal
-
-# 7. Run environment diagnostics
-python3 stm32_agent.py --doctor
-```
-
-### First-time configuration
-
-```bash
-gary config
-```
-
-Follow the prompts to configure:
-
-* API Key
-* Base URL
-* Model
-* Default chip model
-* Default serial parameters (optional)
-
-### Environment diagnostics
-
-```bash
-gary doctor
-```
-
-Example output:
-
-```text
-■ AI Interface
-  ✓ API Key   sk-abc...xyz
-  ✓ Base URL  https://api.deepseek.com/v1
-  ✓ Model     deepseek-chat
-  ✓ API connectivity  OK
-
-■ Compilation Toolchain
-  ✓ arm-none-eabi-gcc  arm-none-eabi-gcc (15.1.0)
-  ✓ HAL resources      STM32F0xx, STM32F1xx, STM32F3xx, STM32F4xx
-  ✓ CMSIS Core
-
-■ Python Dependencies
-  ✓ openai
-  ✓ rich
-  ✓ prompt_toolkit
-  ✓ pyserial      (optional)
-  ✓ pyocd         (optional)
-  ✓ stm32loader   (optional)
-
-■ Hardware Probes
-  ✓ ST-Link V2
-  ✓ Serial port /dev/ttyUSB0
-
-✅ All core components are ready. Gary is good to go.
-```
-
 ---
 
 ## 📖 Usage Guide
