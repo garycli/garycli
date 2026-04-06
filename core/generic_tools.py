@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import ast
 import json
+import os
 import re
 import shlex
 import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urljoin
 
 import requests
 
@@ -81,10 +83,7 @@ def str_replace_edit(file_path: str, old_str: str, new_str: str) -> dict:
 def list_directory(path: str = ".") -> dict:
     try:
         target = Path(path).expanduser().resolve()
-        items = [
-            {"name": item.name, "type": "dir" if item.is_dir() else "file"}
-            for item in target.iterdir()
-        ]
+        items = [{"name": item.name, "type": "dir" if item.is_dir() else "file"} for item in target.iterdir()]
         return {
             "success": True,
             "path": str(target),
@@ -129,25 +128,197 @@ def search_files(query: str, path: str = ".", file_type: str = None) -> dict:
         return {"error": str(exc)}
 
 
-def web_search(query: str) -> dict:
+def _browser_headers() -> dict[str, str]:
+    return {"User-Agent": "Mozilla/5.0 (compatible; GaryCLI/1.0)"}
+
+
+_DEFAULT_SEARXNG_URL = "http://127.0.0.1:8080"
+
+
+def _searxng_base_url() -> str:
+    value = (os.environ.get("GARY_SEARXNG_URL") or _DEFAULT_SEARXNG_URL).strip()
+    if not value:
+        value = _DEFAULT_SEARXNG_URL
+    return value.rstrip("/")
+
+
+def _load_bs4():
+    try:
+        from bs4 import BeautifulSoup  # type: ignore
+    except ImportError:
+        return None, {"error": "beautifulsoup4 未安装: pip install beautifulsoup4"}
+    return BeautifulSoup, None
+
+
+def _clean_browser_text(raw_text: str) -> str:
+    lines = (line.strip() for line in raw_text.splitlines())
+    chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+    return "\n".join(chunk for chunk in chunks if chunk)
+
+
+def _extract_browser_links(soup, base_url: str, limit: int = 40) -> list[dict]:
+    links = []
+    seen: set[tuple[str, str]] = set()
+    for anchor in soup.find_all("a", href=True):
+        href = str(anchor.get("href") or "").strip()
+        text = " ".join(anchor.get_text(" ", strip=True).split())
+        if not href or href.startswith(("#", "javascript:", "mailto:", "tel:")):
+            continue
+        absolute = urljoin(base_url, href)
+        key = (absolute, text)
+        if key in seen:
+            continue
+        seen.add(key)
+        links.append(
+            {
+                "id": len(links) + 1,
+                "text": text or absolute,
+                "url": absolute,
+            }
+        )
+        if len(links) >= limit:
+            break
+    return links
+
+
+def _parse_browser_page(url: str) -> tuple[dict | None, dict | None]:
+    BeautifulSoup, error = _load_bs4()
+    if error is not None:
+        return None, error
+    try:
+        response = requests.get(url, headers=_browser_headers(), timeout=10)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.content, "html.parser")
+        for tag in soup(["script", "style", "noscript"]):
+            tag.decompose()
+
+        title = ""
+        if soup.title and soup.title.string:
+            title = soup.title.string.strip()
+
+        main_root = soup.find("main") or soup.find("article") or soup.body or soup
+        text = _clean_browser_text(main_root.get_text("\n"))
+        final_url = str(response.url or url)
+        links = _extract_browser_links(soup, final_url)
+        page = {
+            "success": True,
+            "url": url,
+            "final_url": final_url,
+            "title": title,
+            "status_code": response.status_code,
+            "content": text,
+            "links": links,
+        }
+        return page, None
+    except Exception as exc:
+        return None, {"error": f"获取失败: {exc}"}
+
+
+def _search_via_searx(query: str, limit: int = 5) -> dict:
+    base_url = _searxng_base_url()
     try:
         response = requests.get(
-            "http://127.0.0.1:8080/search",
+            f"{base_url}/search",
             params={"q": query, "format": "json"},
+            headers=_browser_headers(),
             timeout=8,
         )
+        response.raise_for_status()
         data = response.json()
         results = [
             {
+                "id": index + 1,
                 "title": item.get("title"),
                 "url": item.get("url"),
                 "snippet": item.get("content", "")[:200],
             }
-            for item in data.get("results", [])[:5]
+            for index, item in enumerate(data.get("results", [])[: max(0, limit)])
         ]
-        return {"success": True, "results": results}
+        return {
+            "success": True,
+            "query": query,
+            "backend": "searxng",
+            "base_url": base_url,
+            "results": results,
+            "count": len(results),
+        }
     except Exception as exc:
-        return {"error": f"搜索失败（需要本地 SearXNG）: {exc}"}
+        return {
+            "error": (
+                f"搜索失败：无法连接本地 SearXNG（{base_url}）。"
+                "请先启动本地实例，或运行 `python setup.py --searxng` 完成一键安装。"
+                f" 原始错误: {exc}"
+            )
+        }
+
+
+def web_search(query: str) -> dict:
+    return _search_via_searx(query, limit=5)
+
+
+def browser_search(query: str, limit: int = 5) -> dict:
+    try:
+        safe_limit = max(1, min(int(limit), 10))
+    except Exception:
+        safe_limit = 5
+    return _search_via_searx(query, limit=safe_limit)
+
+
+def browser_open(url: str, max_chars: int = 8000) -> dict:
+    page, error = _parse_browser_page(url)
+    if error is not None:
+        return error
+    assert page is not None
+    text = str(page.get("content") or "")
+    try:
+        safe_max_chars = max(500, min(int(max_chars), 40000))
+    except Exception:
+        safe_max_chars = 8000
+    page["content"] = text[:safe_max_chars]
+    page["truncated"] = len(text) > safe_max_chars
+    page["content_chars"] = len(text)
+    page["link_count"] = len(page.get("links") or [])
+    return page
+
+
+def browser_extract_links(url: str) -> dict:
+    page, error = _parse_browser_page(url)
+    if error is not None:
+        return error
+    assert page is not None
+    return {
+        "success": True,
+        "url": page["url"],
+        "final_url": page["final_url"],
+        "title": page["title"],
+        "status_code": page["status_code"],
+        "links": page["links"],
+        "link_count": len(page.get("links") or []),
+    }
+
+
+def browser_open_result(query: str, index: int = 0, max_chars: int = 8000) -> dict:
+    try:
+        safe_index = max(0, int(index))
+    except Exception:
+        safe_index = 0
+    search_result = browser_search(query, limit=max(5, safe_index + 1))
+    if not search_result.get("success"):
+        return search_result
+    results = search_result.get("results") or []
+    if safe_index >= len(results):
+        return {
+            "error": f"索引超出范围: index={safe_index}, 可用结果数={len(results)}",
+            "query": query,
+            "results": results,
+        }
+    selected = results[safe_index]
+    opened = browser_open(str(selected.get("url") or ""), max_chars=max_chars)
+    if opened.get("success"):
+        opened["query"] = query
+        opened["search_index"] = safe_index
+        opened["search_result"] = selected
+    return opened
 
 
 def append_file_content(file_path: str, content: str) -> dict:
@@ -206,9 +377,7 @@ def grep_search(
                     line_end = len(file_content)
                 line_content = file_content[line_start:line_end].strip()
                 file_matches.append(f"Line {line_num}: {line_content[:100]}")
-            results.append(
-                f"File: {file_path.relative_to(search_path)}\n" + "\n".join(file_matches)
-            )
+            results.append(f"File: {file_path.relative_to(search_path)}\n" + "\n".join(file_matches))
             count += 1
             if count >= max_results:
                 break
@@ -239,24 +408,18 @@ def execute_batch_commands(commands: list, stop_on_error: bool = True) -> dict:
 def fetch_url(url: str) -> dict:
     """抓取 URL 页面并返回纯文本内容。"""
 
-    try:
-        try:
-            from bs4 import BeautifulSoup
-        except ImportError:
-            return {"error": "beautifulsoup4 未安装: pip install beautifulsoup4"}
-        headers = {"User-Agent": "Mozilla/5.0 (compatible; STM32Agent/1.0)"}
-        response = requests.get(url, headers=headers, timeout=10)
-        response.raise_for_status()
-        soup = BeautifulSoup(response.content, "html.parser")
-        for tag in soup(["script", "style"]):
-            tag.decompose()
-        text = soup.get_text()
-        lines = (line.strip() for line in text.splitlines())
-        chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
-        text = "\n".join(chunk for chunk in chunks if chunk)
-        return {"success": True, "url": url, "content": text[:5000], "truncated": len(text) > 5000}
-    except Exception as exc:
-        return {"error": f"获取失败: {exc}"}
+    opened = browser_open(url, max_chars=5000)
+    if not opened.get("success"):
+        return opened
+    return {
+        "success": True,
+        "url": opened.get("url"),
+        "final_url": opened.get("final_url"),
+        "title": opened.get("title"),
+        "content": opened.get("content", ""),
+        "truncated": opened.get("truncated", False),
+        "links": opened.get("links", []),
+    }
 
 
 def get_current_time() -> dict:
@@ -324,17 +487,13 @@ def edit_file_lines(
                 return {"error": "replace 需要 new_content"}
             if not new_content.endswith("\n"):
                 new_content += "\n"
-            new_lines = (
-                lines[:start_index] + new_content.splitlines(keepends=True) + lines[end_index:]
-            )
+            new_lines = lines[:start_index] + new_content.splitlines(keepends=True) + lines[end_index:]
         elif operation == "insert":
             if new_content is None:
                 return {"error": "insert 需要 new_content"}
             if not new_content.endswith("\n"):
                 new_content += "\n"
-            new_lines = (
-                lines[:start_index] + new_content.splitlines(keepends=True) + lines[start_index:]
-            )
+            new_lines = lines[:start_index] + new_content.splitlines(keepends=True) + lines[start_index:]
         elif operation == "delete":
             new_lines = lines[:start_index] + lines[end_index:]
         else:
@@ -417,14 +576,10 @@ def run_python_code(code: str) -> dict:
     import tempfile
 
     try:
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".py", delete=False, encoding="utf-8"
-        ) as handle:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False, encoding="utf-8") as handle:
             handle.write(code)
             tmp_path = handle.name
-        result = subprocess.run(
-            [sys.executable, tmp_path], capture_output=True, text=True, timeout=30
-        )
+        result = subprocess.run([sys.executable, tmp_path], capture_output=True, text=True, timeout=30)
         try:
             Path(tmp_path).unlink()
         except Exception:
@@ -442,6 +597,10 @@ def run_python_code(code: str) -> dict:
 __all__ = [
     "append_file_content",
     "ask_human",
+    "browser_extract_links",
+    "browser_open",
+    "browser_open_result",
+    "browser_search",
     "check_python_code",
     "create_or_overwrite_file",
     "edit_file_lines",
