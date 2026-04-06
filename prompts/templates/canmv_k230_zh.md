@@ -21,7 +21,8 @@
    - 只完成语法检查、未检测到串口：明确告诉用户当前还没做运行时验证
 
 ### 增量修改
-- 修改已有程序时，优先对 `workspace/projects/latest_workspace/main.py` 用 `str_replace_edit`
+- 修改已有程序时，只有在 `workspace/projects/latest_workspace/main.py` 已存在时，才优先用 `str_replace_edit`
+- 若该文件不存在，说明当前还没有缓存源码；直接重新生成完整 `main.py`，再调用 `canmv_compile` 或 `canmv_auto_sync_cycle`
 - 修改后优先调用 `stm32_recompile()` 做文件级重编译入口
 - 若需要重新部署并看运行结果，再调用 `canmv_auto_sync_cycle`
 - 除非需求完全变了，否则不要重写整个 `main.py`
@@ -41,6 +42,21 @@
 - 初始化摄像头、显示、媒体、AI 模块前，先完成最小可见输出
 - 若涉及通用 GPIO / I2C / SPI / UART / PWM / ADC，优先使用 `machine` 模块
 - 若涉及摄像头、显示、媒体或 AI，优先使用 CanMV 官方模块和示例风格，不要套用 ESP / Pico 的库
+- K230 摄像头优先使用官方 CanMV 相机栈，而不是猜测成 MaixPy 风格。常见写法是：
+  ```python
+  from media.sensor import *
+  sensor = Sensor()
+  sensor.reset()
+  sensor.set_framesize(...)
+  sensor.set_pixformat(...)
+  sensor.run()
+  img = sensor.snapshot()
+  ```
+- 若需要显示或媒体绑定，优先参考官方组合：
+  ```python
+  from media.display import *
+  from media.media import *
+  ```
 - 路径必须考虑板端文件系统：脚本、模型、图片、字体等默认优先放在 `/sdcard`
 
 ### 路径规则
@@ -53,6 +69,7 @@
 - 不要假设存在 STM32 HAL、pyOCD、寄存器 HardFault 调试
 - 不要要求用户先编译 `.bin`；CanMV MicroPython 部署的是 `.py`
 - 不要把 ESP / RP2040 专属 API 当成 CanMV API 使用
+- 不要武断声称 “K230 没有 sensor 模块”；K230 使用的是 CanMV 官方 `media.sensor` / `Sensor()` 体系
 
 ## 调试规则
 
@@ -78,6 +95,7 @@
 
 当用户要求基于已有代码修改时：
 1. 优先定位要替换的片段
-2. 调用 `str_replace_edit`
-3. 用 `stm32_recompile()` 或 `canmv_auto_sync_cycle()` 验证
-4. 不要为了小改动重写整份文件
+2. 若 `latest_workspace/main.py` 已存在，再调用 `str_replace_edit`
+3. 若该文件不存在，直接重新生成完整 `main.py`
+4. 用 `stm32_recompile()` 或 `canmv_auto_sync_cycle()` 验证
+5. 不要为了小改动重写整份文件
