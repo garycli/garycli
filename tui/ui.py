@@ -86,6 +86,7 @@ def _print_status_bar(
     hw_connected: bool,
     serial_connected: bool,
     tokens: int,
+    context_left_percent: int | None = None,
     cli_text: Callable[[str, str], str],
 ) -> None:
     """Render the per-turn status bar above the prompt."""
@@ -100,9 +101,10 @@ def _print_status_bar(
         if serial_connected
         else cli_text("[dim]串口未连[/]", "[dim]Serial off[/]")
     )
-    console.print(
-        f"[dim]{hw}  │  {serial}  │  {model}  │  {cli_text('上下文', 'context')}: ~{tokens} tokens[/]"
-    )
+    context_text = f"{cli_text('上下文', 'context')}: ~{tokens} tokens"
+    if context_left_percent is not None:
+        context_text += f"  │  {context_left_percent}% left"
+    console.print(f"[dim]{hw}  │  {serial}  │  {model}  │  {context_text}[/]")
     console.rule(style="dim")
 
 
@@ -159,9 +161,15 @@ def run_interactive(
 
     while True:
         try:
+            usage = (
+                agent._context_usage()
+                if hasattr(agent, "_context_usage")
+                else {"used_tokens": agent._tokens(), "left_percent": None}
+            )
             _print_status_bar(
                 model=model,
-                tokens=agent._tokens(),
+                tokens=int(usage.get("used_tokens") or 0),
+                context_left_percent=usage.get("left_percent"),
                 cli_text=cli_text,
                 **status_snapshot(),
             )
