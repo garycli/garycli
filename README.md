@@ -756,7 +756,15 @@ Issues and PRs are welcome. Contributions are especially appreciated in these ar
 
 # 4. Submit a PR
 ```
+## Star History
 
+<a href="https://www.star-history.com/?repos=garycli%2Fgarycli&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=garycli/garycli&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=garycli/garycli&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=garycli/garycli&type=date&legend=top-left" />
+ </picture>
+</a>
 ---
 
 ## 📜 License
