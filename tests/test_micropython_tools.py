@@ -114,6 +114,39 @@ def test_canmv_flash_deploys_managed_bundle(monkeypatch):
         ctx.serial = old_serial
 
 
+def test_canmv_flash_marks_empty_serial_as_runtime_unverified(monkeypatch):
+    """Deploy success must not be mistaken for confirmed runtime when serial output is empty."""
+
+    ctx = get_context()
+    old_chip = ctx.chip
+    old_hw = ctx.hw_connected
+    old_serial_connected = ctx.serial_connected
+    old_serial = ctx.serial
+
+    monkeypatch.setattr(
+        "core.micropython_tools.sync_text_files",
+        lambda **kwargs: {"success": True, "boot_output": ""},
+    )
+    monkeypatch.setattr(
+        "core.micropython_tools._reconnect_monitor",
+        lambda port, baud, console=None: {"success": True, "port": port},
+    )
+
+    try:
+        ctx.chip = "CANMV_K230"
+        result = micropython_flash(code="print('Gary:BOOT')\n", port="/dev/ttyACM0")
+        assert result["success"] is True
+        assert result["serial_output_observed"] is False
+        assert result["runtime_confirmed"] is False
+        assert result["runtime_unverified"] is True
+        assert "未捕获到任何串口输出" in result["message"]
+    finally:
+        ctx.chip = old_chip
+        ctx.hw_connected = old_hw
+        ctx.serial_connected = old_serial_connected
+        ctx.serial = old_serial
+
+
 def test_canmv_list_files_defaults_to_sdcard(monkeypatch):
     """CanMV file listing should default to the /sdcard directory."""
 
@@ -148,8 +181,7 @@ def test_micropython_flash_syncs_explicit_file_before_upload(tmp_path, monkeypat
     monkeypatch.setattr(
         "core.micropython_tools.sync_latest_workspace",
         lambda code, chip=None: (
-            sync_calls.append((code, chip or ""))
-            or {
+            sync_calls.append((code, chip or "")) or {
                 "success": True,
                 "path": "workspace/projects/latest_workspace/main.py",
                 "source_file": "main.py",
@@ -192,8 +224,7 @@ def test_micropython_flash_uses_last_code_when_latest_workspace_missing(monkeypa
     monkeypatch.setattr(
         "core.micropython_tools.sync_latest_workspace",
         lambda code, chip=None: (
-            sync_calls.append((code, chip or ""))
-            or {
+            sync_calls.append((code, chip or "")) or {
                 "success": True,
                 "path": "workspace/projects/latest_workspace/main.py",
                 "source_file": "main.py",
@@ -270,9 +301,7 @@ def test_micropython_auto_sync_cycle_explains_raw_repl_failure(monkeypatch):
         "core.micropython_tools.micropython_compile",
         lambda *args, **kwargs: {"success": True, "message": "ok"},
     )
-    monkeypatch.setattr(
-        "core.micropython_tools.detect_serial_ports", lambda **kwargs: ["/dev/ttyACM0"]
-    )
+    monkeypatch.setattr("core.micropython_tools.detect_serial_ports", lambda **kwargs: ["/dev/ttyACM0"])
     monkeypatch.setattr(
         "core.micropython_tools.micropython_flash",
         lambda **kwargs: {
@@ -299,6 +328,81 @@ def test_micropython_auto_sync_cycle_explains_raw_repl_failure(monkeypatch):
         assert result["suspected_user_code_block"] is True
         assert "无法进入 raw REPL" in result["error"]
         assert result["recovery_suggestions"] == ["按 RST 复位"]
+    finally:
+        ctx.chip = old_chip
+        ctx.debug_attempt = old_attempt
+
+
+def test_micropython_auto_sync_cycle_requires_runtime_output(monkeypatch):
+    """Auto sync should not report success when no runtime serial output was captured."""
+
+    ctx = get_context()
+    old_chip = ctx.chip
+    old_attempt = ctx.debug_attempt
+
+    monkeypatch.setattr(
+        "core.micropython_tools.micropython_compile",
+        lambda *args, **kwargs: {"success": True, "message": "ok"},
+    )
+    monkeypatch.setattr("core.micropython_tools.detect_serial_ports", lambda **kwargs: ["/dev/ttyACM0"])
+    monkeypatch.setattr(
+        "core.micropython_tools.micropython_flash",
+        lambda **kwargs: {
+            "success": True,
+            "boot_output": "",
+            "device_main_path": "/sdcard/gary_run.py",
+        },
+    )
+
+    try:
+        ctx.chip = "CANMV_K230"
+        ctx.debug_attempt = 0
+        from core.micropython_tools import micropython_auto_sync_cycle
+
+        result = micropython_auto_sync_cycle("print('Gary:BOOT')\n")
+        assert result["success"] is False
+        assert result["deploy_success"] is True
+        assert result["runtime_unverified"] is True
+        assert result["uart_output"] == ""
+        assert "不能确认 /sdcard/gary_run.py 是否已运行" in result["error"]
+    finally:
+        ctx.chip = old_chip
+        ctx.debug_attempt = old_attempt
+
+
+def test_micropython_auto_sync_cycle_does_not_treat_bootstrap_only_output_as_runtime_success(monkeypatch):
+    """Seeing only the managed boot marker must not be treated as gary_run.py having started."""
+
+    ctx = get_context()
+    old_chip = ctx.chip
+    old_attempt = ctx.debug_attempt
+
+    monkeypatch.setattr(
+        "core.micropython_tools.micropython_compile",
+        lambda *args, **kwargs: {"success": True, "message": "ok"},
+    )
+    monkeypatch.setattr("core.micropython_tools.detect_serial_ports", lambda **kwargs: ["/dev/ttyACM0"])
+    monkeypatch.setattr(
+        "core.micropython_tools.micropython_flash",
+        lambda **kwargs: {
+            "success": True,
+            "boot_output": "Gary:BOOT\n",
+            "device_main_path": "/sdcard/gary_run.py",
+        },
+    )
+
+    try:
+        ctx.chip = "CANMV_K230"
+        ctx.debug_attempt = 0
+        from core.micropython_tools import micropython_auto_sync_cycle
+
+        result = micropython_auto_sync_cycle("print('Gary:BOOT')\n")
+        assert result["success"] is False
+        assert result["deploy_success"] is True
+        assert result["runtime_unverified"] is True
+        assert result["uart_output"] == "Gary:BOOT\n"
+        assert "只看到 boot.py 的引导输出" in result["error"]
+        assert "gary_run.py" in result["error"]
     finally:
         ctx.chip = old_chip
         ctx.debug_attempt = old_attempt
