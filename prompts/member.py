@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from core.platforms import detect_target_platform
+from core.platforms import is_micropython_target
 from core.memory import (
     MEMBER_PROMPT_CHAR_LIMIT,
     MEMBER_PROMPT_MAX_DYNAMIC,
@@ -15,7 +15,7 @@ from core.memory import (
 def _entry_matches_platform(entry: str, chip: str | None) -> bool:
     """Return whether one memory entry should be injected for the current platform."""
 
-    if detect_target_platform(chip) not in {"rp2040", "esp"}:
+    if not is_micropython_target(chip):
         return True
     text = entry.lower()
     blocked_keywords = (

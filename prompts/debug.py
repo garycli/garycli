@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from core.platforms import detect_target_platform
+from core.platforms import detect_target_platform, is_micropython_target
 
 _TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 
@@ -61,7 +61,7 @@ def get_debug_prompt(error_type: str, context: dict[str, Any]) -> str:
 
     normalized = (error_type or "").strip().lower()
     platform = detect_target_platform(context.get("chip"))
-    if platform in {"rp2040", "esp"}:
+    if is_micropython_target(context.get("chip")):
         if normalized in {"compile", "compile_error", "build_error"}:
             prompt = _MICROPYTHON_COMPILE_PROMPT
         else:
