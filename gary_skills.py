@@ -322,6 +322,26 @@ class SkillsManager:
                 )
         return "\n".join(parts)
 
+    def get_prompt_additions_for_tools(self, tool_names: set[str] | list[str] | tuple[str, ...]) -> str:
+        """Return prompt additions only for enabled skills relevant to selected tools."""
+
+        active = {str(name or "").strip() for name in (tool_names or []) if str(name or "").strip()}
+        if not active:
+            return ""
+
+        parts = []
+        for skill in self._skills.values():
+            if not skill.meta.enabled or skill.meta.load_error or not skill.prompt_addition:
+                continue
+            skill_tool_names = {str(name) for name in skill.tools_map.keys() if str(name).strip()}
+            if not (skill_tool_names & active):
+                continue
+            parts.append(
+                f"\n## Skill: {skill.meta.display_name or skill.meta.name}\n"
+                f"{skill.prompt_addition}"
+            )
+        return "\n".join(parts)
+
     # ── 安装技能 ────────────────────────────────────────────
 
     def install(self, source: str) -> dict:
