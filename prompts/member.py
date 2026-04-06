@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+
 from core.platforms import is_micropython_target
 from core.memory import (
     MEMBER_PROMPT_CHAR_LIMIT,
@@ -32,14 +34,9 @@ def _entry_matches_platform(entry: str, chip: str | None) -> bool:
     return not any(keyword in text for keyword in blocked_keywords)
 
 
-def get_member_prompt_section(chip: str | None = None) -> str:
-    """Return the trimmed member-memory section injected into the system prompt."""
+def _render_member_prompt_section(current: str, chip: str | None = None) -> str:
+    """Render one trimmed member-memory section from raw member.md text."""
 
-    # `core.memory` owns persistence and pruning rules. This formatter only
-    # consumes its helpers and the persisted markdown artifact.
-    with _MEMBER_LOCK:
-        path = _ensure_member_file()
-        current = path.read_text(encoding="utf-8")
     header, entries = _split_member_content(current)
     pinned = [
         entry
@@ -83,3 +80,23 @@ def get_member_prompt_section(chip: str | None = None) -> str:
         "发现错误、过时、无用经验时，调用 `gary_delete_member_memory` 删除。\n\n"
         f"{excerpt.strip()}"
     )
+
+
+def get_member_prompt_section_state(chip: str | None = None) -> tuple[str, str]:
+    """Return `(section, content_hash)` for the current member prompt snippet."""
+
+    # `core.memory` owns persistence and pruning rules. This formatter only
+    # consumes its helpers and the persisted markdown artifact.
+    with _MEMBER_LOCK:
+        path = _ensure_member_file()
+        current = path.read_text(encoding="utf-8")
+    section = _render_member_prompt_section(current, chip)
+    digest = hashlib.sha1(section.encode("utf-8")).hexdigest()
+    return section, digest
+
+
+def get_member_prompt_section(chip: str | None = None) -> str:
+    """Return the trimmed member-memory section injected into the system prompt."""
+
+    section, _ = get_member_prompt_section_state(chip)
+    return section
