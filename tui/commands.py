@@ -46,6 +46,8 @@ class GaryCompleter(Completer):
         "/disconnect",
         "/serial",
         "/chip",
+        "/enable_thinking",
+        "/disable_thinking",
         "/flash",
         "/status",
         "/probes",
@@ -249,12 +251,19 @@ def _show_help(theme: str, cli_text: Callable[[str, str], str]) -> None:
     table.add_column(cli_text("命令", "Command"), style=f"bold {theme}")
     table.add_column(cli_text("说明", "Description"), style="white")
     cmds = [
+        ("/help", cli_text("显示完整帮助", "Show the full help table")),
+        ("?", cli_text("`/help` 的别名", "Alias for `/help`")),
         (
             "/connect [chip]",
             cli_text(
                 "连接目标板（如 /connect STM32F103C8T6、/connect PICO_W、/connect ESP32、/connect CANMV_K230 或 /connect MICROPYTHON 自动识别）",
                 "Connect the target board (for example: /connect STM32F103C8T6, /connect PICO_W, /connect ESP32, /connect CANMV_K230, or /connect MICROPYTHON for auto-detect)",
             ),
+        ),
+        ("/disconnect", cli_text("断开探针和串口", "Disconnect probe and serial")),
+        (
+            "/serial list",
+            cli_text("列出当前检测到的串口设备", "List currently detected serial devices"),
         ),
         (
             "/serial [port] [baud]",
@@ -270,7 +279,7 @@ def _show_help(theme: str, cli_text: Callable[[str, str], str]) -> None:
                 "Deploy the latest artifact (STM32 bin or main.py for MicroPython targets)",
             ),
         ),
-        ("/disconnect", cli_text("断开探针和串口", "Disconnect probe and serial")),
+        ("/chip", cli_text("查看当前目标板型号", "Show the current target model")),
         ("/chip [model]", cli_text("查看/切换目标板型号", "Show or change the target model")),
         (
             "/language [en|zh]",
@@ -279,8 +288,32 @@ def _show_help(theme: str, cli_text: Callable[[str, str], str]) -> None:
                 "Switch CLI language. `/language` switches to English immediately",
             ),
         ),
+        (
+            "/enable_thinking",
+            cli_text(
+                "为当前会话开启 thinking/reasoning 输出与推理预算",
+                "Enable thinking/reasoning output and reasoning budget for the current session",
+            ),
+        ),
+        (
+            "/disable_thinking",
+            cli_text(
+                "为当前会话关闭 thinking/reasoning 输出与推理预算",
+                "Disable thinking/reasoning output and reasoning budget for the current session",
+            ),
+        ),
         ("/probes", cli_text("列出所有可用探针", "List all available probes")),
         ("/status", cli_text("查看硬件+工具链状态", "Show hardware and toolchain status")),
+        ("/projects", cli_text("列出历史项目", "List saved projects")),
+        ("/member", cli_text("查看当前经验库预览", "Preview the current memory file")),
+        (
+            "/member path",
+            cli_text("显示 member.md 路径", "Show the member.md file path"),
+        ),
+        (
+            "/member reload",
+            cli_text("重新载入 member.md 到当前会话", "Reload member.md into the current session"),
+        ),
         (
             "/config",
             cli_text(
@@ -288,31 +321,23 @@ def _show_help(theme: str, cli_text: Callable[[str, str], str]) -> None:
                 "Configure AI settings (API Key / Model / Base URL)",
             ),
         ),
-        ("/projects", cli_text("列出历史项目", "List saved projects")),
-        (
-            "/member [path|reload]",
-            cli_text(
-                "查看经验库；`path` 显示路径；`reload` 重新载入 member.md",
-                "View memory; `path` shows the file location; `reload` refreshes member.md",
-            ),
-        ),
         (
             "/telegram [subcommand]",
             cli_text(
-                "Telegram 机器人管理: start/stop/status/allow/remove/reset",
-                "Manage the Telegram bot: start/stop/status/allow/remove/reset",
+                "Telegram 机器人管理: status/config/start/stop/restart/allow/remove/allow-all/whitelist/reset",
+                "Manage the Telegram bot: status/config/start/stop/restart/allow/remove/allow-all/whitelist/reset",
             ),
         ),
         (
             "/skill [subcommand]",
             cli_text(
-                "技能管理: list/install/enable/disable/create/export",
-                "Manage skills: list/install/enable/disable/create/export",
+                "技能管理: list/install/uninstall/enable/disable/info/create/export/reload/dir",
+                "Manage skills: list/install/uninstall/enable/disable/info/create/export/reload/dir",
             ),
         ),
         ("/clear", cli_text("清空对话历史", "Clear conversation history")),
         ("/exit", cli_text("退出并停止 Telegram", "Exit and stop Telegram")),
-        ("?", cli_text("显示帮助", "Show help")),
+        ("/quit", cli_text("`/exit` 的别名", "Alias for `/exit`")),
         (
             "Tab",
             cli_text(
@@ -472,6 +497,32 @@ def handle_slash_command(
             message = "CLI 语言已切换为中文。"
             message += " 已保存到 config.py。" if result["saved"] else " 仅当前会话生效。"
         console.print(f"[green]{message}[/]\n")
+        return True
+
+    if head == "/enable_thinking":
+        ctx = get_context()
+        if ctx.thinking_enabled:
+            console.print(
+                f"[yellow]{cli_text('thinking 已经开启（当前会话）', 'Thinking is already enabled for this session.')}[/]\n"
+            )
+            return True
+        ctx.thinking_enabled = True
+        console.print(
+            f"[green]{cli_text('已为当前会话开启 thinking。之后的请求会发送 reasoning 配置，并允许显示思考内容。', 'Thinking is now enabled for this session. Future requests will send reasoning config and may show thought output.')}[/]\n"
+        )
+        return True
+
+    if head == "/disable_thinking":
+        ctx = get_context()
+        if not ctx.thinking_enabled:
+            console.print(
+                f"[yellow]{cli_text('thinking 已经关闭（当前会话）', 'Thinking is already disabled for this session.')}[/]\n"
+            )
+            return True
+        ctx.thinking_enabled = False
+        console.print(
+            f"[green]{cli_text('已为当前会话关闭 thinking。之后的请求不会发送 reasoning 配置，也不会请求思考内容。', 'Thinking is now disabled for this session. Future requests will not send reasoning config or request thought output.')}[/]\n"
+        )
         return True
 
     if head == "/status":
