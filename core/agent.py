@@ -35,6 +35,10 @@ from core.font_tools import stm32_generate_font
 from core.generic_tools import (
     append_file_content,
     ask_human,
+    browser_extract_links,
+    browser_open,
+    browser_open_result,
+    browser_search,
     check_python_code,
     create_or_overwrite_file,
     edit_file_lines,
@@ -128,7 +132,12 @@ from integrations.telegram import (
 )
 from prompts.debug import get_debug_prompt
 from prompts.member import get_member_prompt_section
-from prompts.system import build_system_prompt
+from prompts.system import (
+    WEB_RESEARCH_HINT_HEADER,
+    build_system_prompt,
+    build_web_research_hint,
+    should_force_web_research,
+)
 from tui.commands import GaryCompleter, handle_slash_command
 from tui.ui import console as CONSOLE, print_banner, run_doctor, run_interactive, run_oneshot
 
@@ -674,9 +683,7 @@ def canmv_list_files(path: str = ".", port: str = None, baud: int = None) -> dic
     )
 
 
-def _micropython_connect_for_target(
-    chip: str, port: str | None = None, baud: int | None = None
-) -> dict:
+def _micropython_connect_for_target(chip: str, port: str | None = None, baud: int | None = None) -> dict:
     platform = detect_target_platform(chip)
     if platform == "rp2040":
         return rp2040_connect(chip, port=port, baud=baud)
@@ -936,9 +943,7 @@ def stm32_compile_rtos(code: str, chip: str = None) -> dict:
     target_chip = _current_target(chip)
     ctx.chip = target_chip
     if is_micropython_target(target_chip):
-        return _micropython_not_supported(
-            "stm32_compile_rtos", "请改用对应的 MicroPython compile 或 auto_sync_cycle 工具"
-        )
+        return _micropython_not_supported("stm32_compile_rtos", "请改用对应的 MicroPython compile 或 auto_sync_cycle 工具")
     compiler = _get_compiler()
     if chip:
         compiler.set_chip(target_chip)
@@ -993,9 +998,7 @@ def stm32_recompile(mode: str = "auto") -> dict:
     code = source_path.read_text(encoding="utf-8")
     if source_path.suffix == ".py" or is_micropython_target(ctx.chip):
         if mode == "rtos":
-            return _micropython_not_supported(
-                "stm32_recompile(mode='rtos')", "MicroPython 目标不支持 FreeRTOS 编译"
-            )
+            return _micropython_not_supported("stm32_recompile(mode='rtos')", "MicroPython 目标不支持 FreeRTOS 编译")
         target_chip = ctx.chip if is_micropython_target(ctx.chip) else "ESP32"
         return _micropython_compile_for_target(code, target_chip)
     if mode == "auto":
@@ -1215,9 +1218,7 @@ def stm32_rtos_check_code(code: str) -> dict:
     检查 SysTick 冲突、HAL_Delay 陷阱、缺少 hook 函数、栈大小、ISR 安全等。
     """
     if is_micropython_target(_current_target()):
-        return _micropython_not_supported(
-            "stm32_rtos_check_code", "MicroPython 目标不使用 FreeRTOS C 工程"
-        )
+        return _micropython_not_supported("stm32_rtos_check_code", "MicroPython 目标不使用 FreeRTOS C 工程")
     import re
 
     errors = []
@@ -1365,9 +1366,7 @@ def stm32_rtos_task_stats() -> dict:
     需要先编译（有 ELF 文件）并连接硬件。
     """
     if is_micropython_target(_current_target()):
-        return _micropython_not_supported(
-            "stm32_rtos_task_stats", "MicroPython 目标没有这套 FreeRTOS 任务统计接口"
-        )
+        return _micropython_not_supported("stm32_rtos_task_stats", "MicroPython 目标没有这套 FreeRTOS 任务统计接口")
     if not get_context().hw_connected:
         return {"success": False, "message": "硬件未连接"}
 
@@ -2292,6 +2291,10 @@ bind_tool_implementations(
         "execute_command": execute_command,
         "search_files": search_files,
         "web_search": web_search,
+        "browser_search": browser_search,
+        "browser_open": browser_open,
+        "browser_extract_links": browser_extract_links,
+        "browser_open_result": browser_open_result,
         # 扩展通用工具
         "append_file_content": append_file_content,
         "grep_search": grep_search,
@@ -2377,6 +2380,29 @@ class STM32Agent:
             self.messages[0]["content"] = prompt
         else:
             self.messages.insert(0, {"role": "system", "content": prompt})
+
+    def _remove_web_research_hints(self):
+        """Drop transient one-turn web-research directives from conversation history."""
+
+        preserved = self.messages[:1]
+        remainder = [
+            message
+            for message in self.messages[1:]
+            if not (
+                message.get("role") == "system"
+                and str(message.get("content", "")).startswith(WEB_RESEARCH_HINT_HEADER)
+            )
+        ]
+        self.messages = preserved + remainder
+
+    def _inject_web_research_hint(self, user_input: str):
+        """Add a transient system reminder for turns that should definitely browse first."""
+
+        self._remove_web_research_hints()
+        if not should_force_web_research(user_input):
+            return
+        ctx = get_context()
+        self.messages.append({"role": "system", "content": build_web_research_hint(ctx.cli_language)})
 
     def set_cli_language(self, language: str) -> dict:
         ctx = get_context()
@@ -2484,7 +2510,7 @@ class STM32Agent:
                     continue
 
                 pending = self._partial_think_tag_suffix(source, (close_tag,))
-                chunk = source[: -len(pending)] if pending else source
+                chunk = source[:-len(pending)] if pending else source
                 if chunk:
                     segments.append(("think", chunk))
                 state["pending"] = pending
@@ -2507,7 +2533,7 @@ class STM32Agent:
                 continue
 
             pending = self._partial_think_tag_suffix(source, (open_tag, close_tag))
-            chunk = source[: -len(pending)] if pending else source
+            chunk = source[:-len(pending)] if pending else source
             if chunk:
                 segments.append(("content", chunk))
             state["pending"] = pending
@@ -2526,9 +2552,7 @@ class STM32Agent:
         kind = "think" if state.get("inside_think", False) else "content"
         return [(kind, pending)]
 
-    def _request_final_reply_after_tools(
-        self, stream_to_console: bool = True
-    ) -> dict[str, Any] | None:
+    def _request_final_reply_after_tools(self, stream_to_console: bool = True) -> dict[str, Any] | None:
         """部分模型在工具执行后会停在空回复，这里补一次只求最终答复的请求。"""
         if stream_to_console:
             CONSOLE.print(
@@ -2691,6 +2715,7 @@ class STM32Agent:
         tool_callback=None,
     ) -> str:
         self._truncate_history()
+        self._inject_web_research_hint(user_input)
         self.messages.append({"role": "user", "content": user_input})
         reply_parts: List[str] = []
         tool_summaries: List[str] = []
@@ -2741,9 +2766,7 @@ class STM32Agent:
 
                     # 文本内容
                     if delta.content:
-                        for kind, piece in self._extract_think_segments(
-                            delta.content, think_tag_state
-                        ):
+                        for kind, piece in self._extract_think_segments(delta.content, think_tag_state):
                             if not piece:
                                 continue
                             if kind == "think":
@@ -3092,9 +3115,7 @@ def _print_startup_checks() -> None:
         try:
             import pyocd as _pyocd  # type: ignore
 
-            CONSOLE.print(
-                f"[dim]  pyocd: {_pyocd.__version__} ({_cli_text('可选，调试时备用', 'optional fallback for low-level debug')})[/]"
-            )
+            CONSOLE.print(f"[dim]  pyocd: {_pyocd.__version__} ({_cli_text('可选，调试时备用', 'optional fallback for low-level debug')})[/]")
         except ImportError:
             CONSOLE.print(
                 f"[dim]  pyocd: {_cli_text('未安装（MicroPython 目标不强依赖）', 'not installed (not required for MicroPython targets)')}[/]"
