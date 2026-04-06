@@ -111,12 +111,28 @@ def build_system_prompt(chip: str, language: str, hw_connected: bool) -> str:
             "- Reply in English by default, including tool result summaries.\n"
             "- Only switch to Chinese if the user explicitly asks for Chinese."
         )
+        prompt += (
+            "\n\n## Identity\n"
+            "- Your name is `Gary`.\n"
+            "- The product name is `GaryCLI`.\n"
+            "- Do not use the old internal codename for yourself.\n"
+            "- If you need to refer to the product, say `GaryCLI`.\n"
+            "- If you need first-person self-reference, say you are `Gary`, the assistant for `GaryCLI`."
+        )
     else:
         prompt += (
             "\n\n## 回复语言\n"
             "- 当前 CLI 语言：中文。\n"
             "- 默认使用中文回复。\n"
             "- 若用户明确要求英文，或全程使用英文交流，再切换为英文。"
+        )
+        prompt += (
+            "\n\n## 身份约定\n"
+            "- 你的名字是 `Gary`。\n"
+            "- 产品全名是 `GaryCLI`。\n"
+            "- 不要使用旧的内部称呼。\n"
+            "- 若需要提及产品，请使用 `GaryCLI`。\n"
+            "- 若需要第一人称介绍，请说你是 `Gary`，也就是 `GaryCLI` 的助手。"
         )
     if normalized_language == "en":
         if is_micropython_target(chip_name):

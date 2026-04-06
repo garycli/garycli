@@ -77,8 +77,8 @@ def get_member_prompt_section(chip: str | None = None) -> str:
     if selected:
         excerpt += "\n\n" + "\n\n".join(selected)
     return (
-        "## Gary Member Memory（重点）\n"
-        "以下内容来自 member.md，是 Gary 的长期经验库。优先复用这些成功经验；"
+        "## Gary Memory（重点）\n"
+        "以下内容来自 member.md，是 `Gary` 的长期经验库。优先复用这些成功经验；"
         "遇到新的高价值经验时，调用 `gary_save_member_memory` 写进去；"
         "发现错误、过时、无用经验时，调用 `gary_delete_member_memory` 删除。\n\n"
         f"{excerpt.strip()}"
