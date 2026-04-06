@@ -4,8 +4,17 @@ from __future__ import annotations
 
 import copy
 import json
+import re
 from typing import Any, Callable, Optional
 
+from core.platforms import (
+    CANMV_TARGET_CHOICES,
+    ESP_TARGET_CHOICES,
+    MICROPYTHON_TARGET_CHOICES,
+    RP2040_TARGET_CHOICES,
+    detect_target_platform,
+    normalize_target_name,
+)
 from gary_skills import SKILL_TOOL_SCHEMAS, SKILL_TOOLS_MAP, init_skills
 from stm32_extra_tools import EXTRA_TOOL_SCHEMAS, EXTRA_TOOLS_MAP
 
@@ -409,10 +418,7 @@ TOOL_SCHEMAS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "code": {
-                        "type": "string",
-                        "description": "主源码内容（STM32 为 main.c，MicroPython 目标为 main.py）",
-                    },
+                    "code": {"type": "string", "description": "主源码内容（STM32 为 main.c，MicroPython 目标为 main.py）"},
                     "request": {"type": "string", "description": "项目描述（作为目录名）"},
                 },
                 "required": ["code"],
@@ -493,7 +499,7 @@ TOOL_SCHEMAS = [
         "type": "function",
         "function": {
             "name": "rp2040_flash",
-            "description": "通过 MicroPython raw REPL 把 main.py 同步到 RP2040，并软复位执行。",
+            "description": "通过 MicroPython raw REPL 把代码部署到 RP2040 板端的受控脚本 `gary_run.py`，并由 `boot.py` 一次性托管运行。",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -511,8 +517,23 @@ TOOL_SCHEMAS = [
     {
         "type": "function",
         "function": {
+            "name": "rp2040_soft_reset",
+            "description": "通过 MicroPython REPL 对 RP2040 执行软件复位，适用于需要清掉当前运行态、重新回到 Gary 管理启动流程时。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "port": {"type": "string", "description": "可选：串口设备路径"},
+                    "baud": {"type": "integer", "description": "串口波特率，默认 115200"},
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "rp2040_auto_sync_cycle",
-            "description": "RP2040 推荐闭环：语法检查 main.py → 同步到设备 → 软复位 → 读取启动日志/Traceback。",
+            "description": "RP2040 推荐闭环：语法检查 main.py → 部署到 Gary 管理的 `gary_run.py` → 一次性软复位运行 → 读取启动日志/Traceback。",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -527,7 +548,7 @@ TOOL_SCHEMAS = [
         "type": "function",
         "function": {
             "name": "rp2040_list_files",
-            "description": "列出当前 MicroPython 设备上的文件，检查 main.py、库文件和资源是否已经同步。",
+            "description": "列出当前 MicroPython 设备上的文件，检查 `boot.py`、`gary_run.py`、库文件和资源是否已经同步。",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -578,10 +599,7 @@ TOOL_SCHEMAS = [
                 "type": "object",
                 "properties": {
                     "code": {"type": "string", "description": "完整的 main.py 代码"},
-                    "chip": {
-                        "type": "string",
-                        "description": "可选：目标板名称，如 ESP32-S3、ESP32-C3、ESP8266、NodeMCU",
-                    },
+                    "chip": {"type": "string", "description": "可选：目标板名称，如 ESP32-S3、ESP32-C3、ESP8266、NodeMCU"},
                 },
                 "required": ["code"],
             },
@@ -591,7 +609,7 @@ TOOL_SCHEMAS = [
         "type": "function",
         "function": {
             "name": "esp_flash",
-            "description": "通过 MicroPython raw REPL 把 main.py 同步到 ESP 系列开发板，并软复位执行。",
+            "description": "通过 MicroPython raw REPL 把代码部署到 ESP 板端的受控脚本 `gary_run.py`，并由 `boot.py` 一次性托管运行。",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -609,8 +627,23 @@ TOOL_SCHEMAS = [
     {
         "type": "function",
         "function": {
+            "name": "esp_soft_reset",
+            "description": "通过 MicroPython REPL 对 ESP 开发板执行软件复位，适用于清理当前运行态并恢复 Gary 管理启动流程。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "port": {"type": "string", "description": "可选：串口设备路径"},
+                    "baud": {"type": "integer", "description": "串口波特率，默认 115200"},
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "esp_auto_sync_cycle",
-            "description": "ESP 系列推荐闭环：语法检查 main.py → 同步到设备 → 软复位 → 读取启动日志/Traceback。",
+            "description": "ESP 系列推荐闭环：语法检查 main.py → 部署到 Gary 管理的 `gary_run.py` → 一次性软复位运行 → 读取启动日志/Traceback。",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -625,7 +658,7 @@ TOOL_SCHEMAS = [
         "type": "function",
         "function": {
             "name": "esp_list_files",
-            "description": "列出当前 ESP MicroPython 设备上的文件，检查 main.py、库文件和资源是否已经同步。",
+            "description": "列出当前 ESP MicroPython 设备上的文件，检查 `boot.py`、`gary_run.py`、库文件和资源是否已经同步。",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -676,10 +709,7 @@ TOOL_SCHEMAS = [
                 "type": "object",
                 "properties": {
                     "code": {"type": "string", "description": "完整的 main.py 代码"},
-                    "chip": {
-                        "type": "string",
-                        "description": "可选：目标板名称，如 CANMV_K230 或 CANMV_K230D",
-                    },
+                    "chip": {"type": "string", "description": "可选：目标板名称，如 CANMV_K230 或 CANMV_K230D"},
                 },
                 "required": ["code"],
             },
@@ -689,7 +719,7 @@ TOOL_SCHEMAS = [
         "type": "function",
         "function": {
             "name": "canmv_flash",
-            "description": "通过 MicroPython raw REPL 把 main.py 同步到 CanMV 设备上的 /sdcard/main.py，并软复位执行。",
+            "description": "通过 MicroPython raw REPL 把代码部署到 CanMV 设备上的 `/sdcard/gary_run.py`，并由 `/sdcard/boot.py` 一次性托管运行。",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -707,8 +737,23 @@ TOOL_SCHEMAS = [
     {
         "type": "function",
         "function": {
+            "name": "canmv_soft_reset",
+            "description": "通过 MicroPython REPL 对 CanMV K230 执行软件复位，适用于从卡住的运行态恢复到 Gary 管理启动流程。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "port": {"type": "string", "description": "可选：串口设备路径"},
+                    "baud": {"type": "integer", "description": "串口波特率，默认 115200"},
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "canmv_auto_sync_cycle",
-            "description": "CanMV K230 推荐闭环：语法检查 main.py → 同步到 /sdcard/main.py → 软复位 → 读取启动日志/Traceback。",
+            "description": "CanMV K230 推荐闭环：语法检查 main.py → 部署到 `/sdcard/gary_run.py` → 一次性软复位运行 → 读取启动日志/Traceback。",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -723,14 +768,11 @@ TOOL_SCHEMAS = [
         "type": "function",
         "function": {
             "name": "canmv_list_files",
-            "description": "列出当前 CanMV 设备上的文件；默认优先查看 /sdcard，用于检查 main.py、模型和资源文件是否已经同步。",
+            "description": "列出当前 CanMV 设备上的文件；默认优先查看 /sdcard，用于检查 `boot.py`、`gary_run.py`、模型和资源文件是否已经同步。",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": {
-                        "type": "string",
-                        "description": "设备目录路径，默认 .（CanMV 默认会转到 /sdcard）",
-                    },
+                    "path": {"type": "string", "description": "设备目录路径，默认 .（CanMV 默认会转到 /sdcard）"},
                     "port": {"type": "string", "description": "可选：串口设备路径"},
                     "baud": {"type": "integer", "description": "串口波特率，默认 115200"},
                 },
@@ -928,10 +970,7 @@ TOOL_SCHEMAS = [
                 "type": "object",
                 "properties": {
                     "url": {"type": "string", "description": "要打开的 URL"},
-                    "max_chars": {
-                        "type": "integer",
-                        "description": "正文最大返回字符数，默认 8000",
-                    },
+                    "max_chars": {"type": "integer", "description": "正文最大返回字符数，默认 8000"},
                 },
                 "required": ["url"],
             },
@@ -961,10 +1000,7 @@ TOOL_SCHEMAS = [
                 "properties": {
                     "query": {"type": "string", "description": "搜索关键词"},
                     "index": {"type": "integer", "description": "搜索结果索引，从 0 开始，默认 0"},
-                    "max_chars": {
-                        "type": "integer",
-                        "description": "正文最大返回字符数，默认 8000",
-                    },
+                    "max_chars": {"type": "integer", "description": "正文最大返回字符数，默认 8000"},
                 },
                 "required": ["query"],
             },
@@ -1276,6 +1312,242 @@ _BASE_SCHEMAS_BY_NAME = {
 }
 _TOOLS_WITH_CONTEXT: dict[str, bool] = {}
 TOOLS_MAP: dict[str, ToolHandler] = {}
+_GENERIC_FILE_TOOLS = {
+    "stm32_set_chip",
+    "read_file",
+    "create_or_overwrite_file",
+    "str_replace_edit",
+    "list_directory",
+    "search_files",
+    "append_file_content",
+    "grep_search",
+    "edit_file_lines",
+    "insert_content_by_regex",
+    "check_python_code",
+}
+_PROJECT_TOOLS = {
+    "stm32_save_code",
+    "stm32_list_projects",
+    "stm32_read_project",
+}
+_PLATFORM_BASE_TOOLS = {
+    "stm32": {
+        "stm32_list_probes",
+        "stm32_connect",
+        "stm32_disconnect",
+        "stm32_serial_connect",
+        "stm32_serial_disconnect",
+        "stm32_hardware_status",
+        "stm32_compile",
+        "stm32_recompile",
+        "stm32_flash",
+        "stm32_auto_flash_cycle",
+    },
+    "rp2040": {
+        "stm32_disconnect",
+        "rp2040_connect",
+        "rp2040_hardware_status",
+        "rp2040_compile",
+        "rp2040_flash",
+        "rp2040_auto_sync_cycle",
+        "rp2040_list_files",
+        "rp2040_soft_reset",
+    },
+    "esp": {
+        "stm32_disconnect",
+        "esp_connect",
+        "esp_hardware_status",
+        "esp_compile",
+        "esp_flash",
+        "esp_auto_sync_cycle",
+        "esp_list_files",
+        "esp_soft_reset",
+    },
+    "canmv": {
+        "stm32_disconnect",
+        "canmv_connect",
+        "canmv_hardware_status",
+        "canmv_compile",
+        "canmv_flash",
+        "canmv_auto_sync_cycle",
+        "canmv_list_files",
+        "canmv_soft_reset",
+    },
+    "unknown": {
+        "stm32_connect",
+        "stm32_disconnect",
+        "stm32_hardware_status",
+    },
+}
+_MICROPYTHON_BASE_TOOLS = (
+    _PLATFORM_BASE_TOOLS["rp2040"]
+    | _PLATFORM_BASE_TOOLS["esp"]
+    | _PLATFORM_BASE_TOOLS["canmv"]
+    | {"stm32_connect", "stm32_disconnect", "stm32_hardware_status"}
+)
+_KEYWORD_TOOL_GROUPS: tuple[tuple[tuple[str, ...], set[str]], ...] = (
+    (
+        (
+            "联网",
+            "网上",
+            "网络",
+            "搜索",
+            "web",
+            "browser",
+            "internet",
+            "官网",
+            "official",
+            "最新",
+            "latest",
+            "文档",
+            "docs",
+            "api",
+            "教程",
+            "tutorial",
+        ),
+        {"browser_search", "browser_open", "browser_extract_links", "browser_open_result"},
+    ),
+    (
+        ("git", "commit", "diff", "repo", "仓库", "提交", "版本", "状态"),
+        {"git_status", "git_diff", "git_commit"},
+    ),
+    (
+        ("docx", ".docx", "word", "报告", "合同"),
+        {
+            "read_docx",
+            "replace_docx_text",
+            "append_docx_content",
+            "inspect_docx_structure",
+            "insert_docx_content_after_heading",
+        },
+    ),
+    (
+        ("skill", "技能", "插件"),
+        {
+            "skill_list",
+            "skill_install",
+            "skill_uninstall",
+            "skill_enable",
+            "skill_disable",
+            "skill_info",
+            "skill_create",
+            "skill_export",
+            "skill_reload",
+        },
+    ),
+    (
+        ("member", "memory", "记忆", "经验", "remember", "记住"),
+        {"gary_save_member_memory", "gary_delete_member_memory"},
+    ),
+    (
+        ("shell", "bash", "命令", "终端", "terminal", "脚本", "script", "运行", "执行"),
+        {"execute_command", "execute_batch_commands", "run_python_code", "ask_human"},
+    ),
+    (
+        ("time", "时间", "日期", "几点"),
+        {"get_current_time"},
+    ),
+    (
+        ("rtos", "freertos", "任务", "task", "queue", "semaphore", "mutex", "hook"),
+        {
+            "stm32_compile_rtos",
+            "stm32_regen_bsp",
+            "stm32_analyze_fault_rtos",
+            "stm32_rtos_check_code",
+            "stm32_rtos_task_stats",
+            "stm32_rtos_suggest_config",
+            "stm32_rtos_plan_project",
+        },
+    ),
+    (
+        ("hardfault", "fault", "寄存器", "register", "串口", "serial", "日志", "log", "调试", "debug", "崩溃", "异常"),
+        {"stm32_read_registers", "stm32_analyze_fault", "stm32_serial_read", "stm32_reset_debug_attempts"},
+    ),
+    (
+        ("font", "字体", "字模", "glyph"),
+        {"stm32_generate_font"},
+    ),
+    (
+        ("pid", "控制"),
+        {"stm32_pid_tune", "stm32_pid_analyze"},
+    ),
+    (
+        ("i2c", "总线"),
+        {"stm32_i2c_scan"},
+    ),
+    (
+        ("pwm", "占空比"),
+        {"stm32_pwm_sweep"},
+    ),
+    (
+        ("memory map", "内存映射", "flash map", "ram map"),
+        {"stm32_memory_map"},
+    ),
+    (
+        ("pin", "引脚", "冲突"),
+        {"stm32_pin_conflict"},
+    ),
+    (
+        ("peripheral", "外设", "自检", "test"),
+        {"stm32_peripheral_test"},
+    ),
+    (
+        ("servo", "舵机"),
+        {"stm32_servo_calibrate"},
+    ),
+    (
+        ("power", "功耗", "电流"),
+        {"stm32_power_estimate"},
+    ),
+    (
+        ("signal", "capture", "波形", "采样", "示波"),
+        {"stm32_signal_capture"},
+    ),
+)
+_RESERVED_PREFIXES = {
+    "stm32",
+    "rp2040",
+    "esp",
+    "canmv",
+    "browser",
+    "web",
+    "git",
+    "gary",
+    "skill",
+    "read",
+    "create",
+    "str",
+    "list",
+    "execute",
+    "append",
+    "grep",
+    "fetch",
+    "get",
+    "ask",
+    "edit",
+    "insert",
+    "check",
+    "run",
+    "replace",
+    "inspect",
+}
+_CUSTOM_TOOL_STOPWORDS = {
+    "get",
+    "full",
+    "main",
+    "code",
+    "driver",
+    "atomic",
+    "discovery",
+    "elite",
+    "list",
+    "info",
+    "create",
+    "export",
+    "reload",
+    "enable",
+    "disable",
+}
 
 
 def _find_schema_index(name: str) -> Optional[int]:
@@ -1358,6 +1630,124 @@ def dispatch_tool_call(
         return {"error": str(exc)}
 
 
+def _schema_tool_name(schema: dict[str, Any]) -> str:
+    """Return the function tool name from a schema."""
+
+    return str(schema.get("function", {}).get("name") or "")
+
+
+def _tool_schemas_from_names(names: set[str]) -> list[dict[str, Any]]:
+    """Return registered schemas in stable order for the requested tool names."""
+
+    selected: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for schema in TOOL_SCHEMAS:
+        name = _schema_tool_name(schema)
+        if not name or name in seen or name not in names:
+            continue
+        selected.append(copy.deepcopy(schema))
+        seen.add(name)
+    return selected
+
+
+def _normalize_task_text(*parts: Any) -> str:
+    """Normalize task text for loose keyword matching."""
+
+    merged = " ".join(str(part or "") for part in parts if part)
+    return normalize_target_name(merged).lower()
+
+
+def _contains_any_keyword(text: str, keywords: tuple[str, ...]) -> bool:
+    """Return whether normalized task text contains any configured keyword."""
+
+    return any(normalize_target_name(keyword).lower() in text for keyword in keywords)
+
+
+def _contains_target_alias(text: str, aliases: tuple[str, ...]) -> bool:
+    """Return whether task text mentions any known target alias."""
+
+    return any(normalize_target_name(alias).lower() in text for alias in aliases)
+
+
+def _infer_requested_platforms(chip: str | None, user_input: str = "") -> set[str]:
+    """Infer the relevant platform families from the current chip and task text."""
+
+    platforms: set[str] = set()
+    current_platform = detect_target_platform(chip)
+    if current_platform != "unknown":
+        platforms.add(current_platform)
+
+    text = _normalize_task_text(user_input)
+    if not text:
+        return platforms or {"unknown"}
+
+    if "stm32" in text:
+        platforms.add("stm32")
+    if _contains_target_alias(text, RP2040_TARGET_CHOICES) or "rp2040" in text:
+        platforms.add("rp2040")
+    if _contains_target_alias(text, ESP_TARGET_CHOICES) or "esp32" in text or "esp8266" in text:
+        platforms.add("esp")
+    if _contains_target_alias(text, CANMV_TARGET_CHOICES) or "k230" in text or "canmv" in text:
+        platforms.add("canmv")
+    if _contains_target_alias(text, MICROPYTHON_TARGET_CHOICES) or "micropython" in text:
+        platforms.add("micropython")
+
+    return platforms or {"unknown"}
+
+
+def _custom_tool_matches_task(name: str, task_text: str) -> bool:
+    """Match custom skill-like tool names against the current task."""
+
+    if not task_text:
+        return False
+    prefix = name.split("_", 1)[0].lower()
+    if prefix in _RESERVED_PREFIXES:
+        return False
+    tokens = [token for token in re.split(r"[_\W]+", name.lower()) if token]
+    for token in tokens:
+        if token in _CUSTOM_TOOL_STOPWORDS:
+            continue
+        if len(token) >= 4 or any(ch.isdigit() for ch in token):
+            if token in task_text:
+                return True
+    return False
+
+
+def select_tool_schemas(
+    *,
+    chip: str | None = None,
+    user_input: str = "",
+) -> list[dict[str, Any]]:
+    """Select a smaller, task-relevant subset of tool schemas for the next turn."""
+
+    selected_names: set[str] = set(_GENERIC_FILE_TOOLS | _PROJECT_TOOLS)
+    task_text = _normalize_task_text(user_input)
+    requested_platforms = _infer_requested_platforms(chip, user_input)
+
+    if "micropython" in requested_platforms:
+        selected_names.update(_MICROPYTHON_BASE_TOOLS)
+    for platform in requested_platforms:
+        selected_names.update(_PLATFORM_BASE_TOOLS.get(platform, set()))
+
+    if "unknown" in requested_platforms and len(requested_platforms) == 1:
+        selected_names.update({"stm32_connect", "stm32_disconnect", "stm32_hardware_status"})
+
+    for keywords, tools in _KEYWORD_TOOL_GROUPS:
+        if _contains_any_keyword(task_text, keywords):
+            selected_names.update(tools)
+
+    if task_text:
+        for schema in TOOL_SCHEMAS:
+            name = _schema_tool_name(schema)
+            if not name or name in selected_names:
+                continue
+            if _custom_tool_matches_task(name, task_text):
+                selected_names.add(name)
+
+    schemas = _tool_schemas_from_names(selected_names)
+    return schemas or _tool_schemas_from_names(_GENERIC_FILE_TOOLS | _PLATFORM_BASE_TOOLS["unknown"])
+
+
 for _name, _handler in EXTRA_TOOLS_MAP.items():
     register_tool(_name, _handler)
 for _schema in EXTRA_TOOL_SCHEMAS:
@@ -1375,4 +1765,5 @@ __all__ = [
     "bind_tool_implementations",
     "dispatch_tool_call",
     "register_tool",
+    "select_tool_schemas",
 ]
