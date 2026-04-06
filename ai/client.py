@@ -6,6 +6,7 @@ import base64
 import copy
 import importlib
 import json
+import math
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -28,12 +29,7 @@ _AI_PRESETS = [
         "gemini-2.5-flash",
         "gemini",
     ),
-    (
-        "通义千问 (阿里云)",
-        "https://dashscope.aliyuncs.com/compatible-mode/v1",
-        "qwen-plus",
-        "openai",
-    ),
+    ("通义千问 (阿里云)", "https://dashscope.aliyuncs.com/compatible-mode/v1", "qwen-plus", "openai"),
     ("智谱 GLM", "https://open.bigmodel.cn/api/paas/v4/", "glm-4-flash", "openai"),
     ("Ollama (本地)", "http://127.0.0.1:11434/v1", "qwen2.5-coder:14b", "openai"),
     ("自定义 / Other", "", "", ""),
@@ -74,6 +70,11 @@ REGISTER_READ_DELAY = getattr(_cfg, "REGISTER_READ_DELAY", 0.3)
 
 _AI_CLIENT: Any | None = None
 _AI_CLIENT_SIGNATURE: tuple[str, str, str, float] | None = None
+
+try:
+    import tiktoken as _tiktoken  # type: ignore
+except Exception:  # pragma: no cover - optional dependency
+    _tiktoken = None
 
 
 @dataclass
@@ -222,12 +223,7 @@ def _read_ai_config() -> tuple[str, str, str, str]:
     """Read `(api_key, base_url, model, api_style)` from `config.py`."""
 
     if not _CONFIG_PATH.exists():
-        return (
-            AI_API_KEY,
-            AI_BASE_URL,
-            AI_MODEL,
-            _normalize_api_style(AI_API_STYLE, default="") or "",
-        )
+        return AI_API_KEY, AI_BASE_URL, AI_MODEL, _normalize_api_style(AI_API_STYLE, default="") or ""
     text = _CONFIG_PATH.read_text(encoding="utf-8")
 
     def _get(pattern: str) -> str:
@@ -333,6 +329,46 @@ def _mask_key(key: str) -> str:
     if not key:
         return "(未设置)"
     return key[:6] + "..." + key[-4:] if len(key) > 12 else "***"
+
+
+def _encoding_for_model(model: str | None):
+    """Best-effort tokenizer lookup for the configured model."""
+
+    if _tiktoken is None:
+        return None
+    try:
+        return _tiktoken.encoding_for_model(model or AI_MODEL)
+    except Exception:
+        try:
+            return _tiktoken.get_encoding("cl100k_base")
+        except Exception:
+            return None
+
+
+def _estimate_text_tokens(text: str, model: str | None = None) -> int:
+    """Estimate tokens for text, preferring tiktoken when available."""
+
+    source = str(text or "")
+    if not source:
+        return 0
+    encoding = _encoding_for_model(model)
+    if encoding is not None:
+        try:
+            return len(encoding.encode(source))
+        except Exception:
+            pass
+    # Fallback heuristic: UTF-8 bytes handle CJK far better than plain char counts.
+    return max(1, math.ceil(len(source.encode("utf-8")) / 3))
+
+
+def _estimate_json_tokens(payload: Any, model: str | None = None) -> int:
+    """Estimate tokens for one JSON-serializable payload."""
+
+    if isinstance(payload, str):
+        text = payload
+    else:
+        text = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+    return _estimate_text_tokens(text, model=model)
 
 
 def _api_key_is_placeholder(api_key: str) -> bool:
@@ -535,9 +571,7 @@ def probe_ai_connection(client: Any | None = None, timeout: float = 8.0) -> None
                 message = (payload.get("error") or {}).get("message") or response.text
             except Exception:
                 message = response.text
-            raise RuntimeError(
-                f"Anthropic probe failed: HTTP {response.status_code}: {message[:200]}"
-            )
+            raise RuntimeError(f"Anthropic probe failed: HTTP {response.status_code}: {message[:200]}")
         return
 
     active_client.models.list()
@@ -590,9 +624,7 @@ def _tool_message_to_anthropic_result_block(message: dict[str, Any]) -> dict[str
     return result
 
 
-def _messages_to_anthropic_payload(
-    messages: list[dict[str, Any]],
-) -> tuple[str, list[dict[str, Any]]]:
+def _messages_to_anthropic_payload(messages: list[dict[str, Any]]) -> tuple[str, list[dict[str, Any]]]:
     """Convert Gary's OpenAI-style history into Anthropic `system` + `messages`."""
 
     system_parts: list[str] = []
@@ -618,10 +650,7 @@ def _messages_to_anthropic_payload(
 
         if role == "tool":
             blocks: list[dict[str, Any]] = []
-            while (
-                idx < len(messages)
-                and str(messages[idx].get("role") or "").strip().lower() == "tool"
-            ):
+            while idx < len(messages) and str(messages[idx].get("role") or "").strip().lower() == "tool":
                 blocks.append(_tool_message_to_anthropic_result_block(messages[idx]))
                 idx += 1
             if blocks:
@@ -656,6 +685,49 @@ def _openai_tools_to_anthropic_tools(tools: Optional[list[dict[str, Any]]]) -> l
             }
         )
     return converted
+
+
+def _estimate_anthropic_request_tokens(
+    messages: list[dict[str, Any]],
+    tools: Optional[list[dict[str, Any]]],
+    tool_choice: str | dict[str, Any],
+    model: str | None,
+    temperature: float | None,
+    enable_thinking: bool,
+) -> dict[str, int | str]:
+    """Estimate Anthropic request tokens from the transformed payload."""
+
+    system_prompt, anthropic_messages = _messages_to_anthropic_payload(messages)
+    converted_tools = _openai_tools_to_anthropic_tools(tools)
+    payload: dict[str, Any] = {
+        "model": model or AI_MODEL,
+        "max_tokens": 8192,
+        "messages": anthropic_messages,
+        "stream": True,
+    }
+    if system_prompt:
+        payload["system"] = system_prompt
+    if enable_thinking:
+        payload["thinking"] = {"type": "enabled", "budget_tokens": 2048}
+    else:
+        payload["temperature"] = min(
+            1.0,
+            max(0.0, AI_TEMPERATURE if temperature is None else temperature),
+        )
+    if converted_tools:
+        payload["tools"] = converted_tools
+        tool_choice_payload = _anthropic_tool_choice_payload(tool_choice)
+        if tool_choice_payload is not None:
+            payload["tool_choice"] = tool_choice_payload
+    return {
+        "provider": "anthropic",
+        "message_tokens": _estimate_json_tokens(
+            {"system": system_prompt, "messages": anthropic_messages},
+            model=model,
+        ),
+        "tools_tokens": _estimate_json_tokens(converted_tools, model=model) if converted_tools else 0,
+        "total_tokens": _estimate_json_tokens(payload, model=model),
+    }
 
 
 def _normalize_anthropic_response(data: dict[str, Any]) -> _NormalizedChunk:
@@ -840,6 +912,7 @@ def _stream_chat_anthropic(
     tool_choice: str | dict[str, Any] = "auto",
     model: Optional[str] = None,
     temperature: Optional[float] = None,
+    enable_thinking: bool = False,
     client: Any | None = None,
     timeout: float = 180.0,
 ) -> Iterator[_NormalizedChunk]:
@@ -876,11 +949,11 @@ def _stream_chat_anthropic(
     response = requests.post(
         _anthropic_messages_endpoint(AI_BASE_URL),
         headers=_anthropic_request_headers(AI_API_KEY),
-        json=_build_payload(True),
+        json=_build_payload(enable_thinking),
         timeout=timeout,
         stream=True,
     )
-    if response.status_code >= 400 and _anthropic_should_retry_without_thinking(response):
+    if enable_thinking and response.status_code >= 400 and _anthropic_should_retry_without_thinking(response):
         response.close()
         response = requests.post(
             _anthropic_messages_endpoint(AI_BASE_URL),
@@ -1072,6 +1145,84 @@ def _tool_message_to_gemini_parts(message: dict[str, Any], types_mod: Any) -> li
     return [types_mod.Part(function_response=response)]
 
 
+def _assistant_message_to_gemini_part_dicts(message: dict[str, Any]) -> list[dict[str, Any]]:
+    """Convert an assistant message into JSON-friendly Gemini-style parts."""
+
+    parts: list[dict[str, Any]] = []
+    reasoning = str(message.get("reasoning_content") or "")
+    if reasoning:
+        parts.append({"text": reasoning, "thought": True})
+
+    content = str(message.get("content") or "")
+    if content:
+        parts.append({"text": content})
+
+    for tool_call in message.get("tool_calls") or []:
+        func = tool_call.get("function") or {}
+        args_text = str(func.get("arguments") or "").strip()
+        try:
+            args = json.loads(args_text) if args_text else {}
+        except Exception:
+            args = {"raw_arguments": args_text}
+        part: dict[str, Any] = {
+            "function_call": {
+                "id": tool_call.get("id") or None,
+                "name": func.get("name") or None,
+                "args": args,
+            }
+        }
+        thought_signature = func.get("thought_signature")
+        if thought_signature:
+            part["thought_signature"] = thought_signature
+        parts.append(part)
+    return parts
+
+
+def _tool_message_to_gemini_part_dicts(message: dict[str, Any]) -> list[dict[str, Any]]:
+    """Convert a tool response message into JSON-friendly Gemini-style parts."""
+
+    return [
+        {
+            "function_response": {
+                "id": message.get("tool_call_id") or None,
+                "name": str(message.get("name") or "").strip() or None,
+                "response": _coerce_tool_payload(message.get("content")),
+            }
+        }
+    ]
+
+
+def _messages_to_gemini_payload_dict(messages: list[dict[str, Any]]) -> tuple[str, list[dict[str, Any]]]:
+    """Convert message history into a JSON-friendly Gemini request payload."""
+
+    system_parts: list[str] = []
+    contents: list[dict[str, Any]] = []
+
+    for message in messages:
+        role = str(message.get("role") or "").strip().lower()
+        if role == "system":
+            text = str(message.get("content") or "").strip()
+            if text:
+                system_parts.append(text)
+            continue
+
+        if role == "assistant":
+            parts = _assistant_message_to_gemini_part_dicts(message)
+            target_role = "model"
+        elif role == "tool":
+            parts = _tool_message_to_gemini_part_dicts(message)
+            target_role = "user"
+        else:
+            text = str(message.get("content") or "")
+            parts = [{"text": text}] if text else []
+            target_role = "user"
+
+        if parts:
+            contents.append({"role": target_role, "parts": parts})
+
+    return "\n\n".join(system_parts).strip(), contents
+
+
 def _messages_to_gemini_payload(
     messages: list[dict[str, Any]], types_mod: Any
 ) -> tuple[str, list[Any]]:
@@ -1130,6 +1281,63 @@ def _openai_tools_to_gemini_tools(
     if not declarations:
         return []
     return [types_mod.Tool(function_declarations=declarations)]
+
+
+def _openai_tools_to_gemini_tool_dicts(tools: Optional[list[dict[str, Any]]]) -> list[dict[str, Any]]:
+    """Convert OpenAI tool schemas into JSON-friendly Gemini declarations."""
+
+    if not tools:
+        return []
+
+    declarations: list[dict[str, Any]] = []
+    for tool in tools:
+        if tool.get("type") != "function":
+            continue
+        func = tool.get("function") or {}
+        declarations.append(
+            {
+                "name": func.get("name") or "",
+                "description": func.get("description") or "",
+                "parameters_json_schema": func.get("parameters")
+                or {"type": "object", "properties": {}, "required": []},
+            }
+        )
+    if not declarations:
+        return []
+    return [{"function_declarations": declarations}]
+
+
+def _estimate_gemini_request_tokens(
+    messages: list[dict[str, Any]],
+    tools: Optional[list[dict[str, Any]]],
+    model: str | None,
+    temperature: float | None,
+    enable_thinking: bool,
+) -> dict[str, int | str]:
+    """Estimate Gemini request tokens from a JSON-friendly proxy payload."""
+
+    system_instruction, contents = _messages_to_gemini_payload_dict(messages)
+    converted_tools = _openai_tools_to_gemini_tool_dicts(tools)
+    payload: dict[str, Any] = {
+        "model": model or AI_MODEL,
+        "contents": contents,
+        "config": {
+            "system_instruction": system_instruction or None,
+            "temperature": AI_TEMPERATURE if temperature is None else temperature,
+            "tools": converted_tools or None,
+            "automatic_function_calling": {"disable": True},
+            "thinking_config": {"include_thoughts": bool(enable_thinking)},
+        },
+    }
+    return {
+        "provider": "gemini",
+        "message_tokens": _estimate_json_tokens(
+            {"system_instruction": system_instruction, "contents": contents},
+            model=model,
+        ),
+        "tools_tokens": _estimate_json_tokens(converted_tools, model=model) if converted_tools else 0,
+        "total_tokens": _estimate_json_tokens(payload, model=model),
+    }
 
 
 def _normalize_gemini_chunk(chunk: Any) -> _NormalizedChunk:
@@ -1201,6 +1409,7 @@ def _stream_chat_gemini(
     tools: Optional[list[dict[str, Any]]] = None,
     model: Optional[str] = None,
     temperature: Optional[float] = None,
+    enable_thinking: bool = False,
     client: Any | None = None,
     timeout: float = 180.0,
 ) -> Iterator[_NormalizedChunk]:
@@ -1217,7 +1426,7 @@ def _stream_chat_gemini(
         temperature=AI_TEMPERATURE if temperature is None else temperature,
         tools=_openai_tools_to_gemini_tools(tools, types_mod) or None,
         automatic_function_calling=types_mod.AutomaticFunctionCallingConfig(disable=True),
-        thinking_config=types_mod.ThinkingConfig(include_thoughts=True),
+        thinking_config=types_mod.ThinkingConfig(include_thoughts=bool(enable_thinking)),
     )
 
     stream = active_client.models.generate_content_stream(
@@ -1229,6 +1438,45 @@ def _stream_chat_gemini(
         yield _normalize_gemini_chunk(chunk)
 
 
+def estimate_request_tokens(
+    *,
+    messages: list[dict[str, Any]],
+    tools: Optional[list[dict[str, Any]]] = None,
+    tool_choice: str | dict[str, Any] = "auto",
+    model: Optional[str] = None,
+    temperature: Optional[float] = None,
+    enable_thinking: bool = False,
+) -> dict[str, int | str]:
+    """Estimate input tokens for the next request payload."""
+
+    target_model = model or AI_MODEL
+    kind = _provider_kind(AI_BASE_URL, target_model, AI_API_STYLE)
+    if kind == "gemini":
+        return _estimate_gemini_request_tokens(
+            messages, tools, target_model, temperature, enable_thinking
+        )
+    if kind == "anthropic":
+        return _estimate_anthropic_request_tokens(
+            messages, tools, tool_choice, target_model, temperature, enable_thinking
+        )
+
+    payload: dict[str, Any] = {
+        "model": target_model,
+        "messages": messages,
+        "temperature": AI_TEMPERATURE if temperature is None else temperature,
+        "stream": True,
+    }
+    if tools is not None:
+        payload["tools"] = tools
+        payload["tool_choice"] = tool_choice
+    return {
+        "provider": "openai",
+        "message_tokens": _estimate_json_tokens(messages, model=target_model),
+        "tools_tokens": _estimate_json_tokens(tools, model=target_model) if tools else 0,
+        "total_tokens": _estimate_json_tokens(payload, model=target_model),
+    }
+
+
 def stream_chat(
     *,
     messages: list[dict[str, Any]],
@@ -1236,6 +1484,7 @@ def stream_chat(
     tool_choice: str | dict[str, Any] = "auto",
     model: Optional[str] = None,
     temperature: Optional[float] = None,
+    enable_thinking: bool = False,
     client: Any | None = None,
     timeout: float = 180.0,
 ) -> Any:
@@ -1248,6 +1497,7 @@ def stream_chat(
             tools=tools,
             model=model,
             temperature=temperature,
+            enable_thinking=enable_thinking,
             client=client,
             timeout=timeout,
         )
@@ -1258,6 +1508,7 @@ def stream_chat(
             tool_choice=tool_choice,
             model=model,
             temperature=temperature,
+            enable_thinking=enable_thinking,
             client=client,
             timeout=timeout,
         )
@@ -1307,5 +1558,6 @@ __all__ = [
     "probe_ai_connection",
     "provider_name",
     "reload_ai_config",
+    "estimate_request_tokens",
     "stream_chat",
 ]
