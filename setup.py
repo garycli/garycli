@@ -486,12 +486,7 @@ _AI_PRESETS = [
         "gemini-2.5-flash",
         "gemini",
     ),
-    (
-        "通义千问 (阿里云)",
-        "https://dashscope.aliyuncs.com/compatible-mode/v1",
-        "qwen-plus",
-        "openai",
-    ),
+    ("通义千问 (阿里云)", "https://dashscope.aliyuncs.com/compatible-mode/v1", "qwen-plus", "openai"),
     ("智谱 GLM", "https://open.bigmodel.cn/api/paas/v4/", "glm-4-flash", "openai"),
     ("Ollama (本地无需Key)", "http://127.0.0.1:11434/v1", "qwen2.5-coder:14b", "openai"),
     ("自定义 / Other", "", "", ""),
@@ -667,11 +662,7 @@ def configure_ai(auto: bool):
     default_model = (
         preset_model
         if preset_model
-        else (
-            current_model_for_style
-            if current_model_for_style
-            else default_models.get(api_style, "gpt-4o")
-        )
+        else (current_model_for_style if current_model_for_style else default_models.get(api_style, "gpt-4o"))
     )
     hint = f" [{_c('36', default_model)}]"
 
@@ -1184,6 +1175,7 @@ SEARXNG_DEFAULT_GIT_BRANCH = "master"
 SEARXNG_NATIVE_REPO_DIR = SEARXNG_DIR / "native-src"
 SEARXNG_DEFAULT_WSL_DISTRO = "Ubuntu"
 SEARXNG_DEFAULT_WSL_REPO_DIR = "~/.garycli/searxng"
+WINDOWS_DOCKER_DESKTOP_PACKAGE = "Docker.DockerDesktop"
 
 
 def _searxng_url() -> str:
@@ -1229,6 +1221,8 @@ def _searxng_wsl_repo_dir() -> str:
 
 
 def _container_runtime() -> Optional[str]:
+    if IS_WIN:
+        _refresh_windows_docker_cli()
     for candidate in ("docker", "podman"):
         if _which(candidate):
             return candidate
@@ -1239,6 +1233,148 @@ def _wsl_runtime() -> Optional[str]:
     for candidate in ("wsl", "wsl.exe"):
         if _which(candidate):
             return candidate
+    return None
+
+
+def _prepend_process_path(path: Path | str):
+    target = str(Path(path))
+    current = os.environ.get("PATH", "")
+    parts = [part for part in current.split(os.pathsep) if part]
+    if target not in parts:
+        os.environ["PATH"] = target + (os.pathsep + current if current else "")
+
+
+def _windows_docker_cli_dir() -> Optional[Path]:
+    candidates = []
+    for env_name in ("ProgramFiles", "ProgramW6432"):
+        base = os.environ.get(env_name)
+        if base:
+            candidates.append(Path(base) / "Docker" / "Docker" / "resources" / "bin")
+    candidates.append(Path("C:/Program Files/Docker/Docker/resources/bin"))
+    for candidate in candidates:
+        if (candidate / "docker.exe").exists():
+            return candidate
+    return None
+
+
+def _docker_desktop_exe_path() -> Optional[Path]:
+    candidates = []
+    for env_name in ("ProgramFiles", "ProgramW6432"):
+        base = os.environ.get(env_name)
+        if base:
+            candidates.append(Path(base) / "Docker" / "Docker" / "Docker Desktop.exe")
+    candidates.append(Path("C:/Program Files/Docker/Docker/Docker Desktop.exe"))
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def _refresh_windows_docker_cli() -> Optional[str]:
+    docker = _which("docker")
+    if docker:
+        return docker
+    if not IS_WIN:
+        return None
+    cli_dir = _windows_docker_cli_dir()
+    if cli_dir:
+        _prepend_process_path(cli_dir)
+        return _which("docker")
+    return None
+
+
+def _wait_for_container_runtime_ready(runtime: str, timeout_seconds: int = 180) -> bool:
+    import time
+
+    deadline = time.time() + timeout_seconds
+    while time.time() < deadline:
+        result = _run([runtime, "info"], timeout=15)
+        if result.returncode == 0:
+            return True
+        time.sleep(5)
+    return False
+
+
+def _install_windows_wsl_distribution() -> bool:
+    runtime = _wsl_runtime()
+    if not runtime:
+        warn("未找到 wsl.exe，无法自动准备 Docker Desktop 依赖的 WSL 环境")
+        info("请先在管理员 PowerShell 中执行: wsl --install -d Ubuntu")
+        return False
+
+    distros = _list_wsl_distros(runtime)
+    if distros:
+        ok(f"已检测到 WSL 发行版: {distros[0]}")
+        return True
+
+    distro = _searxng_wsl_distro()
+    step(f"自动安装 WSL 发行版: {distro}")
+    result = _run([runtime, "--install", "-d", distro], capture=False, timeout=None)
+    if result.returncode != 0:
+        warn("WSL 安装命令执行失败")
+        info(f"请在管理员 PowerShell 中重试: {runtime} --install -d {distro}")
+        return False
+
+    warn("WSL 已开始安装，通常需要重启或重新登录后再继续安装 Docker Desktop / SearXNG")
+    return False
+
+
+def _ensure_windows_docker_desktop(auto: bool, *, explicit: bool = False) -> Optional[str]:
+    docker = _refresh_windows_docker_cli()
+    if docker and _wait_for_container_runtime_ready("docker", timeout_seconds=10):
+        ok("Docker Desktop 已可用")
+        return "docker"
+
+    if not IS_WIN:
+        return None
+
+    if not _install_windows_wsl_distribution():
+        return None
+
+    if not (auto or explicit or ask("未找到 Docker Desktop，是否现在自动安装并启动？", default="y")):
+        info("已跳过 Docker Desktop 自动安装")
+        return None
+
+    winget = _which("winget")
+    choco = _which("choco")
+    if winget:
+        step("使用 winget 安装 Docker Desktop")
+        install_cmd = [
+            winget,
+            "install",
+            "-e",
+            "--id",
+            WINDOWS_DOCKER_DESKTOP_PACKAGE,
+            "--accept-package-agreements",
+            "--accept-source-agreements",
+        ]
+    elif choco:
+        step("使用 Chocolatey 安装 Docker Desktop")
+        install_cmd = [choco, "install", "docker-desktop", "-y"]
+    else:
+        warn("未找到 winget / choco，无法自动安装 Docker Desktop")
+        info("请先手动安装 Docker Desktop: https://docs.docker.com/desktop/setup/install/windows-install/")
+        return None
+
+    result = _run(install_cmd, capture=False, timeout=None)
+    if result.returncode != 0:
+        warn("Docker Desktop 安装失败")
+        return None
+
+    docker = _refresh_windows_docker_cli()
+    desktop_exe = _docker_desktop_exe_path()
+    if desktop_exe:
+        step("启动 Docker Desktop")
+        _run([str(desktop_exe)], capture=False, timeout=30)
+    else:
+        warn("未找到 Docker Desktop.exe，可能需要用户手动首次启动一次")
+
+    if docker and _wait_for_container_runtime_ready("docker", timeout_seconds=240):
+        ok("Docker Desktop 已启动并可用")
+        return "docker"
+
+    warn("Docker Desktop 已安装，但 Docker 引擎尚未就绪")
+    info("请完成 Docker Desktop 的首次初始化后，再重新执行：python setup.py --searxng")
     return None
 
 
@@ -1476,15 +1612,21 @@ def setup_local_searxng(auto: bool, *, explicit: bool = False):
 
     runtime = _container_runtime()
     if not runtime:
-        warn("未找到 docker / podman，容器一键安装不可用")
-        info("可改用官方原生安装：python setup.py --searxng-native")
-        if (
-            not auto
-            and not explicit
-            and ask("改用官方原生方式安装本地 SearXNG（需要 git + sudo）？", default="y")
-        ):
-            setup_native_searxng(auto=True, explicit=True)
-        return
+        if IS_WIN:
+            info("Windows 未检测到可用的 Docker 运行时，尝试自动安装 Docker Desktop")
+            runtime = _ensure_windows_docker_desktop(auto or explicit, explicit=explicit)
+        if runtime:
+            ok(f"容器运行时已就绪: {runtime}")
+        else:
+            warn("未找到 docker / podman，容器一键安装不可用")
+            if IS_WIN:
+                info("Windows 上可重试：python setup.py --searxng，脚本会继续尝试安装 Docker Desktop")
+                info("若 Docker Desktop 已安装，请先完成首次启动初始化，再重新执行当前命令")
+                return
+            info("可改用官方原生安装：python setup.py --searxng-native")
+            if not auto and not explicit and ask("改用官方原生方式安装本地 SearXNG（需要 git + sudo）？", default="y"):
+                setup_native_searxng(auto=True, explicit=True)
+            return
 
     if not (
         auto
@@ -2014,9 +2156,7 @@ def _install_gary_unix(auto: bool):
 def _install_gary_win(auto: bool):
     install_dir = _resolve_win_install_dir()
     gary_bat = install_dir / "gary.bat"
-    expected_content = _GARY_BAT.format(
-        agent_script=str(AGENT_SCRIPT), python=_active_python_path()
-    )
+    expected_content = _GARY_BAT.format(agent_script=str(AGENT_SCRIPT), python=_active_python_path())
 
     if gary_bat.exists():
         existing = gary_bat.read_text(encoding="utf-8", errors="ignore")
