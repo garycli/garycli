@@ -29,7 +29,12 @@ _AI_PRESETS = [
         "gemini-2.5-flash",
         "gemini",
     ),
-    ("通义千问 (阿里云)", "https://dashscope.aliyuncs.com/compatible-mode/v1", "qwen-plus", "openai"),
+    (
+        "通义千问 (阿里云)",
+        "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "qwen-plus",
+        "openai",
+    ),
     ("智谱 GLM", "https://open.bigmodel.cn/api/paas/v4/", "glm-4-flash", "openai"),
     ("Ollama (本地)", "http://127.0.0.1:11434/v1", "qwen2.5-coder:14b", "openai"),
     ("自定义 / Other", "", "", ""),
@@ -223,7 +228,12 @@ def _read_ai_config() -> tuple[str, str, str, str]:
     """Read `(api_key, base_url, model, api_style)` from `config.py`."""
 
     if not _CONFIG_PATH.exists():
-        return AI_API_KEY, AI_BASE_URL, AI_MODEL, _normalize_api_style(AI_API_STYLE, default="") or ""
+        return (
+            AI_API_KEY,
+            AI_BASE_URL,
+            AI_MODEL,
+            _normalize_api_style(AI_API_STYLE, default="") or "",
+        )
     text = _CONFIG_PATH.read_text(encoding="utf-8")
 
     def _get(pattern: str) -> str:
@@ -571,7 +581,9 @@ def probe_ai_connection(client: Any | None = None, timeout: float = 8.0) -> None
                 message = (payload.get("error") or {}).get("message") or response.text
             except Exception:
                 message = response.text
-            raise RuntimeError(f"Anthropic probe failed: HTTP {response.status_code}: {message[:200]}")
+            raise RuntimeError(
+                f"Anthropic probe failed: HTTP {response.status_code}: {message[:200]}"
+            )
         return
 
     active_client.models.list()
@@ -624,7 +636,9 @@ def _tool_message_to_anthropic_result_block(message: dict[str, Any]) -> dict[str
     return result
 
 
-def _messages_to_anthropic_payload(messages: list[dict[str, Any]]) -> tuple[str, list[dict[str, Any]]]:
+def _messages_to_anthropic_payload(
+    messages: list[dict[str, Any]],
+) -> tuple[str, list[dict[str, Any]]]:
     """Convert Gary's OpenAI-style history into Anthropic `system` + `messages`."""
 
     system_parts: list[str] = []
@@ -650,7 +664,10 @@ def _messages_to_anthropic_payload(messages: list[dict[str, Any]]) -> tuple[str,
 
         if role == "tool":
             blocks: list[dict[str, Any]] = []
-            while idx < len(messages) and str(messages[idx].get("role") or "").strip().lower() == "tool":
+            while (
+                idx < len(messages)
+                and str(messages[idx].get("role") or "").strip().lower() == "tool"
+            ):
                 blocks.append(_tool_message_to_anthropic_result_block(messages[idx]))
                 idx += 1
             if blocks:
@@ -725,7 +742,9 @@ def _estimate_anthropic_request_tokens(
             {"system": system_prompt, "messages": anthropic_messages},
             model=model,
         ),
-        "tools_tokens": _estimate_json_tokens(converted_tools, model=model) if converted_tools else 0,
+        "tools_tokens": (
+            _estimate_json_tokens(converted_tools, model=model) if converted_tools else 0
+        ),
         "total_tokens": _estimate_json_tokens(payload, model=model),
     }
 
@@ -953,7 +972,11 @@ def _stream_chat_anthropic(
         timeout=timeout,
         stream=True,
     )
-    if enable_thinking and response.status_code >= 400 and _anthropic_should_retry_without_thinking(response):
+    if (
+        enable_thinking
+        and response.status_code >= 400
+        and _anthropic_should_retry_without_thinking(response)
+    ):
         response.close()
         response = requests.post(
             _anthropic_messages_endpoint(AI_BASE_URL),
@@ -1192,7 +1215,9 @@ def _tool_message_to_gemini_part_dicts(message: dict[str, Any]) -> list[dict[str
     ]
 
 
-def _messages_to_gemini_payload_dict(messages: list[dict[str, Any]]) -> tuple[str, list[dict[str, Any]]]:
+def _messages_to_gemini_payload_dict(
+    messages: list[dict[str, Any]],
+) -> tuple[str, list[dict[str, Any]]]:
     """Convert message history into a JSON-friendly Gemini request payload."""
 
     system_parts: list[str] = []
@@ -1283,7 +1308,9 @@ def _openai_tools_to_gemini_tools(
     return [types_mod.Tool(function_declarations=declarations)]
 
 
-def _openai_tools_to_gemini_tool_dicts(tools: Optional[list[dict[str, Any]]]) -> list[dict[str, Any]]:
+def _openai_tools_to_gemini_tool_dicts(
+    tools: Optional[list[dict[str, Any]]],
+) -> list[dict[str, Any]]:
     """Convert OpenAI tool schemas into JSON-friendly Gemini declarations."""
 
     if not tools:
@@ -1335,7 +1362,9 @@ def _estimate_gemini_request_tokens(
             {"system_instruction": system_instruction, "contents": contents},
             model=model,
         ),
-        "tools_tokens": _estimate_json_tokens(converted_tools, model=model) if converted_tools else 0,
+        "tools_tokens": (
+            _estimate_json_tokens(converted_tools, model=model) if converted_tools else 0
+        ),
         "total_tokens": _estimate_json_tokens(payload, model=model),
     }
 
