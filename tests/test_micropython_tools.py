@@ -148,7 +148,8 @@ def test_micropython_flash_syncs_explicit_file_before_upload(tmp_path, monkeypat
     monkeypatch.setattr(
         "core.micropython_tools.sync_latest_workspace",
         lambda code, chip=None: (
-            sync_calls.append((code, chip or "")) or {
+            sync_calls.append((code, chip or ""))
+            or {
                 "success": True,
                 "path": "workspace/projects/latest_workspace/main.py",
                 "source_file": "main.py",
@@ -191,7 +192,8 @@ def test_micropython_flash_uses_last_code_when_latest_workspace_missing(monkeypa
     monkeypatch.setattr(
         "core.micropython_tools.sync_latest_workspace",
         lambda code, chip=None: (
-            sync_calls.append((code, chip or "")) or {
+            sync_calls.append((code, chip or ""))
+            or {
                 "success": True,
                 "path": "workspace/projects/latest_workspace/main.py",
                 "source_file": "main.py",
@@ -268,7 +270,9 @@ def test_micropython_auto_sync_cycle_explains_raw_repl_failure(monkeypatch):
         "core.micropython_tools.micropython_compile",
         lambda *args, **kwargs: {"success": True, "message": "ok"},
     )
-    monkeypatch.setattr("core.micropython_tools.detect_serial_ports", lambda **kwargs: ["/dev/ttyACM0"])
+    monkeypatch.setattr(
+        "core.micropython_tools.detect_serial_ports", lambda **kwargs: ["/dev/ttyACM0"]
+    )
     monkeypatch.setattr(
         "core.micropython_tools.micropython_flash",
         lambda **kwargs: {
