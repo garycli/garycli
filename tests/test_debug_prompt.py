@@ -12,6 +12,8 @@ def test_micropython_runtime_debug_prompt_requires_web_verification_for_unknown_
 
     assert "先联网搜索官方文档 / 示例验证" in prompt
     assert "先联网查证" in prompt
+    assert "canmv_soft_reset" in prompt
+    assert "gary_run.py" in prompt
 
 
 def test_micropython_compile_debug_prompt_requires_web_verification_for_unknown_imports():
@@ -21,3 +23,4 @@ def test_micropython_compile_debug_prompt_requires_web_verification_for_unknown_
 
     assert "先用 `browser_search -> browser_open_result`" in prompt
     assert "板级专有 API" in prompt
+    assert "while_loop_missing_delay" in prompt

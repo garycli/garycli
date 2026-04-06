@@ -93,6 +93,7 @@ def test_tokens_estimate_uses_request_payload_and_tools(monkeypatch):
     ]
 
     monkeypatch.setattr("core.agent.TOOL_SCHEMAS", tool_schemas)
+    monkeypatch.setattr("core.agent.select_tool_schemas", lambda chip, user_input="": tool_schemas)
     monkeypatch.setattr("core.agent.AI_MODEL", "gpt-4o")
     monkeypatch.setattr("core.agent.AI_TEMPERATURE", 1)
 
@@ -160,9 +161,7 @@ def test_context_usage_reports_remaining_percent(monkeypatch):
 def test_context_usage_starts_full_before_first_user_turn(monkeypatch):
     """The initial status should show a full remaining budget before any chat turns."""
 
-    monkeypatch.setattr(
-        "core.agent.estimate_request_tokens", lambda **kwargs: {"total_tokens": 12000}
-    )
+    monkeypatch.setattr("core.agent.estimate_request_tokens", lambda **kwargs: {"total_tokens": 12000})
     monkeypatch.setattr("core.agent.get_context", lambda: SimpleNamespace(thinking_enabled=False))
     monkeypatch.setattr("core.agent.TOOL_SCHEMAS", [])
     monkeypatch.setattr("core.agent.AI_MODEL", "gpt-4o")
@@ -176,6 +175,50 @@ def test_context_usage_starts_full_before_first_user_turn(monkeypatch):
 
     assert usage["used_tokens"] == 0
     assert usage["left_percent"] == 100
+
+
+def test_context_usage_uses_selected_tool_subset(monkeypatch):
+    """Token estimation should use the dynamically selected tool subset."""
+
+    captured = {}
+    selected_tools = [
+        {
+            "type": "function",
+            "function": {
+                "name": "browser_search",
+                "description": "搜索网页",
+                "parameters": {"type": "object", "properties": {}, "required": []},
+            },
+        }
+    ]
+
+    monkeypatch.setattr(
+        "core.agent.select_tool_schemas",
+        lambda chip, user_input="": selected_tools,
+    )
+
+    def fake_estimate_request_tokens(**kwargs):
+        captured["tools"] = kwargs.get("tools")
+        return {"total_tokens": 123}
+
+    monkeypatch.setattr("core.agent.estimate_request_tokens", fake_estimate_request_tokens)
+    monkeypatch.setattr("core.agent.get_context", lambda: SimpleNamespace(chip="STM32F103C8T6", thinking_enabled=False))
+    monkeypatch.setattr("core.agent.AI_MODEL", "gpt-4o")
+    monkeypatch.setattr("core.agent.AI_TEMPERATURE", 1)
+
+    agent = object.__new__(STM32Agent)
+    agent._tool_schema_cache = []
+    agent._tool_schema_signature = None
+    agent._current_tool_task_hint = "搜索文档"
+    agent._pending_system_hint = ""
+    agent.messages = [
+        {"role": "system", "content": "base prompt"},
+        {"role": "user", "content": "search docs"},
+    ]
+
+    agent._context_usage()
+
+    assert captured["tools"] == selected_tools
 
 
 def test_compose_system_prompt_caches_static_and_dynamic_parts(monkeypatch):
@@ -196,9 +239,7 @@ def test_compose_system_prompt_caches_static_and_dynamic_parts(monkeypatch):
     monkeypatch.setattr("core.agent.get_context", lambda: ctx)
     monkeypatch.setattr(
         "core.agent.build_system_prompt",
-        lambda chip, language, hw_connected: build_calls.__setitem__(
-            "system", build_calls["system"] + 1
-        )
+        lambda chip, language, hw_connected: build_calls.__setitem__("system", build_calls["system"] + 1)
         or "static-base",
     )
     monkeypatch.setattr(

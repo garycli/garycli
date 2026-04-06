@@ -23,9 +23,7 @@ def test_handle_enable_thinking_sets_session_flag(monkeypatch):
     printed: list[str] = []
 
     monkeypatch.setattr("tui.commands.get_context", lambda: ctx)
-    monkeypatch.setattr(
-        "tui.commands.console.print", lambda *args, **kwargs: printed.append(str(args[0]))
-    )
+    monkeypatch.setattr("tui.commands.console.print", lambda *args, **kwargs: printed.append(str(args[0])))
 
     handled = handle_slash_command(
         agent=SimpleNamespace(),
@@ -48,9 +46,7 @@ def test_handle_enable_thinking_is_idempotent(monkeypatch):
     printed: list[str] = []
 
     monkeypatch.setattr("tui.commands.get_context", lambda: ctx)
-    monkeypatch.setattr(
-        "tui.commands.console.print", lambda *args, **kwargs: printed.append(str(args[0]))
-    )
+    monkeypatch.setattr("tui.commands.console.print", lambda *args, **kwargs: printed.append(str(args[0])))
 
     handled = handle_slash_command(
         agent=SimpleNamespace(),
@@ -73,9 +69,7 @@ def test_handle_disable_thinking_sets_session_flag(monkeypatch):
     printed: list[str] = []
 
     monkeypatch.setattr("tui.commands.get_context", lambda: ctx)
-    monkeypatch.setattr(
-        "tui.commands.console.print", lambda *args, **kwargs: printed.append(str(args[0]))
-    )
+    monkeypatch.setattr("tui.commands.console.print", lambda *args, **kwargs: printed.append(str(args[0])))
 
     handled = handle_slash_command(
         agent=SimpleNamespace(),

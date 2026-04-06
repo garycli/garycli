@@ -53,3 +53,12 @@ def test_build_web_research_hint_contains_browse_first_directive():
 
     assert "回答前先用 `browser_search`" in zh_hint
     assert "Before answering, use `browser_search`" in en_hint
+
+
+def test_build_system_prompt_for_micropython_mentions_managed_bootstrap_paths():
+    """MicroPython prompts should expose the managed boot.py + gary_run.py board paths."""
+
+    prompt = build_system_prompt("CANMV_K230", "zh", hw_connected=True)
+
+    assert "/sdcard/boot.py" in prompt
+    assert "/sdcard/gary_run.py" in prompt
