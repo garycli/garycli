@@ -119,7 +119,9 @@ def _enter_raw_repl(ser: Any, *, console: Any = None) -> dict[str, Any]:
         if attempt == 0:
             time.sleep(0.2)
     failure = _raw_repl_failure_result(banner)
-    _console_print(console, f"[yellow]  MicroPython raw REPL 响应异常: {failure.get('banner', '')[:120]}[/]")
+    _console_print(
+        console, f"[yellow]  MicroPython raw REPL 响应异常: {failure.get('banner', '')[:120]}[/]"
+    )
     return failure
 
 
@@ -544,7 +546,11 @@ def scan_micropython_boards(
         "success": bool(boards),
         "ports": ports or [],
         "boards": boards,
-        "message": f"检测到 {len(boards)} 个可识别的 MicroPython 设备" if boards else "未检测到可识别的 MicroPython 设备",
+        "message": (
+            f"检测到 {len(boards)} 个可识别的 MicroPython 设备"
+            if boards
+            else "未检测到可识别的 MicroPython 设备"
+        ),
     }
 
 
