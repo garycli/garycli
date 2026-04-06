@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 from ai import client as ai_client
 
@@ -109,6 +110,40 @@ def test_messages_to_anthropic_payload_preserves_thinking_blocks():
     assert converted[0]["content"][1] == {"type": "text", "text": "final"}
 
 
+def test_estimate_request_tokens_counts_tools_and_messages(monkeypatch):
+    """Token estimate should include both message history and tool schemas."""
+
+    monkeypatch.setattr(ai_client, "AI_BASE_URL", "https://api.openai.com/v1")
+    monkeypatch.setattr(ai_client, "AI_API_STYLE", "openai")
+    monkeypatch.setattr(ai_client, "AI_MODEL", "gpt-4o")
+
+    messages = [
+        {"role": "system", "content": "你是 Gary"},
+        {"role": "user", "content": "帮我搜索 K230 文档"},
+    ]
+    tools = [
+        {
+            "type": "function",
+            "function": {
+                "name": "browser_search",
+                "description": "搜索网页",
+                "parameters": {
+                    "type": "object",
+                    "properties": {"query": {"type": "string"}},
+                    "required": ["query"],
+                },
+            },
+        }
+    ]
+
+    estimate = ai_client.estimate_request_tokens(messages=messages, tools=tools, tool_choice="auto")
+
+    assert estimate["provider"] == "openai"
+    assert estimate["message_tokens"] > 0
+    assert estimate["tools_tokens"] > 0
+    assert estimate["total_tokens"] > estimate["message_tokens"]
+
+
 def test_stream_chat_anthropic_emits_streaming_thinking_and_tools(monkeypatch):
     """Anthropic SSE events should become normalized thinking/text/tool deltas."""
 
@@ -118,22 +153,24 @@ def test_stream_chat_anthropic_emits_streaming_thinking_and_tools(monkeypatch):
 
         def iter_lines(self, decode_unicode=True):
             events = [
-                "event: content_block_start\n"
+                'event: content_block_start\n'
                 'data: {"type":"content_block_start","index":0,"content_block":{"type":"thinking"}}\n\n',
-                "event: content_block_delta\n"
+                'event: content_block_delta\n'
                 'data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"plan "}}\n\n',
-                "event: content_block_delta\n"
+                'event: content_block_delta\n'
                 'data: {"type":"content_block_delta","index":0,"delta":{"type":"signature_delta","signature":"sig-1"}}\n\n',
-                "event: content_block_stop\n" 'data: {"type":"content_block_stop","index":0}\n\n',
-                "event: content_block_start\n"
+                'event: content_block_stop\n'
+                'data: {"type":"content_block_stop","index":0}\n\n',
+                'event: content_block_start\n'
                 'data: {"type":"content_block_start","index":1,"content_block":{"type":"text","text":"hello "}}\n\n',
-                "event: content_block_delta\n"
+                'event: content_block_delta\n'
                 'data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"world"}}\n\n',
-                "event: content_block_start\n"
+                'event: content_block_start\n'
                 'data: {"type":"content_block_start","index":2,"content_block":{"type":"tool_use","id":"call_1","name":"foo","input":{}}}\n\n',
-                "event: content_block_delta\n"
+                'event: content_block_delta\n'
                 'data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"{\\"x\\":1}"}}\n\n',
-                "event: message_stop\n" 'data: {"type":"message_stop"}\n\n',
+                'event: message_stop\n'
+                'data: {"type":"message_stop"}\n\n',
             ]
             for item in events:
                 for line in item.splitlines():
@@ -166,6 +203,7 @@ def test_stream_chat_anthropic_emits_streaming_thinking_and_tools(monkeypatch):
                         },
                     }
                 ],
+                enable_thinking=True,
             )
         )
     finally:
@@ -186,9 +224,7 @@ def test_stream_chat_anthropic_emits_streaming_thinking_and_tools(monkeypatch):
         for chunk in chunks
         if chunk.choices[0].delta.tool_calls
     )
-    thinking_blocks = [
-        chunk.anthropic_thinking_blocks for chunk in chunks if chunk.anthropic_thinking_blocks
-    ]
+    thinking_blocks = [chunk.anthropic_thinking_blocks for chunk in chunks if chunk.anthropic_thinking_blocks]
 
     assert reasoning == "plan "
     assert content == "hello world"
@@ -216,9 +252,10 @@ def test_stream_chat_anthropic_retries_without_thinking(monkeypatch):
 
         def iter_lines(self, decode_unicode=True):
             events = [
-                "event: content_block_start\n"
+                'event: content_block_start\n'
                 'data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":"ok"}}\n\n',
-                "event: message_stop\n" 'data: {"type":"message_stop"}\n\n',
+                'event: message_stop\n'
+                'data: {"type":"message_stop"}\n\n',
             ]
             for item in events:
                 for line in item.splitlines():
@@ -246,7 +283,9 @@ def test_stream_chat_anthropic_retries_without_thinking(monkeypatch):
     ai_client.AI_MODEL = "claude-unknown"
 
     try:
-        chunks = list(ai_client.stream_chat(messages=[{"role": "user", "content": "hi"}]))
+        chunks = list(
+            ai_client.stream_chat(messages=[{"role": "user", "content": "hi"}], enable_thinking=True)
+        )
     finally:
         ai_client.AI_API_STYLE = old_style
         ai_client.AI_BASE_URL = old_url
@@ -257,3 +296,125 @@ def test_stream_chat_anthropic_retries_without_thinking(monkeypatch):
     assert "thinking" in calls[0]
     assert "thinking" not in calls[1]
     assert "".join(chunk.choices[0].delta.content or "" for chunk in chunks) == "ok"
+
+
+def test_stream_chat_anthropic_disables_thinking_by_default(monkeypatch):
+    """Anthropic requests should not send thinking unless explicitly enabled."""
+
+    class StreamResponse:
+        status_code = 200
+        text = ""
+
+        def iter_lines(self, decode_unicode=True):
+            events = [
+                'event: content_block_start\n'
+                'data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":"ok"}}\n\n',
+                'event: message_stop\n'
+                'data: {"type":"message_stop"}\n\n',
+            ]
+            for item in events:
+                for line in item.splitlines():
+                    yield line
+
+        def close(self):
+            return None
+
+    calls = []
+
+    def fake_post(*args, **kwargs):
+        calls.append(kwargs["json"])
+        return StreamResponse()
+
+    old_style = ai_client.AI_API_STYLE
+    old_url = ai_client.AI_BASE_URL
+    old_key = ai_client.AI_API_KEY
+    old_model = ai_client.AI_MODEL
+    monkeypatch.setattr(ai_client.requests, "post", fake_post)
+    ai_client.AI_API_STYLE = "anthropic"
+    ai_client.AI_BASE_URL = "https://api.anthropic.com/v1"
+    ai_client.AI_API_KEY = "sk-test"
+    ai_client.AI_MODEL = "claude-3-7-sonnet-latest"
+
+    try:
+        chunks = list(ai_client.stream_chat(messages=[{"role": "user", "content": "hi"}]))
+    finally:
+        ai_client.AI_API_STYLE = old_style
+        ai_client.AI_BASE_URL = old_url
+        ai_client.AI_API_KEY = old_key
+        ai_client.AI_MODEL = old_model
+
+    assert len(calls) == 1
+    assert "thinking" not in calls[0]
+    assert "".join(chunk.choices[0].delta.content or "" for chunk in chunks) == "ok"
+
+
+def test_stream_chat_gemini_disables_include_thoughts_by_default(monkeypatch):
+    """Gemini should not request thought parts unless explicitly enabled."""
+
+    captured = {}
+
+    class DummyThinkingConfig:
+        def __init__(self, include_thoughts):
+            self.include_thoughts = include_thoughts
+
+    class DummyAutomaticFunctionCallingConfig:
+        def __init__(self, disable):
+            self.disable = disable
+
+    class DummyGenerateContentConfig:
+        def __init__(self, **kwargs):
+            self.system_instruction = kwargs.get("system_instruction")
+            self.temperature = kwargs.get("temperature")
+            self.tools = kwargs.get("tools")
+            self.automatic_function_calling = kwargs.get("automatic_function_calling")
+            self.thinking_config = kwargs.get("thinking_config")
+
+    class DummyPart:
+        def __init__(self, text=None, thought=False, function_call=None, thought_signature=None, function_response=None):
+            self.text = text
+            self.thought = thought
+            self.function_call = function_call
+            self.thought_signature = thought_signature
+            self.function_response = function_response
+
+        @classmethod
+        def from_text(cls, text):
+            return cls(text=text)
+
+    class DummyContent:
+        def __init__(self, role, parts):
+            self.role = role
+            self.parts = parts
+
+    class DummyModels:
+        def generate_content_stream(self, *, model, contents, config):
+            captured["model"] = model
+            captured["contents"] = contents
+            captured["config"] = config
+            return iter([])
+
+    class DummyClient:
+        def __init__(self):
+            self.models = DummyModels()
+
+    dummy_types = SimpleNamespace(
+        ThinkingConfig=DummyThinkingConfig,
+        AutomaticFunctionCallingConfig=DummyAutomaticFunctionCallingConfig,
+        GenerateContentConfig=DummyGenerateContentConfig,
+        Part=DummyPart,
+        Content=DummyContent,
+        FunctionDeclaration=lambda **kwargs: kwargs,
+        Tool=lambda **kwargs: kwargs,
+        FunctionCall=lambda **kwargs: kwargs,
+        FunctionResponse=lambda **kwargs: kwargs,
+    )
+
+    monkeypatch.setattr(ai_client, "_load_gemini_sdk", lambda: (object(), dummy_types))
+    monkeypatch.setattr(ai_client, "get_ai_client", lambda timeout=180.0: DummyClient())
+    monkeypatch.setattr(ai_client, "AI_API_STYLE", "gemini")
+    monkeypatch.setattr(ai_client, "AI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta")
+    monkeypatch.setattr(ai_client, "AI_MODEL", "gemini-2.5-flash")
+
+    list(ai_client.stream_chat(messages=[{"role": "user", "content": "hi"}]))
+
+    assert captured["config"].thinking_config.include_thoughts is False

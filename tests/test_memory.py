@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import core.memory as memory
+import prompts.member as member_prompt
 
 
 def test_gary_save_member_memory_writes_and_deduplicates(tmp_path, monkeypatch):
@@ -58,7 +59,7 @@ def test_split_member_content_distinguishes_pinned_and_dynamic():
     pinned = [entry for entry in entries if entry.startswith("### [Pinned]")]
     dynamic = [entry for entry in entries if not entry.startswith("### [Pinned]")]
 
-    assert header.startswith("# Gary Member Memory")
+    assert header.startswith("# gary Memory")
     assert pinned
     assert dynamic
     assert all(entry.startswith("### [Pinned]") for entry in pinned)
@@ -109,3 +110,24 @@ def test_gary_delete_member_memory_removes_matching_dynamic_entries(tmp_path, mo
     assert result["deleted_count"] == 1
     assert "错误经验" not in content
     assert "启动标记优先" in content
+
+
+def test_member_prompt_limits_are_tightened_and_hashed(tmp_path, monkeypatch):
+    """Injected member prompt should respect the tightened limits and expose a stable hash."""
+
+    member_path = tmp_path / "member.md"
+    dynamic_entries = [
+        f"### [2026-04-06 12:{index:02d}] 动态经验 {index}\n- {'x' * 260}" for index in range(30)
+    ]
+    member_path.write_text(
+        memory._default_member_content().rstrip() + "\n\n" + "\n\n".join(dynamic_entries),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(memory, "MEMBER_MD_PATH", member_path)
+
+    section, digest = member_prompt.get_member_prompt_section_state("STM32F103C8T6")
+
+    assert memory.MEMBER_PROMPT_CHAR_LIMIT == 6000
+    assert memory.MEMBER_PROMPT_MAX_DYNAMIC == 12
+    assert len(digest) == 40
+    assert section.count("### [2026-04-06") <= memory.MEMBER_PROMPT_MAX_DYNAMIC
