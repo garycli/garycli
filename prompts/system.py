@@ -101,4 +101,26 @@ def build_system_prompt(chip: str, language: str, hw_connected: bool) -> str:
                 f"- 当前硬件连接状态：`{str(bool(hw_connected)).lower()}`\n"
                 "- 若硬件未连接，优先走可编译路径，并明确说明无法做运行时验证。"
             )
-    return prompt.rstrip() + dynamic
+    if normalized_language == "en":
+        web_workflow = (
+            "\n\n## Web Research Workflow\n"
+            "- For online docs, latest information, API references, and tutorials, prefer this flow: "
+            "`browser_search -> browser_open_result -> browser_extract_links`.\n"
+            "- Do not stop after only listing search hits. Open the most relevant result and read the page.\n"
+            "- If the target URL is already known, use `browser_open` directly.\n"
+            "- Use `fetch_url` only for lightweight exact-URL text fetches when title and links are not needed.\n"
+            "- `browser_search` and `web_search` depend on a local SearXNG instance. If search fails, clearly tell the user to start local SearXNG or run `python setup.py --searxng`.\n"
+            "- Do not silently switch to public search backends when local SearXNG is unavailable."
+        )
+    else:
+        web_workflow = (
+            "\n\n## 联网检索工作流\n"
+            "- 需要查在线文档、最新信息、API 说明或教程时，优先走："
+            "`browser_search -> browser_open_result -> browser_extract_links`。\n"
+            "- 不要只停留在搜索结果列表，必须打开最相关网页并读取正文。\n"
+            "- 已知目标 URL 时，直接用 `browser_open`。\n"
+            "- `fetch_url` 只用于已知 URL 的轻量纯文本抓取；若需要标题和链接列表，优先用 `browser_open`。\n"
+            "- `browser_search` 和 `web_search` 依赖本地 SearXNG；若搜索失败，要明确提示用户启动本地 SearXNG，或运行 `python setup.py --searxng` 完成一键安装。\n"
+            "- 本地 SearXNG 不可用时，不要擅自切换到公共搜索后端。"
+        )
+    return prompt.rstrip() + dynamic + web_workflow
