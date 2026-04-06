@@ -11,6 +11,7 @@ from core.micropython_tools import (
     micropython_flash,
     micropython_hardware_status,
     micropython_list_files_tool,
+    micropython_soft_reset,
 )
 from core.platforms import canonical_target_name, detect_target_platform
 from core.state import get_context
@@ -108,6 +109,22 @@ def canmv_list_files_tool(
     return micropython_list_files_tool(path=path, port=port, baud=baud, console=console)
 
 
+def canmv_soft_reset(
+    *,
+    port: str | None = None,
+    baud: int = 115200,
+    console: Any = None,
+    capture_timeout: float = 5.0,
+) -> dict[str, Any]:
+    _ensure_canmv_context()
+    return micropython_soft_reset(
+        port=port,
+        baud=baud,
+        console=console,
+        capture_timeout=capture_timeout,
+    )
+
+
 __all__ = [
     "canmv_auto_sync_cycle",
     "canmv_compile",
@@ -115,4 +132,5 @@ __all__ = [
     "canmv_flash",
     "canmv_hardware_status",
     "canmv_list_files_tool",
+    "canmv_soft_reset",
 ]

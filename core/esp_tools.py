@@ -11,6 +11,7 @@ from core.micropython_tools import (
     micropython_flash,
     micropython_hardware_status,
     micropython_list_files_tool,
+    micropython_soft_reset,
 )
 from core.platforms import canonical_target_name, detect_target_platform
 from core.state import get_context
@@ -108,6 +109,22 @@ def esp_list_files_tool(
     return micropython_list_files_tool(path=path, port=port, baud=baud, console=console)
 
 
+def esp_soft_reset(
+    *,
+    port: str | None = None,
+    baud: int = 115200,
+    console: Any = None,
+    capture_timeout: float = 4.0,
+) -> dict[str, Any]:
+    _ensure_esp_context()
+    return micropython_soft_reset(
+        port=port,
+        baud=baud,
+        console=console,
+        capture_timeout=capture_timeout,
+    )
+
+
 __all__ = [
     "esp_auto_sync_cycle",
     "esp_compile",
@@ -115,4 +132,5 @@ __all__ = [
     "esp_flash",
     "esp_hardware_status",
     "esp_list_files_tool",
+    "esp_soft_reset",
 ]

@@ -213,16 +213,11 @@ def canonical_target_name_from_micropython_info(info: dict[str, str] | None) -> 
         ("ESP32", ("esp32", "lolin32", "nodemcu-32s", "wroom32")),
     )
     for chip_name, patterns in esp_patterns:
-        if any(
-            pattern in text or pattern.replace("-", "").replace(" ", "") in compact
-            for pattern in patterns
-        ):
+        if any(pattern in text or pattern.replace("-", "").replace(" ", "") in compact for pattern in patterns):
             return chip_name
     if "k230d" in compact:
         return "CANMV_K230D"
-    if "k230" in compact and (
-        "canmv" in compact or str(data.get("platform") or "").strip().lower() == "rt-smart"
-    ):
+    if "k230" in compact and ("canmv" in compact or str(data.get("platform") or "").strip().lower() == "rt-smart"):
         return "CANMV_K230"
     return None
 
@@ -240,7 +235,31 @@ def device_root_for_target(chip: str | None) -> str:
 
 
 def device_main_path_for_target(chip: str | None) -> str:
-    """Return the on-device path used for the deployed startup script."""
+    """Return the on-device path used for Gary-managed user code."""
+
+    if is_canmv_target(chip):
+        return "/sdcard/gary_run.py"
+    return "gary_run.py"
+
+
+def device_bootstrap_path_for_target(chip: str | None) -> str:
+    """Return the stable board-side bootstrap path managed by Gary."""
+
+    if is_canmv_target(chip):
+        return "/sdcard/boot.py"
+    return "boot.py"
+
+
+def device_autorun_flag_path_for_target(chip: str | None) -> str:
+    """Return the one-shot autorun flag used by Gary's MicroPython bootstrap."""
+
+    if is_canmv_target(chip):
+        return "/sdcard/gary_autorun.flag"
+    return "gary_autorun.flag"
+
+
+def device_legacy_main_path_for_target(chip: str | None) -> str:
+    """Return the legacy startup-script path used by older Gary versions."""
 
     if is_canmv_target(chip):
         return "/sdcard/main.py"
@@ -267,6 +286,9 @@ __all__ = [
     "RP2040_TARGET_CHOICES",
     "canonical_target_name_from_micropython_info",
     "canonical_target_name",
+    "device_autorun_flag_path_for_target",
+    "device_bootstrap_path_for_target",
+    "device_legacy_main_path_for_target",
     "device_main_path_for_target",
     "device_root_for_target",
     "detect_target_platform",

@@ -23,7 +23,7 @@ from ai.client import (
     reload_ai_config,
     stream_chat,
 )
-from ai.tools import TOOL_SCHEMAS, bind_tool_implementations, dispatch_tool_call
+from ai.tools import TOOL_SCHEMAS, bind_tool_implementations, dispatch_tool_call, select_tool_schemas
 from core.cli_config import configure_ai_cli as _configure_ai_cli_impl
 from core.docx_tools import (
     append_docx_content,
@@ -79,6 +79,7 @@ from core.esp_tools import (
     esp_flash as _esp_flash_impl,
     esp_hardware_status as _esp_hardware_status_impl,
     esp_list_files_tool as _esp_list_files_impl,
+    esp_soft_reset as _esp_soft_reset_impl,
 )
 from core.canmv_tools import (
     canmv_auto_sync_cycle as _canmv_auto_sync_cycle_impl,
@@ -87,6 +88,7 @@ from core.canmv_tools import (
     canmv_flash as _canmv_flash_impl,
     canmv_hardware_status as _canmv_hardware_status_impl,
     canmv_list_files_tool as _canmv_list_files_impl,
+    canmv_soft_reset as _canmv_soft_reset_impl,
 )
 from core.project_store import (
     latest_workspace_main_path,
@@ -103,6 +105,7 @@ from core.rp2040_tools import (
     rp2040_flash as _rp2040_flash_impl,
     rp2040_hardware_status as _rp2040_hardware_status_impl,
     rp2040_list_files_tool as _rp2040_list_files_impl,
+    rp2040_soft_reset as _rp2040_soft_reset_impl,
 )
 from core.state import get_context
 from hardware.serial_mon import (
@@ -541,6 +544,17 @@ def rp2040_list_files(path: str = ".", port: str = None, baud: int = None) -> di
     )
 
 
+def rp2040_soft_reset(port: str = None, baud: int = None) -> dict:
+    """Soft-reset the connected RP2040 MicroPython board."""
+
+    return _rp2040_soft_reset_impl(
+        port=port,
+        baud=baud or SERIAL_BAUD,
+        console=CONSOLE,
+        capture_timeout=POST_FLASH_DELAY + 1.5,
+    )
+
+
 def esp_connect(chip: str = None, port: str = None, baud: int = None) -> dict:
     """Connect an ESP32 / ESP8266 board over USB serial."""
 
@@ -610,6 +624,17 @@ def esp_list_files(path: str = ".", port: str = None, baud: int = None) -> dict:
         port=port,
         baud=baud or SERIAL_BAUD,
         console=CONSOLE,
+    )
+
+
+def esp_soft_reset(port: str = None, baud: int = None) -> dict:
+    """Soft-reset the connected ESP MicroPython board."""
+
+    return _esp_soft_reset_impl(
+        port=port,
+        baud=baud or SERIAL_BAUD,
+        console=CONSOLE,
+        capture_timeout=POST_FLASH_DELAY + 1.5,
     )
 
 
@@ -685,9 +710,18 @@ def canmv_list_files(path: str = ".", port: str = None, baud: int = None) -> dic
     )
 
 
-def _micropython_connect_for_target(
-    chip: str, port: str | None = None, baud: int | None = None
-) -> dict:
+def canmv_soft_reset(port: str = None, baud: int = None) -> dict:
+    """Soft-reset the connected CanMV K230 MicroPython board."""
+
+    return _canmv_soft_reset_impl(
+        port=port,
+        baud=baud or SERIAL_BAUD,
+        console=CONSOLE,
+        capture_timeout=POST_FLASH_DELAY + 2.5,
+    )
+
+
+def _micropython_connect_for_target(chip: str, port: str | None = None, baud: int | None = None) -> dict:
     platform = detect_target_platform(chip)
     if platform == "rp2040":
         return rp2040_connect(chip, port=port, baud=baud)
@@ -947,9 +981,7 @@ def stm32_compile_rtos(code: str, chip: str = None) -> dict:
     target_chip = _current_target(chip)
     ctx.chip = target_chip
     if is_micropython_target(target_chip):
-        return _micropython_not_supported(
-            "stm32_compile_rtos", "请改用对应的 MicroPython compile 或 auto_sync_cycle 工具"
-        )
+        return _micropython_not_supported("stm32_compile_rtos", "请改用对应的 MicroPython compile 或 auto_sync_cycle 工具")
     compiler = _get_compiler()
     if chip:
         compiler.set_chip(target_chip)
@@ -1004,9 +1036,7 @@ def stm32_recompile(mode: str = "auto") -> dict:
     code = source_path.read_text(encoding="utf-8")
     if source_path.suffix == ".py" or is_micropython_target(ctx.chip):
         if mode == "rtos":
-            return _micropython_not_supported(
-                "stm32_recompile(mode='rtos')", "MicroPython 目标不支持 FreeRTOS 编译"
-            )
+            return _micropython_not_supported("stm32_recompile(mode='rtos')", "MicroPython 目标不支持 FreeRTOS 编译")
         target_chip = ctx.chip if is_micropython_target(ctx.chip) else "ESP32"
         return _micropython_compile_for_target(code, target_chip)
     if mode == "auto":
@@ -1226,9 +1256,7 @@ def stm32_rtos_check_code(code: str) -> dict:
     检查 SysTick 冲突、HAL_Delay 陷阱、缺少 hook 函数、栈大小、ISR 安全等。
     """
     if is_micropython_target(_current_target()):
-        return _micropython_not_supported(
-            "stm32_rtos_check_code", "MicroPython 目标不使用 FreeRTOS C 工程"
-        )
+        return _micropython_not_supported("stm32_rtos_check_code", "MicroPython 目标不使用 FreeRTOS C 工程")
     import re
 
     errors = []
@@ -1376,9 +1404,7 @@ def stm32_rtos_task_stats() -> dict:
     需要先编译（有 ELF 文件）并连接硬件。
     """
     if is_micropython_target(_current_target()):
-        return _micropython_not_supported(
-            "stm32_rtos_task_stats", "MicroPython 目标没有这套 FreeRTOS 任务统计接口"
-        )
+        return _micropython_not_supported("stm32_rtos_task_stats", "MicroPython 目标没有这套 FreeRTOS 任务统计接口")
     if not get_context().hw_connected:
         return {"success": False, "message": "硬件未连接"}
 
@@ -2279,6 +2305,7 @@ bind_tool_implementations(
         "rp2040_flash": rp2040_flash,
         "rp2040_auto_sync_cycle": rp2040_auto_sync_cycle,
         "rp2040_list_files": rp2040_list_files,
+        "rp2040_soft_reset": rp2040_soft_reset,
         # ESP / MicroPython
         "esp_connect": esp_connect,
         "esp_hardware_status": esp_hardware_status,
@@ -2286,6 +2313,7 @@ bind_tool_implementations(
         "esp_flash": esp_flash,
         "esp_auto_sync_cycle": esp_auto_sync_cycle,
         "esp_list_files": esp_list_files,
+        "esp_soft_reset": esp_soft_reset,
         # CanMV / MicroPython
         "canmv_connect": canmv_connect,
         "canmv_hardware_status": canmv_hardware_status,
@@ -2293,6 +2321,7 @@ bind_tool_implementations(
         "canmv_flash": canmv_flash,
         "canmv_auto_sync_cycle": canmv_auto_sync_cycle,
         "canmv_list_files": canmv_list_files,
+        "canmv_soft_reset": canmv_soft_reset,
         "gary_save_member_memory": gary_save_member_memory,
         "gary_delete_member_memory": gary_delete_member_memory,
         # 通用
@@ -2358,6 +2387,9 @@ class STM32Agent:
         self._dynamic_prompt_signature: tuple[Any, ...] | None = None
         self._system_prompt_cache = ""
         self._system_prompt_signature: tuple[Any, ...] | None = None
+        self._tool_schema_cache: list[dict[str, Any]] = []
+        self._tool_schema_signature: tuple[Any, ...] | None = None
+        self._current_tool_task_hint = ""
         self.messages: List[Dict] = [{"role": "system", "content": self._compose_system_prompt()}]
         self._pending_system_hint = ""
         self.client = get_ai_client(timeout=180.0)
@@ -2414,6 +2446,7 @@ class STM32Agent:
 
     def reset_conversation(self):
         self.thinking_log = []
+        self._current_tool_task_hint = ""
         self.messages = [{"role": "system", "content": self._compose_system_prompt()}]
 
     def refresh_system_prompt(self):
@@ -2459,6 +2492,32 @@ class STM32Agent:
         return {"success": True, "language": ctx.cli_language, "saved": saved}
 
     # ── Token 估算 ──────────────────────────────────────────
+    def _current_tool_schemas(self, task_hint: str | None = None) -> list[dict[str, Any]]:
+        """Return the cached tool subset for the current platform and task hint."""
+
+        if not hasattr(self, "_tool_schema_cache") or self._tool_schema_cache is None:
+            self._tool_schema_cache = []
+        if not hasattr(self, "_tool_schema_signature"):
+            self._tool_schema_signature = None
+        if not hasattr(self, "_current_tool_task_hint"):
+            self._current_tool_task_hint = ""
+        if task_hint is not None:
+            self._current_tool_task_hint = str(task_hint or "")
+
+        ctx = get_context()
+        signature = (
+            str(getattr(ctx, "chip", "") or ""),
+            str(self._current_tool_task_hint or ""),
+            len(TOOL_SCHEMAS),
+        )
+        if signature != self._tool_schema_signature:
+            self._tool_schema_cache = select_tool_schemas(
+                chip=getattr(ctx, "chip", ""),
+                user_input=self._current_tool_task_hint,
+            )
+            self._tool_schema_signature = signature
+        return self._tool_schema_cache
+
     def _base_context_tokens(self) -> int:
         """Estimate the fixed per-request overhead before the first user turn."""
 
@@ -2466,12 +2525,11 @@ class STM32Agent:
         system_content = ""
         if self.messages and self.messages[0].get("role") == "system":
             system_content = str(self.messages[0].get("content", "") or "")
-        baseline_messages = (
-            [{"role": "system", "content": system_content}] if system_content else []
-        )
+        baseline_messages = [{"role": "system", "content": system_content}] if system_content else []
+        tool_schemas = self._current_tool_schemas()
         estimate = estimate_request_tokens(
             messages=baseline_messages,
-            tools=TOOL_SCHEMAS,
+            tools=tool_schemas,
             tool_choice="auto",
             model=AI_MODEL,
             temperature=AI_TEMPERATURE,
@@ -2483,9 +2541,10 @@ class STM32Agent:
         """Estimate request usage against the configured context window."""
 
         ctx = get_context()
+        tool_schemas = self._current_tool_schemas()
         estimate = estimate_request_tokens(
             messages=self._messages_for_api(),
-            tools=TOOL_SCHEMAS,
+            tools=tool_schemas,
             tool_choice="auto",
             model=AI_MODEL,
             temperature=AI_TEMPERATURE,
@@ -2648,7 +2707,7 @@ class STM32Agent:
                     continue
 
                 pending = self._partial_think_tag_suffix(source, (close_tag,))
-                chunk = source[: -len(pending)] if pending else source
+                chunk = source[:-len(pending)] if pending else source
                 if chunk:
                     segments.append(("think", chunk))
                 state["pending"] = pending
@@ -2671,7 +2730,7 @@ class STM32Agent:
                 continue
 
             pending = self._partial_think_tag_suffix(source, (open_tag, close_tag))
-            chunk = source[: -len(pending)] if pending else source
+            chunk = source[:-len(pending)] if pending else source
             if chunk:
                 segments.append(("content", chunk))
             state["pending"] = pending
@@ -2690,9 +2749,7 @@ class STM32Agent:
         kind = "think" if state.get("inside_think", False) else "content"
         return [(kind, pending)]
 
-    def _request_final_reply_after_tools(
-        self, stream_to_console: bool = True
-    ) -> dict[str, Any] | None:
+    def _request_final_reply_after_tools(self, stream_to_console: bool = True) -> dict[str, Any] | None:
         """部分模型在工具执行后会停在空回复，这里补一次只求最终答复的请求。"""
         if stream_to_console:
             CONSOLE.print(
@@ -2856,6 +2913,7 @@ class STM32Agent:
         text_callback=None,
         tool_callback=None,
     ) -> str:
+        self._current_tool_schemas(user_input)
         self._prepare_web_research_hint(user_input)
         self.messages.append({"role": "user", "content": user_input})
         self._truncate_history()
@@ -2863,67 +2921,133 @@ class STM32Agent:
         tool_summaries: List[str] = []
         used_tools = False
 
-        while True:
-            # API 调用
-            try:
-                ctx = get_context()
-                stream = stream_chat(
-                    client=self.client,
-                    messages=self._messages_for_api(),
-                    model=AI_MODEL,
-                    tools=TOOL_SCHEMAS,
-                    tool_choice="auto",
-                    temperature=AI_TEMPERATURE,
-                    enable_thinking=bool(getattr(ctx, "thinking_enabled", False)),
-                )
-            except Exception as e:
-                if stream_to_console:
-                    CONSOLE.print(f"\n[red]{_cli_text('API 错误', 'API error')}: {e}[/]")
-                return f"{_cli_text('API 错误', 'API error')}: {e}"
+        try:
+            while True:
+                # API 调用
+                try:
+                    ctx = get_context()
+                    stream = stream_chat(
+                        client=self.client,
+                        messages=self._messages_for_api(),
+                        model=AI_MODEL,
+                        tools=self._current_tool_schemas(),
+                        tool_choice="auto",
+                        temperature=AI_TEMPERATURE,
+                        enable_thinking=bool(getattr(ctx, "thinking_enabled", False)),
+                    )
+                except Exception as e:
+                    if stream_to_console:
+                        CONSOLE.print(f"\n[red]{_cli_text('API 错误', 'API error')}: {e}[/]")
+                    return f"{_cli_text('API 错误', 'API error')}: {e}"
 
-            # 收集流式输出
-            content = ""
-            tool_calls_raw: Dict[int, dict] = {}
-            thinking = ""
-            anthropic_thinking_blocks = None
-            in_think = False
-            think_tag_state = {"inside_think": False, "pending": ""}
+                # 收集流式输出
+                content = ""
+                tool_calls_raw: Dict[int, dict] = {}
+                thinking = ""
+                anthropic_thinking_blocks = None
+                in_think = False
+                think_tag_state = {"inside_think": False, "pending": ""}
 
-            try:
-                for chunk in stream:
-                    if not chunk.choices:
-                        continue
-                    chunk_thinking_blocks = getattr(chunk, "anthropic_thinking_blocks", None)
-                    if chunk_thinking_blocks is not None:
-                        anthropic_thinking_blocks = chunk_thinking_blocks
-                    delta = chunk.choices[0].delta
+                try:
+                    for chunk in stream:
+                        if not chunk.choices:
+                            continue
+                        chunk_thinking_blocks = getattr(chunk, "anthropic_thinking_blocks", None)
+                        if chunk_thinking_blocks is not None:
+                            anthropic_thinking_blocks = chunk_thinking_blocks
+                        delta = chunk.choices[0].delta
 
-                    # Reasoning (deepseek-r1 style)
-                    rc = getattr(delta, "reasoning_content", None)
-                    if rc:
-                        if not in_think and stream_to_console:
-                            CONSOLE.print(f"\n[dim {THEME}]💭 思考:[/]")
-                        in_think = True
-                        thinking += rc
-                        if stream_to_console:
-                            CONSOLE.print(rc, end="", style="dim")
+                        # Reasoning (deepseek-r1 style)
+                        rc = getattr(delta, "reasoning_content", None)
+                        if rc:
+                            if not in_think and stream_to_console:
+                                CONSOLE.print(f"\n[dim {THEME}]💭 思考:[/]")
+                            in_think = True
+                            thinking += rc
+                            if stream_to_console:
+                                CONSOLE.print(rc, end="", style="dim")
 
-                    # 文本内容
-                    if delta.content:
-                        for kind, piece in self._extract_think_segments(
-                            delta.content, think_tag_state
-                        ):
-                            if not piece:
-                                continue
-                            if kind == "think":
-                                if not in_think and stream_to_console:
-                                    CONSOLE.print(f"\n[dim {THEME}]💭 思考:[/]")
-                                in_think = True
-                                thinking += piece
+                        # 文本内容
+                        if delta.content:
+                            for kind, piece in self._extract_think_segments(delta.content, think_tag_state):
+                                if not piece:
+                                    continue
+                                if kind == "think":
+                                    if not in_think and stream_to_console:
+                                        CONSOLE.print(f"\n[dim {THEME}]💭 思考:[/]")
+                                    in_think = True
+                                    thinking += piece
+                                    if stream_to_console:
+                                        CONSOLE.print(piece, end="", style="dim")
+                                    continue
+
+                                if in_think and stream_to_console:
+                                    CONSOLE.print()
+                                in_think = False
+                                content += piece
                                 if stream_to_console:
-                                    CONSOLE.print(piece, end="", style="dim")
-                                continue
+                                    CONSOLE.print(piece, end="", style="white")
+                                if text_callback:
+                                    preview_text = "\n\n".join(
+                                        part for part in [*reply_parts, content.strip()] if part
+                                    ).strip()
+                                    text_callback(preview_text)
 
+                        # 工具调用
+                        if delta.tool_calls:
+                            # 用 model_dump() 获取含 Gemini extra_content 的完整 chunk 数据
+                            try:
+                                _chunk_dict = chunk.model_dump()
+                                _raw_tcs = (_chunk_dict.get("choices") or [{}])[0].get("delta", {}).get(
+                                    "tool_calls"
+                                ) or []
+                            except Exception:
+                                _raw_tcs = []
+                            for i, tc in enumerate(delta.tool_calls):
+                                idx = tc.index
+                                if idx not in tool_calls_raw:
+                                    tool_calls_raw[idx] = {
+                                        "id": "",
+                                        "name": "",
+                                        "args": "",
+                                        "thought_signature": "",
+                                    }
+                                if tc.id:
+                                    tool_calls_raw[idx]["id"] = tc.id
+                                if tc.function and tc.function.name:
+                                    tool_calls_raw[idx]["name"] = tc.function.name
+                                if tc.function and tc.function.arguments:
+                                    tool_calls_raw[idx]["args"] += tc.function.arguments
+                                # Gemini thinking models 将签名放在 extra_content.google.thought_signature
+                                # 必须原样回传到 function.thought_signature，否则下次请求报 400
+                                _raw_tc = _raw_tcs[i] if i < len(_raw_tcs) else {}
+                                sig = (
+                                    (_raw_tc.get("extra_content") or {})
+                                    .get("google", {})
+                                    .get("thought_signature")
+                                    or (_raw_tc.get("function") or {}).get("thought_signature")
+                                    or _raw_tc.get("thought_signature")
+                                    or getattr(tc, "thought_signature", None)
+                                    or (
+                                        getattr(tc.function, "thought_signature", None)
+                                        if tc.function
+                                        else None
+                                    )
+                                )
+                                if sig:
+                                    tool_calls_raw[idx]["thought_signature"] += sig
+
+                    for kind, piece in self._flush_think_segments(think_tag_state):
+                        if not piece:
+                            continue
+                        if kind == "think":
+                            if not in_think and stream_to_console:
+                                CONSOLE.print(f"\n[dim {THEME}]💭 思考:[/]")
+                            in_think = True
+                            thinking += piece
+                            if stream_to_console:
+                                CONSOLE.print(piece, end="", style="dim")
+                        else:
                             if in_think and stream_to_console:
                                 CONSOLE.print()
                             in_think = False
@@ -2936,203 +3060,138 @@ class STM32Agent:
                                 ).strip()
                                 text_callback(preview_text)
 
-                    # 工具调用
-                    if delta.tool_calls:
-                        # 用 model_dump() 获取含 Gemini extra_content 的完整 chunk 数据
-                        try:
-                            _chunk_dict = chunk.model_dump()
-                            _raw_tcs = (_chunk_dict.get("choices") or [{}])[0].get("delta", {}).get(
-                                "tool_calls"
-                            ) or []
-                        except Exception:
-                            _raw_tcs = []
-                        for i, tc in enumerate(delta.tool_calls):
-                            idx = tc.index
-                            if idx not in tool_calls_raw:
-                                tool_calls_raw[idx] = {
-                                    "id": "",
-                                    "name": "",
-                                    "args": "",
-                                    "thought_signature": "",
-                                }
-                            if tc.id:
-                                tool_calls_raw[idx]["id"] = tc.id
-                            if tc.function and tc.function.name:
-                                tool_calls_raw[idx]["name"] = tc.function.name
-                            if tc.function and tc.function.arguments:
-                                tool_calls_raw[idx]["args"] += tc.function.arguments
-                            # Gemini thinking models 将签名放在 extra_content.google.thought_signature
-                            # 必须原样回传到 function.thought_signature，否则下次请求报 400
-                            _raw_tc = _raw_tcs[i] if i < len(_raw_tcs) else {}
-                            sig = (
-                                (_raw_tc.get("extra_content") or {})
-                                .get("google", {})
-                                .get("thought_signature")
-                                or (_raw_tc.get("function") or {}).get("thought_signature")
-                                or _raw_tc.get("thought_signature")
-                                or getattr(tc, "thought_signature", None)
-                                or (
-                                    getattr(tc.function, "thought_signature", None)
-                                    if tc.function
-                                    else None
-                                )
-                            )
-                            if sig:
-                                tool_calls_raw[idx]["thought_signature"] += sig
+                    if in_think and stream_to_console:
+                        CONSOLE.print()
+                    if content and stream_to_console:
+                        CONSOLE.print()
 
-                for kind, piece in self._flush_think_segments(think_tag_state):
-                    if not piece:
-                        continue
-                    if kind == "think":
-                        if not in_think and stream_to_console:
-                            CONSOLE.print(f"\n[dim {THEME}]💭 思考:[/]")
-                        in_think = True
-                        thinking += piece
-                        if stream_to_console:
-                            CONSOLE.print(piece, end="", style="dim")
-                    else:
-                        if in_think and stream_to_console:
-                            CONSOLE.print()
-                        in_think = False
-                        content += piece
-                        if stream_to_console:
-                            CONSOLE.print(piece, end="", style="white")
-                        if text_callback:
-                            preview_text = "\n\n".join(
-                                part for part in [*reply_parts, content.strip()] if part
-                            ).strip()
-                            text_callback(preview_text)
+                except Exception as e:
+                    if stream_to_console:
+                        CONSOLE.print(f"\n[red]{_cli_text('流式读取错误', 'Streaming error')}: {e}[/]")
+                    return f"{_cli_text('流式读取错误', 'Streaming error')}: {e}"
 
-                if in_think and stream_to_console:
-                    CONSOLE.print()
-                if content and stream_to_console:
-                    CONSOLE.print()
-
-            except Exception as e:
-                if stream_to_console:
-                    CONSOLE.print(f"\n[red]{_cli_text('流式读取错误', 'Streaming error')}: {e}[/]")
-                return f"{_cli_text('流式读取错误', 'Streaming error')}: {e}"
-
-            # 无工具调用 → 结束
-            if not tool_calls_raw:
-                if content.strip():
+                # 无工具调用 → 结束
+                if not tool_calls_raw:
+                    if content.strip():
+                        self._record_thinking_trace(
+                            stage="assistant_reply",
+                            thinking=thinking,
+                            provider_blocks=anthropic_thinking_blocks,
+                        )
+                        assistant_msg = {"role": "assistant", "content": content or ""}
+                        self.messages.append(assistant_msg)
+                        reply_parts.append(content.strip())
+                        break
+                    if used_tools:
+                        final_reply_msg = self._request_final_reply_after_tools(
+                            stream_to_console=stream_to_console
+                        )
+                        if final_reply_msg:
+                            self.messages.append(final_reply_msg)
+                            reply_parts.append(str(final_reply_msg.get("content") or ""))
+                            break
+                        fallback_reply = self._build_tool_only_reply(tool_summaries, reply_parts)
+                        self.messages.append({"role": "assistant", "content": fallback_reply})
+                        reply_parts.append(fallback_reply)
+                        break
                     self._record_thinking_trace(
-                        stage="assistant_reply",
+                        stage="assistant_empty_reply",
                         thinking=thinking,
                         provider_blocks=anthropic_thinking_blocks,
                     )
                     assistant_msg = {"role": "assistant", "content": content or ""}
                     self.messages.append(assistant_msg)
-                    reply_parts.append(content.strip())
                     break
-                if used_tools:
-                    final_reply_msg = self._request_final_reply_after_tools(
-                        stream_to_console=stream_to_console
+
+                # 构造 assistant tool_calls 消息
+                tool_calls_list = []
+                for idx in sorted(tool_calls_raw.keys()):
+                    tc = tool_calls_raw[idx]
+                    func_dict: dict = {"name": tc["name"], "arguments": tc["args"]}
+                    if tc.get("thought_signature"):  # Gemini 思考签名，必须原样回传
+                        func_dict["thought_signature"] = tc["thought_signature"]
+                    tool_calls_list.append(
+                        {
+                            "id": tc["id"],
+                            "type": "function",
+                            "function": func_dict,
+                        }
                     )
-                    if final_reply_msg:
-                        self.messages.append(final_reply_msg)
-                        reply_parts.append(str(final_reply_msg.get("content") or ""))
-                        break
-                    fallback_reply = self._build_tool_only_reply(tool_summaries, reply_parts)
-                    self.messages.append({"role": "assistant", "content": fallback_reply})
-                    reply_parts.append(fallback_reply)
-                    break
+                assistant_tool_msg = {
+                    "role": "assistant",
+                    "content": content or "",
+                    "tool_calls": tool_calls_list,
+                }
+
                 self._record_thinking_trace(
-                    stage="assistant_empty_reply",
+                    stage="assistant_tool_call",
                     thinking=thinking,
                     provider_blocks=anthropic_thinking_blocks,
                 )
-                assistant_msg = {"role": "assistant", "content": content or ""}
-                self.messages.append(assistant_msg)
-                break
+                self.messages.append(assistant_tool_msg)
+                used_tools = True
 
-            # 构造 assistant tool_calls 消息
-            tool_calls_list = []
-            for idx in sorted(tool_calls_raw.keys()):
-                tc = tool_calls_raw[idx]
-                func_dict: dict = {"name": tc["name"], "arguments": tc["args"]}
-                if tc.get("thought_signature"):  # Gemini 思考签名，必须原样回传
-                    func_dict["thought_signature"] = tc["thought_signature"]
-                tool_calls_list.append(
-                    {
-                        "id": tc["id"],
-                        "type": "function",
-                        "function": func_dict,
-                    }
-                )
-            assistant_tool_msg = {
-                "role": "assistant",
-                "content": content or "",
-                "tool_calls": tool_calls_list,
-            }
+                # 执行工具
+                tool_results = []
+                for tc in tool_calls_list:
+                    func_name = tc["function"]["name"]
+                    args_str = tc["function"]["arguments"]
+                    result_obj = None
+                    telegram_log(f"chat tool_exec_start name={func_name}")
 
-            self._record_thinking_trace(
-                stage="assistant_tool_call",
-                thinking=thinking,
-                provider_blocks=anthropic_thinking_blocks,
-            )
-            self.messages.append(assistant_tool_msg)
-            used_tools = True
-
-            # 执行工具
-            tool_results = []
-            for tc in tool_calls_list:
-                func_name = tc["function"]["name"]
-                args_str = tc["function"]["arguments"]
-                result_obj = None
-                telegram_log(f"chat tool_exec_start name={func_name}")
-
-                if stream_to_console:
-                    CONSOLE.print(f"[dim]  🔧 {func_name}[/]", end="")
-                if tool_callback:
-                    tool_callback({"phase": "start", "name": func_name, "arguments": args_str})
-                try:
-                    args = json.loads(args_str) if args_str.strip() else {}
-                    result_obj = dispatch_tool_call(
-                        func_name,
-                        args,
-                        get_context_fn=get_context,
-                    )
-                    result_str = json.dumps(result_obj, ensure_ascii=False, indent=2)
-                except Exception as e:
-                    result_str = f'{{"error": "{e}"}}'
-                    result_obj = {"error": str(e)}
+                    if stream_to_console:
+                        CONSOLE.print(f"[dim]  🔧 {func_name}[/]", end="")
                     if tool_callback:
-                        tool_callback({"phase": "error", "name": func_name, "error": str(e)})
+                        tool_callback({"phase": "start", "name": func_name, "arguments": args_str})
+                    try:
+                        args = json.loads(args_str) if args_str.strip() else {}
+                        result_obj = dispatch_tool_call(
+                            func_name,
+                            args,
+                            get_context_fn=get_context,
+                        )
+                        result_str = json.dumps(result_obj, ensure_ascii=False, indent=2)
+                    except Exception as e:
+                        result_str = f'{{"error": "{e}"}}'
+                        result_obj = {"error": str(e)}
+                        if tool_callback:
+                            tool_callback({"phase": "error", "name": func_name, "error": str(e)})
 
-                # 简短预览
-                preview = result_str[:120].replace("\n", " ")
-                if stream_to_console:
-                    CONSOLE.print(f" → [dim green]{preview}[/]")
-                if tool_callback:
-                    tool_callback(
+                    # 简短预览
+                    preview = result_str[:120].replace("\n", " ")
+                    if stream_to_console:
+                        CONSOLE.print(f" → [dim green]{preview}[/]")
+                    if tool_callback:
+                        tool_callback(
+                            {
+                                "phase": "finish",
+                                "name": func_name,
+                                "preview": preview,
+                                "result": result_str,
+                            }
+                        )
+                    telegram_log(f"chat tool_exec_finish name={func_name} preview={preview[:80]}")
+                    tool_summaries.append(self._summarize_tool_result(func_name, result_obj, preview))
+
+                    tool_results.append(
                         {
-                            "phase": "finish",
-                            "name": func_name,
-                            "preview": preview,
-                            "result": result_str,
+                            "role": "tool",
+                            "tool_call_id": tc["id"],
+                            "content": self._truncate_result(result_str, func_name),
                         }
                     )
-                telegram_log(f"chat tool_exec_finish name={func_name} preview={preview[:80]}")
-                tool_summaries.append(self._summarize_tool_result(func_name, result_obj, preview))
 
-                tool_results.append(
-                    {
-                        "role": "tool",
-                        "tool_call_id": tc["id"],
-                        "content": self._truncate_result(result_str, func_name),
-                    }
-                )
+                self.messages.extend(tool_results)
+                self.refresh_system_prompt()
+                self._truncate_history()
+                # 继续循环，把工具结果发回 AI
 
-            self.messages.extend(tool_results)
-            self.refresh_system_prompt()
-            self._truncate_history()
-            # 继续循环，把工具结果发回 AI
+                if content.strip():
+                    reply_parts.append(content.strip())
 
-            if content.strip():
-                reply_parts.append(content.strip())
-
-        return "\n\n".join(part for part in reply_parts if part).strip()
+            return "\n\n".join(part for part in reply_parts if part).strip()
+        finally:
+            self._current_tool_task_hint = ""
 
     # ── 内置命令处理 ────────────────────────────────────────
     def handle_builtin(self, cmd: str) -> bool:
@@ -3265,9 +3324,7 @@ def _print_startup_checks() -> None:
         try:
             import pyocd as _pyocd  # type: ignore
 
-            CONSOLE.print(
-                f"[dim]  pyocd: {_pyocd.__version__} ({_cli_text('可选，调试时备用', 'optional fallback for low-level debug')})[/]"
-            )
+            CONSOLE.print(f"[dim]  pyocd: {_pyocd.__version__} ({_cli_text('可选，调试时备用', 'optional fallback for low-level debug')})[/]")
         except ImportError:
             CONSOLE.print(
                 f"[dim]  pyocd: {_cli_text('未安装（MicroPython 目标不强依赖）', 'not installed (not required for MicroPython targets)')}[/]"

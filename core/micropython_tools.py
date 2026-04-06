@@ -9,6 +9,9 @@ from typing import Any, Callable
 from core.platforms import (
     canonical_target_name,
     canonical_target_name_from_micropython_info,
+    device_autorun_flag_path_for_target,
+    device_bootstrap_path_for_target,
+    device_legacy_main_path_for_target,
     device_main_path_for_target,
     device_root_for_target,
     detect_target_platform,
@@ -20,14 +23,10 @@ from hardware.micropython import (
     list_remote_files,
     probe_micropython_board,
     scan_micropython_boards,
-    upload_text_file,
+    soft_reset_board,
+    sync_text_files,
 )
-from hardware.serial_mon import (
-    SerialMonitor,
-    connect_serial,
-    detect_serial_ports,
-    disconnect_serial,
-)
+from hardware.serial_mon import SerialMonitor, connect_serial, detect_serial_ports, disconnect_serial
 
 
 def _micropython_platform_label(chip: str | None) -> str:
@@ -51,10 +50,142 @@ def _micropython_port_help(chip: str | None) -> str:
     return f"未检测到 {label} 常见 USB 串口，请确认开发板已刷入 MicroPython 且 USB 数据线可传输"
 
 
+def _normalize_raw_repl_error(result: dict[str, Any] | None, chip: str | None) -> dict[str, Any] | None:
+    """Rewrite raw-REPL transport failures into a clearer diagnostic payload."""
+
+    data = dict(result or {})
+    if not data.get("raw_repl_failure") and data.get("reason") != "raw_repl_unresponsive":
+        return None
+    label = _micropython_platform_label(chip)
+    banner = str(data.get("banner") or "").strip()
+    suggestions = list(data.get("recovery_suggestions") or [])
+    causes = list(data.get("suspected_causes") or [])
+    message = (
+        f"{label} 当前无法进入 raw REPL。设备很可能还在执行上一次部署的用户脚本，"
+        "例如无延时的 while True 死循环、摄像头/显示循环，或阻塞式初始化。"
+    )
+    if banner:
+        message += f" 原始响应: {banner[:160]}"
+    data.update(
+        {
+            "raw_repl_failure": True,
+            "reason": "raw_repl_unresponsive",
+            "suspected_user_code_block": True,
+            "message": message,
+            "recovery_suggestions": suggestions,
+            "suspected_causes": causes,
+        }
+    )
+    return data
+
+
+_LOOP_DELAY_CALLS = {
+    "sleep",
+    "sleep_ms",
+    "sleep_us",
+    "sleep_ns",
+    "idle",
+    "machine.idle",
+    "time.sleep",
+    "time.sleep_ms",
+    "time.sleep_us",
+    "utime.sleep",
+    "utime.sleep_ms",
+    "utime.sleep_us",
+    "asyncio.sleep",
+    "asyncio.sleep_ms",
+}
+
+
+def _call_name(node: ast.AST) -> str:
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        base = _call_name(node.value)
+        return f"{base}.{node.attr}" if base else node.attr
+    return ""
+
+
+def _contains_loop_delay(node: ast.AST) -> bool:
+    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)):
+        return False
+    if isinstance(node, ast.Call) and _call_name(node.func) in _LOOP_DELAY_CALLS:
+        return True
+    return any(_contains_loop_delay(child) for child in ast.iter_child_nodes(node))
+
+
+def _while_lines_missing_delay(tree: ast.AST) -> list[int]:
+    lines: list[int] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.While) and not _contains_loop_delay(node):
+            lines.append(int(getattr(node, "lineno", 0) or 0))
+    return [line for line in lines if line > 0]
+
+
+def _build_gary_bootstrap(chip: str | None) -> str:
+    run_path = device_main_path_for_target(chip)
+    flag_path = device_autorun_flag_path_for_target(chip)
+    return (
+        "print('Gary:BOOT')\n"
+        "try:\n"
+        " import time\n"
+        "except ImportError:\n"
+        " import utime as time\n"
+        "try:\n"
+        " import os\n"
+        "except ImportError:\n"
+        " import uos as os\n"
+        "try:\n"
+        " import sys\n"
+        "except ImportError:\n"
+        " sys = None\n"
+        f"FLAG_PATH = {flag_path!r}\n"
+        f"RUN_PATH = {run_path!r}\n"
+        "should_run = False\n"
+        "try:\n"
+        " os.stat(FLAG_PATH)\n"
+        " should_run = True\n"
+        "except OSError:\n"
+        " should_run = False\n"
+        "if should_run:\n"
+        " try:\n"
+        "  os.remove(FLAG_PATH)\n"
+        " except OSError:\n"
+        "  pass\n"
+        " try:\n"
+        "  time.sleep_ms(120)\n"
+        " except AttributeError:\n"
+        "  time.sleep(0.12)\n"
+        " scope = {'__name__': '__main__', '__file__': RUN_PATH}\n"
+        " try:\n"
+        "  exec(compile(open(RUN_PATH, 'r').read(), RUN_PATH, 'exec'), scope, scope)\n"
+        " except Exception as exc:\n"
+        "  if sys and hasattr(sys, 'print_exception'):\n"
+        "   sys.print_exception(exc)\n"
+        "  else:\n"
+        "   print(exc)\n"
+    )
+
+
+def _managed_device_files(chip: str | None, code: str) -> tuple[list[tuple[str, str]], list[str]]:
+    device_main_path = device_main_path_for_target(chip)
+    bootstrap_path = device_bootstrap_path_for_target(chip)
+    flag_path = device_autorun_flag_path_for_target(chip)
+    legacy_main_path = device_legacy_main_path_for_target(chip)
+    remove_paths = [legacy_main_path] if legacy_main_path != device_main_path else []
+    files = [
+        (bootstrap_path, _build_gary_bootstrap(chip)),
+        (device_main_path, code),
+        (flag_path, "run\n"),
+    ]
+    return files, remove_paths
+
+
 def _looks_like_usb_device_port(port: str | None) -> bool:
     text = str(port or "").lower()
     return any(
-        token in text for token in ("ttyacm", "ttyusb", "usbmodem", "usbserial", "/cu.usb", "com")
+        token in text
+        for token in ("ttyacm", "ttyusb", "usbmodem", "usbserial", "/cu.usb", "com")
     )
 
 
@@ -259,7 +390,10 @@ def micropython_hardware_status(*, console: Any = None) -> dict[str, Any]:
         "all_detected_ports": ports[:8],
         "source_file": "main.py",
         "device_root": device_root_for_target(chip),
+        "device_bootstrap_path": device_bootstrap_path_for_target(chip),
         "device_main_path": device_main_path_for_target(chip),
+        "device_autorun_flag_path": device_autorun_flag_path_for_target(chip),
+        "managed_bootstrap": True,
         "deploy_transport": "raw_repl_over_usb_serial",
     }
 
@@ -279,7 +413,7 @@ def micropython_compile(
     ctx.chip = canonical_target_name(chip or ctx.chip or "ESP32")
     platform = detect_target_platform(ctx.chip)
     try:
-        ast.parse(code)
+        tree = ast.parse(code)
     except SyntaxError as exc:
         line = exc.lineno or 0
         snippet = exc.text.strip() if exc.text else ""
@@ -290,6 +424,21 @@ def micropython_compile(
             "offset": exc.offset,
             "snippet": snippet,
             "platform": platform,
+        }
+
+    missing_delay_lines = _while_lines_missing_delay(tree)
+    if missing_delay_lines:
+        line = missing_delay_lines[0]
+        return {
+            "success": False,
+            "message": (
+                "MicroPython 安全检查失败：每个 while 循环都必须包含短延时，"
+                f"例如 `time.sleep_ms(5)`；请先修复 line {line}"
+            ),
+            "line": line,
+            "lines": missing_delay_lines,
+            "platform": platform,
+            "error_type": "while_loop_missing_delay",
         }
 
     ctx.last_code = code
@@ -331,7 +480,7 @@ def micropython_flash(
     console: Any = None,
     capture_timeout: float = 4.0,
 ) -> dict[str, Any]:
-    """Deploy `main.py` to a serial MicroPython board and soft-reset it."""
+    """Deploy a managed MicroPython program bundle and soft-reset it once."""
 
     ctx = get_context()
     ctx.chip = canonical_target_name(ctx.chip or "ESP32")
@@ -351,11 +500,7 @@ def micropython_flash(
         elif ctx.last_code:
             code = ctx.last_code
         else:
-            return {
-                "success": False,
-                "platform": platform,
-                "message": f"源文件不存在: {source_path}",
-            }
+            return {"success": False, "platform": platform, "message": f"源文件不存在: {source_path}"}
 
     # 烧录前强制同步到 latest_workspace，保证后续运行报错时 AI 有稳定的编辑目标。
     ctx.last_code = code
@@ -371,30 +516,46 @@ def micropython_flash(
     disconnect_serial(ctx)
     ctx.serial_connected = False
     device_main_path = device_main_path_for_target(ctx.chip)
+    device_bootstrap_path = device_bootstrap_path_for_target(ctx.chip)
+    device_flag_path = device_autorun_flag_path_for_target(ctx.chip)
+    files, remove_paths = _managed_device_files(ctx.chip, code)
 
-    result = upload_text_file(
+    result = sync_text_files(
         port=resolved_port,
-        device_path=device_main_path,
-        content=code,
+        files=files,
+        remove_paths=remove_paths,
         baud=baud,
         console=console,
         soft_reset=True,
         capture_timeout=capture_timeout,
     )
     if not result.get("success"):
+        raw_repl_error = _normalize_raw_repl_error(result, ctx.chip)
+        if raw_repl_error is not None:
+            raw_repl_error.update(
+                {
+                    "success": False,
+                    "platform": platform,
+                    "port": resolved_port,
+                    "source_path": sync_result.get("path"),
+                    "source_file": sync_result.get("source_file"),
+                    "device_bootstrap_path": device_bootstrap_path,
+                    "device_main_path": device_main_path,
+                    "device_autorun_flag_path": device_flag_path,
+                }
+            )
+            return raw_repl_error
         return {
             "success": False,
             "platform": platform,
             "port": resolved_port,
-            "message": result.get("message", "同步 main.py 失败"),
+            "message": result.get("message", "同步 MicroPython 托管脚本失败"),
             "stderr": result.get("stderr", ""),
         }
 
     reconnect = _reconnect_monitor(resolved_port, baud, console=console)
     boot_output = result.get("boot_output", "")
-    traceback_present = (
-        "Traceback (most recent call last)" in boot_output or "Traceback:" in boot_output
-    )
+    traceback_present = "Traceback (most recent call last)" in boot_output or "Traceback:" in boot_output
     ctx.hw_connected = True
     return {
         "success": True,
@@ -405,8 +566,61 @@ def micropython_flash(
         "traceback": traceback_present,
         "source_path": sync_result.get("path"),
         "source_file": sync_result.get("source_file"),
+        "device_bootstrap_path": device_bootstrap_path,
         "device_main_path": device_main_path,
-        "message": f"已部署 {device_main_path} 到 {resolved_port}",
+        "device_autorun_flag_path": device_flag_path,
+        "managed_bootstrap": True,
+        "message": f"已部署 {device_main_path}（由 {device_bootstrap_path} 托管）到 {resolved_port}",
+    }
+
+
+def micropython_soft_reset(
+    *,
+    port: str | None = None,
+    baud: int = 115200,
+    console: Any = None,
+    capture_timeout: float = 4.0,
+) -> dict[str, Any]:
+    """Issue a MicroPython soft reset on the connected board."""
+
+    ctx = get_context()
+    ctx.chip = canonical_target_name(ctx.chip or "ESP32")
+    platform = detect_target_platform(ctx.chip)
+    resolved_port = _serial_port_for_ctx(port)
+    if not resolved_port:
+        return {"success": False, "platform": platform, "message": _micropython_port_help(ctx.chip)}
+
+    disconnect_serial(ctx)
+    ctx.serial_connected = False
+    result = soft_reset_board(
+        port=resolved_port,
+        baud=baud,
+        console=console,
+        capture_timeout=capture_timeout,
+    )
+    if not result.get("success"):
+        raw_repl_error = _normalize_raw_repl_error(result, ctx.chip)
+        if raw_repl_error is not None:
+            raw_repl_error.update({"platform": platform, "port": resolved_port})
+            return raw_repl_error
+        return {
+            "success": False,
+            "platform": platform,
+            "port": resolved_port,
+            "message": result.get("message", "MicroPython soft reset 失败"),
+        }
+
+    reconnect = _reconnect_monitor(resolved_port, baud, console=console)
+    boot_output = result.get("boot_output", "")
+    ctx.hw_connected = True
+    return {
+        "success": True,
+        "platform": platform,
+        "port": resolved_port,
+        "serial_connected": reconnect.get("success", False),
+        "boot_output": boot_output,
+        "traceback": "Traceback" in boot_output,
+        "message": "已发送 MicroPython soft reset",
     }
 
 
@@ -448,35 +662,26 @@ def micropython_auto_sync_cycle(
         record_success_memory=record_success_memory,
         log_error=log_error,
     )
-    steps.append(
-        {
-            "step": "compile",
-            "success": compile_result.get("success", False),
-            "msg": compile_result.get("message", ""),
-        }
-    )
+    steps.append({"step": "compile", "success": compile_result.get("success", False), "msg": compile_result.get("message", "")})
     if not compile_result.get("success"):
+        error_message = compile_result.get("message", "MicroPython 检查失败")
         return {
             "success": False,
             "attempt": attempt,
             "remaining": max(0, remaining),
             "give_up": False,
             "steps": steps,
-            "compile_errors": compile_result.get("message", ""),
-            "error": "MicroPython 语法错误，请按行号修复",
+            "compile_errors": error_message,
+            "error": error_message
+            if compile_result.get("error_type") == "while_loop_missing_delay"
+            else "MicroPython 语法错误，请按行号修复",
             "platform": platform,
         }
 
     ports = detect_serial_ports(verbose=False)
     if not ports and not getattr(getattr(ctx, "serial", None), "port", None):
         if request:
-            save_project(
-                code,
-                {"bin_path": None, "bin_size": len(code.encode("utf-8"))},
-                request,
-                chip=ctx.chip,
-                console=console,
-            )
+            save_project(code, {"bin_path": None, "bin_size": len(code.encode("utf-8"))}, request, chip=ctx.chip, console=console)
         return {
             "success": True,
             "attempt": attempt,
@@ -486,14 +691,26 @@ def micropython_auto_sync_cycle(
         }
 
     flash_result = micropython_flash(code=code, baud=baud, console=console)
-    steps.append(
-        {
-            "step": "deploy",
-            "success": flash_result.get("success", False),
-            "msg": flash_result.get("message", ""),
-        }
-    )
+    steps.append({"step": "deploy", "success": flash_result.get("success", False), "msg": flash_result.get("message", "")})
     if not flash_result.get("success"):
+        raw_repl_error = _normalize_raw_repl_error(flash_result, ctx.chip)
+        if raw_repl_error is not None:
+            return {
+                "success": False,
+                "attempt": attempt,
+                "remaining": max(0, remaining),
+                "give_up": False,
+                "steps": steps,
+                "error": raw_repl_error.get("message", f"部署到 {label} 失败"),
+                "platform": platform,
+                "raw_repl_failure": True,
+                "suspected_user_code_block": True,
+                "recovery_suggestions": raw_repl_error.get("recovery_suggestions", []),
+                "suspected_causes": raw_repl_error.get("suspected_causes", []),
+                "source_path": flash_result.get("source_path"),
+                "source_file": flash_result.get("source_file"),
+                "device_main_path": flash_result.get("device_main_path"),
+            }
         return {
             "success": False,
             "attempt": attempt,
@@ -579,7 +796,12 @@ def micropython_list_files_tool(
     if not resolved_port:
         return {"success": False, "platform": platform, "message": _micropython_port_help(ctx.chip)}
     target_path = device_root_for_target(ctx.chip) if path == "." and platform == "canmv" else path
-    return list_remote_files(port=resolved_port, path=target_path, baud=baud, console=console)
+    result = list_remote_files(port=resolved_port, path=target_path, baud=baud, console=console)
+    raw_repl_error = _normalize_raw_repl_error(result, ctx.chip)
+    if raw_repl_error is not None:
+        raw_repl_error.update({"platform": platform, "port": resolved_port, "path": target_path})
+        return raw_repl_error
+    return result
 
 
 __all__ = [
@@ -589,4 +811,5 @@ __all__ = [
     "micropython_flash",
     "micropython_hardware_status",
     "micropython_list_files_tool",
+    "micropython_soft_reset",
 ]
