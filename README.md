@@ -9,7 +9,6 @@
 [![Python](https://img.shields.io/badge/Python-3.8+-green.svg)](https://www.python.org/)
 [![Boards](https://img.shields.io/badge/Boards-STM32%20%7C%20RP2040%20%7C%20ESP32%20%7C%20ESP8266-blue.svg)](#supported-chips)
 [![Website](https://img.shields.io/badge/Website-garycli.com-success)](https://www.garycli.com)
-[![Tests](https://github.com/PrettyMyGirlZyy4Embedded/garycli/actions/workflows/test.yml/badge.svg)](https://github.com/PrettyMyGirlZyy4Embedded/garycli/actions)
 
 <br>
 
