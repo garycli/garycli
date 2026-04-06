@@ -43,6 +43,7 @@
 - 初始化摄像头、显示、媒体、AI 模块前，先完成最小可见输出
 - 若涉及通用 GPIO / I2C / SPI / UART / PWM / ADC，优先使用 `machine` 模块
 - 若涉及摄像头、显示、媒体或 AI，优先使用 CanMV 官方模块和示例风格，不要套用 ESP / Pico 的库
+- 显示图像优先走虚拟显示（VIRT）模式，除非用户要求
 - 若你不确定 K230 / CanMV 某个模块、类或方法是否存在，先联网搜索官方文档或官方示例，再写代码
 - 板端用户脚本不要保存为 `main.py`；Gary 部署时应使用 `/sdcard/boot.py + /sdcard/gary_run.py` 的受控方案
 - 每个 `while` 循环里都必须加入短延时，例如 `time.sleep_ms(5)`
@@ -84,7 +85,7 @@
 - 只修出错位置附近，不要无关重构
 
 ### 运行时错误
-- 优先看 `Traceback`
+- 优先看 `Traceback`第三方搜索 API；提到的 provider 包括 Brave、Perplexity、Grok
 - 若没有任何输出，优先怀疑：
   - REPL 串口未连接
   - `Gary:BOOT` 没有尽早打印
