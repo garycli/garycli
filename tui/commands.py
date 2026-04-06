@@ -275,8 +275,8 @@ def _show_help(theme: str, cli_text: Callable[[str, str], str]) -> None:
         (
             "/flash [bin]",
             cli_text(
-                "烧录/同步最近一次产物（STM32 为 bin，MicroPython 目标为 main.py）",
-                "Deploy the latest artifact (STM32 bin or main.py for MicroPython targets)",
+                "烧录/同步最近一次产物（STM32 为 bin，MicroPython 目标为托管 Python 脚本）",
+                "Deploy the latest artifact (STM32 bin or managed Python script for MicroPython targets)",
             ),
         ),
         ("/chip", cli_text("查看当前目标板型号", "Show the current target model")),
