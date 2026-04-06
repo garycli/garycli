@@ -26,7 +26,12 @@ from hardware.micropython import (
     soft_reset_board,
     sync_text_files,
 )
-from hardware.serial_mon import SerialMonitor, connect_serial, detect_serial_ports, disconnect_serial
+from hardware.serial_mon import (
+    SerialMonitor,
+    connect_serial,
+    detect_serial_ports,
+    disconnect_serial,
+)
 
 
 def _micropython_platform_label(chip: str | None) -> str:
@@ -50,7 +55,9 @@ def _micropython_port_help(chip: str | None) -> str:
     return f"未检测到 {label} 常见 USB 串口，请确认开发板已刷入 MicroPython 且 USB 数据线可传输"
 
 
-def _normalize_raw_repl_error(result: dict[str, Any] | None, chip: str | None) -> dict[str, Any] | None:
+def _normalize_raw_repl_error(
+    result: dict[str, Any] | None, chip: str | None
+) -> dict[str, Any] | None:
     """Rewrite raw-REPL transport failures into a clearer diagnostic payload."""
 
     data = dict(result or {})
@@ -87,9 +94,13 @@ def _inspect_boot_output(boot_output: str) -> dict[str, Any]:
     run_started = "Gary:RUN_START" in boot_output
     run_done = "Gary:RUN_DONE" in boot_output
     run_error = "Gary:RUN_ERROR" in boot_output
-    traceback_present = "Traceback (most recent call last)" in boot_output or "Traceback:" in boot_output
+    traceback_present = (
+        "Traceback (most recent call last)" in boot_output or "Traceback:" in boot_output
+    )
     informative_lines = [line for line in lines if line != "Gary:BOOT"]
-    runtime_confirmed = run_started or run_done or run_error or traceback_present or bool(informative_lines)
+    runtime_confirmed = (
+        run_started or run_done or run_error or traceback_present or bool(informative_lines)
+    )
     return {
         "lines": lines,
         "boot_ok": boot_ok,
@@ -209,8 +220,7 @@ def _managed_device_files(chip: str | None, code: str) -> tuple[list[tuple[str, 
 def _looks_like_usb_device_port(port: str | None) -> bool:
     text = str(port or "").lower()
     return any(
-        token in text
-        for token in ("ttyacm", "ttyusb", "usbmodem", "usbserial", "/cu.usb", "com")
+        token in text for token in ("ttyacm", "ttyusb", "usbmodem", "usbserial", "/cu.usb", "com")
     )
 
 
@@ -525,7 +535,11 @@ def micropython_flash(
         elif ctx.last_code:
             code = ctx.last_code
         else:
-            return {"success": False, "platform": platform, "message": f"源文件不存在: {source_path}"}
+            return {
+                "success": False,
+                "platform": platform,
+                "message": f"源文件不存在: {source_path}",
+            }
 
     # 烧录前强制同步到 latest_workspace，保证后续运行报错时 AI 有稳定的编辑目标。
     ctx.last_code = code
@@ -706,7 +720,13 @@ def micropython_auto_sync_cycle(
         record_success_memory=record_success_memory,
         log_error=log_error,
     )
-    steps.append({"step": "compile", "success": compile_result.get("success", False), "msg": compile_result.get("message", "")})
+    steps.append(
+        {
+            "step": "compile",
+            "success": compile_result.get("success", False),
+            "msg": compile_result.get("message", ""),
+        }
+    )
     if not compile_result.get("success"):
         error_message = compile_result.get("message", "MicroPython 检查失败")
         return {
@@ -716,16 +736,24 @@ def micropython_auto_sync_cycle(
             "give_up": False,
             "steps": steps,
             "compile_errors": error_message,
-            "error": error_message
-            if compile_result.get("error_type") == "while_loop_missing_delay"
-            else "MicroPython 语法错误，请按行号修复",
+            "error": (
+                error_message
+                if compile_result.get("error_type") == "while_loop_missing_delay"
+                else "MicroPython 语法错误，请按行号修复"
+            ),
             "platform": platform,
         }
 
     ports = detect_serial_ports(verbose=False)
     if not ports and not getattr(getattr(ctx, "serial", None), "port", None):
         if request:
-            save_project(code, {"bin_path": None, "bin_size": len(code.encode("utf-8"))}, request, chip=ctx.chip, console=console)
+            save_project(
+                code,
+                {"bin_path": None, "bin_size": len(code.encode("utf-8"))},
+                request,
+                chip=ctx.chip,
+                console=console,
+            )
         return {
             "success": True,
             "attempt": attempt,
@@ -735,7 +763,13 @@ def micropython_auto_sync_cycle(
         }
 
     flash_result = micropython_flash(code=code, baud=baud, console=console)
-    steps.append({"step": "deploy", "success": flash_result.get("success", False), "msg": flash_result.get("message", "")})
+    steps.append(
+        {
+            "step": "deploy",
+            "success": flash_result.get("success", False),
+            "msg": flash_result.get("message", ""),
+        }
+    )
     if not flash_result.get("success"):
         raw_repl_error = _normalize_raw_repl_error(flash_result, ctx.chip)
         if raw_repl_error is not None:
@@ -799,16 +833,16 @@ def micropython_auto_sync_cycle(
             console=console,
         )
     if not boot_info["runtime_confirmed"]:
-        device_main_path = flash_result.get("device_main_path") or device_main_path_for_target(ctx.chip)
+        device_main_path = flash_result.get("device_main_path") or device_main_path_for_target(
+            ctx.chip
+        )
         if boot_info["bootstrap_only"]:
             error = (
                 f"代码已写入 {ctx.chip}，但只看到 boot.py 的引导输出，未看到 {device_main_path} 的启动标记或串口日志，"
                 "不能确认程序已经运行"
             )
         else:
-            error = (
-                f"代码已写入 {ctx.chip}，但未捕获到任何串口输出，不能确认 {device_main_path} 是否已运行"
-            )
+            error = f"代码已写入 {ctx.chip}，但未捕获到任何串口输出，不能确认 {device_main_path} 是否已运行"
         return {
             "success": False,
             "attempt": attempt,
