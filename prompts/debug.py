@@ -25,6 +25,7 @@ _I2C_FAILURE_PROMPT = """## I2C 失败专项诊断
 _MICROPYTHON_COMPILE_PROMPT = """## MicroPython 语法诊断
 - 优先修复工具返回的 `line` / `offset` / `snippet`，不要做无关重构。
 - 常见问题：缩进不一致、缺冒号、括号不配对、字符串未闭合、`try/except` 结构错误。
+- 若 `workspace/projects/latest_workspace/main.py` 不存在，说明当前还没有缓存源码；不要调用 `str_replace_edit`，直接生成完整 `main.py` 并用对应的 compile / auto_sync_cycle 创建缓存。
 - 若是增量修改造成的错误，优先 `str_replace_edit` + `stm32_recompile`，不要整文件重写。"""
 
 _MICROPYTHON_RUNTIME_PROMPT = """## MicroPython 运行诊断
