@@ -8,7 +8,14 @@ from typing import Any, Callable, Mapping, Optional
 
 import compiler as _compiler_module
 from core.memory import _ensure_member_file, _member_preview_markdown
-from core.platforms import ESP_TARGET_CHOICES, RP2040_TARGET_CHOICES, detect_target_platform
+from core.platforms import (
+    CANMV_TARGET_CHOICES,
+    ESP_TARGET_CHOICES,
+    MICROPYTHON_TARGET_CHOICES,
+    RP2040_TARGET_CHOICES,
+    detect_target_platform,
+    is_micropython_target,
+)
 from core.state import get_context
 from gary_skills import _get_manager, handle_skill_command
 from hardware.serial_mon import detect_serial_ports
@@ -110,9 +117,15 @@ class GaryCompleter(Completer):
         chips = set(_compiler_module.CHIP_DB.keys())
         chips.update(RP2040_TARGET_CHOICES)
         chips.update(ESP_TARGET_CHOICES)
+        chips.update(CANMV_TARGET_CHOICES)
         for value in (self._default_chip, ctx.chip):
             if value:
                 chips.add(str(value).upper())
+        return sorted(chips)
+
+    def _connect_candidates(self) -> list[str]:
+        chips = set(self._chip_candidates())
+        chips.update(MICROPYTHON_TARGET_CHOICES)
         return sorted(chips)
 
     def _serial_candidates(self) -> list[str]:
@@ -176,7 +189,12 @@ class GaryCompleter(Completer):
             args = parts[1:-1]
         arg_index = len(args)
 
-        if head in ("/connect", "/chip"):
+        if head == "/connect":
+            if arg_index == 0:
+                yield from self._complete(current, self._connect_candidates())
+            return
+
+        if head == "/chip":
             if arg_index == 0:
                 yield from self._complete(current, self._chip_candidates())
             return
@@ -234,8 +252,8 @@ def _show_help(theme: str, cli_text: Callable[[str, str], str]) -> None:
         (
             "/connect [chip]",
             cli_text(
-                "连接目标板（如 /connect STM32F103C8T6、/connect PICO_W 或 /connect ESP32）",
-                "Connect the target board (for example: /connect STM32F103C8T6, /connect PICO_W, or /connect ESP32)",
+                "连接目标板（如 /connect STM32F103C8T6、/connect PICO_W、/connect ESP32、/connect CANMV_K230 或 /connect MICROPYTHON 自动识别）",
+                "Connect the target board (for example: /connect STM32F103C8T6, /connect PICO_W, /connect ESP32, /connect CANMV_K230, or /connect MICROPYTHON for auto-detect)",
             ),
         ),
         (
@@ -344,7 +362,7 @@ def handle_slash_command(
                 f"Connected: {r.get('chip', ctx.chip)}  Serial: {serial_state}",
             )
         else:
-            is_micropython = detect_target_platform(chip or get_context().chip) in {"rp2040", "esp"}
+            is_micropython = is_micropython_target(chip or get_context().chip)
             msg = (
                 cli_text(
                     "连接失败，请检查 USB 串口、数据线和 MicroPython 固件",
