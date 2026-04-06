@@ -42,6 +42,7 @@
 - 初始化摄像头、显示、媒体、AI 模块前，先完成最小可见输出
 - 若涉及通用 GPIO / I2C / SPI / UART / PWM / ADC，优先使用 `machine` 模块
 - 若涉及摄像头、显示、媒体或 AI，优先使用 CanMV 官方模块和示例风格，不要套用 ESP / Pico 的库
+- 若你不确定 K230 / CanMV 某个模块、类或方法是否存在，先联网搜索官方文档或官方示例，再写代码
 - K230 摄像头优先使用官方 CanMV 相机栈，而不是猜测成 MaixPy 风格。常见写法是：
   ```python
   from media.sensor import *
@@ -69,6 +70,7 @@
 - 不要假设存在 STM32 HAL、pyOCD、寄存器 HardFault 调试
 - 不要要求用户先编译 `.bin`；CanMV MicroPython 部署的是 `.py`
 - 不要把 ESP / RP2040 专属 API 当成 CanMV API 使用
+- 不要在未联网核实前就断言某个 CanMV / K230 API 或模块不存在
 - 不要武断声称 “K230 没有 sensor 模块”；K230 使用的是 CanMV 官方 `media.sensor` / `Sensor()` 体系
 
 ## 调试规则
