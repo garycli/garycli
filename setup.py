@@ -484,12 +484,7 @@ _AI_PRESETS = [
         "gemini-2.5-flash",
         "gemini",
     ),
-    (
-        "通义千问 (阿里云)",
-        "https://dashscope.aliyuncs.com/compatible-mode/v1",
-        "qwen-plus",
-        "openai",
-    ),
+    ("通义千问 (阿里云)", "https://dashscope.aliyuncs.com/compatible-mode/v1", "qwen-plus", "openai"),
     ("智谱 GLM", "https://open.bigmodel.cn/api/paas/v4/", "glm-4-flash", "openai"),
     ("Ollama (本地无需Key)", "http://127.0.0.1:11434/v1", "qwen2.5-coder:14b", "openai"),
     ("自定义 / Other", "", "", ""),
@@ -665,11 +660,7 @@ def configure_ai(auto: bool):
     default_model = (
         preset_model
         if preset_model
-        else (
-            current_model_for_style
-            if current_model_for_style
-            else default_models.get(api_style, "gpt-4o")
-        )
+        else (current_model_for_style if current_model_for_style else default_models.get(api_style, "gpt-4o"))
     )
     hint = f" [{_c('36', default_model)}]"
 
@@ -1175,7 +1166,7 @@ def install_python_packages(auto: bool):
 # STEP 3b: 本地 SearXNG（网页搜索）
 # ─────────────────────────────────────────────────────────────────────────────
 SEARXNG_DEFAULT_URL = "http://127.0.0.1:8080"
-SEARXNG_DEFAULT_IMAGE = "ghcr.io/searxng/searxng:latest"
+SEARXNG_DEFAULT_IMAGE = "searxng/searxng:latest"
 SEARXNG_DEFAULT_CONTAINER = "gary-searxng"
 
 
@@ -1217,27 +1208,35 @@ def _container_running(runtime: str, name: str) -> bool:
     return result.returncode == 0 and result.stdout.strip().lower() == "true"
 
 
+def _container_image_present(runtime: str, image: str) -> bool:
+    return _run([runtime, "image", "inspect", image], timeout=30).returncode == 0
+
+
 def _searxng_healthcheck(base_url: str = None) -> bool:
     import urllib.request
 
     target = (base_url or _searxng_url()).rstrip("/")
-    req = urllib.request.Request(
-        f"{target}/search?q=gary&format=json",
-        headers={"User-Agent": "Mozilla/5.0"},
-    )
     try:
+        req = urllib.request.Request(
+            f"{target}/",
+            headers={"User-Agent": "Mozilla/5.0"},
+        )
         with urllib.request.urlopen(req, timeout=5) as resp:
-            body = resp.read(256).decode("utf-8", errors="ignore")
-            return resp.status == 200 and "results" in body
+            body = resp.read(512).decode("utf-8", errors="ignore").lower()
+            return resp.status == 200 and "searxng" in body
     except Exception:
         return False
 
 
-def setup_local_searxng(auto: bool):
+def setup_local_searxng(auto: bool, *, explicit: bool = False):
     header("Step 3b  本地 SearXNG（网页搜索可选）")
     base_url = _searxng_url()
     if _searxng_healthcheck(base_url):
         ok(f"SearXNG 已运行: {base_url}")
+        return
+
+    if auto and not explicit:
+        info("默认跳过本地 SearXNG 安装；需要网页搜索时再执行：python setup.py --searxng")
         return
 
     runtime = _container_runtime()
@@ -1247,7 +1246,11 @@ def setup_local_searxng(auto: bool):
         return
 
     if not (
-        auto or ask("安装并启动本地 SearXNG（browser_search / web_search 需要）？", default="n")
+        auto
+        or ask(
+            "安装并启动本地 SearXNG（首次需拉取 Docker 镜像，可能较慢；browser_search / web_search 需要）？",
+            default="n",
+        )
     ):
         info("已跳过，本地网页搜索工具将在 SearXNG 启动后可用")
         return
@@ -1270,11 +1273,18 @@ def setup_local_searxng(auto: bool):
                 warn(f"启动容器失败，请手动查看日志: {runtime} logs {container_name}")
                 return
     else:
-        info(f"拉取镜像: {image}")
-        pull_result = _run([runtime, "pull", image], capture=False, timeout=9000)
-        if pull_result.returncode != 0:
-            warn(f"镜像拉取失败，请手动重试: {runtime} pull {image}")
-            return
+        if _container_image_present(runtime, image):
+            ok(f"镜像已存在: {image}")
+        else:
+            info(f"拉取镜像: {image}")
+            info("首次拉取可能较慢；已下载的层会被 Docker 缓存，重试会从断点继续")
+            pull_result = _run([runtime, "pull", image], capture=False, timeout=None)
+            if pull_result.returncode != 0:
+                if _container_image_present(runtime, image):
+                    warn("镜像拉取命令返回异常，但镜像已存在，继续创建容器")
+                else:
+                    warn(f"镜像拉取失败，请手动重试: {runtime} pull {image}")
+                    return
 
         info(f"创建容器: {container_name}")
         run_result = _run(
@@ -1763,9 +1773,7 @@ def _install_gary_unix(auto: bool):
 def _install_gary_win(auto: bool):
     install_dir = _resolve_win_install_dir()
     gary_bat = install_dir / "gary.bat"
-    expected_content = _GARY_BAT.format(
-        agent_script=str(AGENT_SCRIPT), python=_active_python_path()
-    )
+    expected_content = _GARY_BAT.format(agent_script=str(AGENT_SCRIPT), python=_active_python_path())
 
     if gary_bat.exists():
         existing = gary_bat.read_text(encoding="utf-8", errors="ignore")
@@ -1962,7 +1970,7 @@ def main():
 
         if args.searxng:
             create_workspace()
-            setup_local_searxng(auto=True)
+            setup_local_searxng(auto=True, explicit=True)
             return
 
         check_python()
@@ -1972,7 +1980,7 @@ def main():
         install_arm_gcc(auto=args.auto)
         install_python_packages(auto=args.auto)
         create_workspace()
-        setup_local_searxng(auto=args.auto)
+        setup_local_searxng(auto=args.auto, explicit=False)
         download_hal(auto=args.auto)
         download_freertos(auto=args.auto)
         setup_udev(auto=args.auto)
