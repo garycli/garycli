@@ -16,18 +16,8 @@ from core.platforms import (
 )
 from core.project_store import latest_workspace_main_path, save_project, sync_latest_workspace
 from core.state import get_context
-from hardware.micropython import (
-    list_remote_files,
-    probe_micropython_board,
-    scan_micropython_boards,
-    upload_text_file,
-)
-from hardware.serial_mon import (
-    SerialMonitor,
-    connect_serial,
-    detect_serial_ports,
-    disconnect_serial,
-)
+from hardware.micropython import list_remote_files, probe_micropython_board, scan_micropython_boards, upload_text_file
+from hardware.serial_mon import SerialMonitor, connect_serial, detect_serial_ports, disconnect_serial
 
 
 def _micropython_platform_label(chip: str | None) -> str:
@@ -54,7 +44,8 @@ def _micropython_port_help(chip: str | None) -> str:
 def _looks_like_usb_device_port(port: str | None) -> bool:
     text = str(port or "").lower()
     return any(
-        token in text for token in ("ttyacm", "ttyusb", "usbmodem", "usbserial", "/cu.usb", "com")
+        token in text
+        for token in ("ttyacm", "ttyusb", "usbmodem", "usbserial", "/cu.usb", "com")
     )
 
 
@@ -346,13 +337,23 @@ def micropython_flash(
             if file_path
             else latest_workspace_main_path(ctx.chip)
         )
-        if not source_path.exists():
-            return {
-                "success": False,
-                "platform": platform,
-                "message": f"源文件不存在: {source_path}",
-            }
-        code = source_path.read_text(encoding="utf-8")
+        if source_path.exists():
+            code = source_path.read_text(encoding="utf-8")
+        elif ctx.last_code:
+            code = ctx.last_code
+        else:
+            return {"success": False, "platform": platform, "message": f"源文件不存在: {source_path}"}
+
+    # 烧录前强制同步到 latest_workspace，保证后续运行报错时 AI 有稳定的编辑目标。
+    ctx.last_code = code
+    sync_result = sync_latest_workspace(code, chip=ctx.chip)
+    if not sync_result.get("success"):
+        return {
+            "success": False,
+            "platform": platform,
+            "port": resolved_port,
+            "message": f"烧录前保存 latest_workspace 失败: {sync_result.get('message', '')}",
+        }
 
     disconnect_serial(ctx)
     ctx.serial_connected = False
@@ -378,9 +379,7 @@ def micropython_flash(
 
     reconnect = _reconnect_monitor(resolved_port, baud, console=console)
     boot_output = result.get("boot_output", "")
-    traceback_present = (
-        "Traceback (most recent call last)" in boot_output or "Traceback:" in boot_output
-    )
+    traceback_present = "Traceback (most recent call last)" in boot_output or "Traceback:" in boot_output
     ctx.hw_connected = True
     return {
         "success": True,
@@ -389,6 +388,8 @@ def micropython_flash(
         "serial_connected": reconnect.get("success", False),
         "boot_output": boot_output,
         "traceback": traceback_present,
+        "source_path": sync_result.get("path"),
+        "source_file": sync_result.get("source_file"),
         "device_main_path": device_main_path,
         "message": f"已部署 {device_main_path} 到 {resolved_port}",
     }
@@ -432,13 +433,7 @@ def micropython_auto_sync_cycle(
         record_success_memory=record_success_memory,
         log_error=log_error,
     )
-    steps.append(
-        {
-            "step": "compile",
-            "success": compile_result.get("success", False),
-            "msg": compile_result.get("message", ""),
-        }
-    )
+    steps.append({"step": "compile", "success": compile_result.get("success", False), "msg": compile_result.get("message", "")})
     if not compile_result.get("success"):
         return {
             "success": False,
@@ -454,13 +449,7 @@ def micropython_auto_sync_cycle(
     ports = detect_serial_ports(verbose=False)
     if not ports and not getattr(getattr(ctx, "serial", None), "port", None):
         if request:
-            save_project(
-                code,
-                {"bin_path": None, "bin_size": len(code.encode("utf-8"))},
-                request,
-                chip=ctx.chip,
-                console=console,
-            )
+            save_project(code, {"bin_path": None, "bin_size": len(code.encode("utf-8"))}, request, chip=ctx.chip, console=console)
         return {
             "success": True,
             "attempt": attempt,
@@ -470,13 +459,7 @@ def micropython_auto_sync_cycle(
         }
 
     flash_result = micropython_flash(code=code, baud=baud, console=console)
-    steps.append(
-        {
-            "step": "deploy",
-            "success": flash_result.get("success", False),
-            "msg": flash_result.get("message", ""),
-        }
-    )
+    steps.append({"step": "deploy", "success": flash_result.get("success", False), "msg": flash_result.get("message", "")})
     if not flash_result.get("success"):
         return {
             "success": False,
