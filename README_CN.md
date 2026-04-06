@@ -31,6 +31,95 @@
 
 </div>
 
+
+## 🚀 快速开始
+
+### 一键安装
+
+**Linux / macOS / WSL：**
+
+```bash
+curl -fsSL https://www.garycli.com/install.sh | bash
+```
+
+**Windows（PowerShell）：**
+
+```powershell
+irm https://www.garycli.com/install.ps1 | iex
+```
+
+安装脚本会尝试完成：
+
+* Python 环境检查
+* arm-none-eabi-gcc 安装或检测
+* HAL / CMSIS 相关资源准备
+* Python 依赖安装
+* 串口与调试工具安装
+* CLI 启动命令写入
+
+### 手动安装
+
+```bash
+# 1. 克隆仓库
+git clone https://github.com/PrettyMyGirlZyy4Embedded/garycli.git
+cd garycli
+
+# 2. 下载安装资源
+python3 setup.py --auto
+
+# 3. 运行环境诊断
+python3 stm32_agent.py --doctor
+```
+
+### 首次配置
+
+```bash
+gary config
+```
+
+按提示配置：
+
+* API Key
+* Base URL
+* Model
+* 默认芯片型号
+* 默认串口参数（可选）
+
+### 环境诊断
+
+```bash
+gary doctor
+```
+
+输出示例：
+
+```text
+■ AI 接口
+  ✓ API Key   sk-abc...xyz
+  ✓ Base URL  https://api.deepseek.com/v1
+  ✓ Model     deepseek-chat
+  ✓ API 连通性  测试通过
+
+■ 编译工具链
+  ✓ arm-none-eabi-gcc  arm-none-eabi-gcc (15.1.0)
+  ✓ HAL 资源           STM32F0xx, STM32F1xx, STM32F3xx, STM32F4xx
+  ✓ CMSIS Core
+
+■ Python 依赖
+  ✓ openai
+  ✓ rich
+  ✓ prompt_toolkit
+  ✓ pyserial      (可选)
+  ✓ pyocd         (可选)
+  ✓ stm32loader   (可选)
+
+■ 硬件探针
+  ✓ ST-Link V2
+  ✓ 串口 /dev/ttyUSB0
+
+✅ 所有核心配置正常，Gary 已就绪
+```
+
 ---
 
 ## ⚡ 什么是 Gary？
@@ -165,115 +254,6 @@ Gary 支持可插拔技能包，用于扩展能力边界。
 * 依赖文件
 
 安装后即可热加载，无需重启。
-
----
-
-## 🚀 快速开始
-
-### 一键安装
-
-**Linux / macOS / WSL：**
-
-```bash
-curl -fsSL https://www.garycli.com/install.sh | bash
-```
-
-**Windows（PowerShell）：**
-
-```powershell
-irm https://www.garycli.com/install.ps1 | iex
-```
-
-安装脚本会尝试完成：
-
-* Python 环境检查
-* arm-none-eabi-gcc 安装或检测
-* HAL / CMSIS 相关资源准备
-* Python 依赖安装
-* 串口与调试工具安装
-* CLI 启动命令写入
-
-### 手动安装
-
-```bash
-# 1. 克隆仓库
-git clone https://github.com/PrettyMyGirlZyy4Embedded/garycli.git
-cd garycli
-
-# 2. 安装 Python 依赖
-pip install -r requirements.txt
-
-# 3. 安装交叉编译器
-# Ubuntu / Debian:
-sudo apt install gcc-arm-none-eabi
-
-# macOS:
-brew install --cask gcc-arm-embedded
-
-# Windows:
-# 从 ARM 官方或对应发行源安装 gcc-arm-none-eabi
-
-# 4. 可选：安装 UART ISP 烧录工具
-pip install stm32loader
-
-# 5. 可选：安装 SWD 调试工具
-pip install pyocd
-
-# 6. 下载 HAL 资源
-python3 setup.py --hal
-
-# 7. 运行环境诊断
-python3 stm32_agent.py --doctor
-```
-
-### 首次配置
-
-```bash
-gary config
-```
-
-按提示配置：
-
-* API Key
-* Base URL
-* Model
-* 默认芯片型号
-* 默认串口参数（可选）
-
-### 环境诊断
-
-```bash
-gary doctor
-```
-
-输出示例：
-
-```text
-■ AI 接口
-  ✓ API Key   sk-abc...xyz
-  ✓ Base URL  https://api.deepseek.com/v1
-  ✓ Model     deepseek-chat
-  ✓ API 连通性  测试通过
-
-■ 编译工具链
-  ✓ arm-none-eabi-gcc  arm-none-eabi-gcc (15.1.0)
-  ✓ HAL 资源           STM32F0xx, STM32F1xx, STM32F3xx, STM32F4xx
-  ✓ CMSIS Core
-
-■ Python 依赖
-  ✓ openai
-  ✓ rich
-  ✓ prompt_toolkit
-  ✓ pyserial      (可选)
-  ✓ pyocd         (可选)
-  ✓ stm32loader   (可选)
-
-■ 硬件探针
-  ✓ ST-Link V2
-  ✓ 串口 /dev/ttyUSB0
-
-✅ 所有核心配置正常，Gary 已就绪
-```
 
 ---
 
