@@ -9,23 +9,15 @@ from typing import Any, Callable
 from core.platforms import (
     canonical_target_name,
     canonical_target_name_from_micropython_info,
+    device_main_path_for_target,
+    device_root_for_target,
     detect_target_platform,
     is_generic_micropython_name,
 )
 from core.project_store import latest_workspace_main_path, save_project, sync_latest_workspace
 from core.state import get_context
-from hardware.micropython import (
-    list_remote_files,
-    probe_micropython_board,
-    scan_micropython_boards,
-    upload_text_file,
-)
-from hardware.serial_mon import (
-    SerialMonitor,
-    connect_serial,
-    detect_serial_ports,
-    disconnect_serial,
-)
+from hardware.micropython import list_remote_files, probe_micropython_board, scan_micropython_boards, upload_text_file
+from hardware.serial_mon import SerialMonitor, connect_serial, detect_serial_ports, disconnect_serial
 
 
 def _micropython_platform_label(chip: str | None) -> str:
@@ -34,18 +26,26 @@ def _micropython_platform_label(chip: str | None) -> str:
         return "RP2040"
     if platform == "esp":
         return "ESP"
+    if platform == "canmv":
+        return "CanMV K230"
     return "MicroPython"
 
 
 def _micropython_port_help(chip: str | None) -> str:
     label = _micropython_platform_label(chip)
+    if detect_target_platform(chip) == "canmv":
+        return (
+            f"未检测到 {label} 的 REPL 串口，请确认已刷入 CanMV-K230 MicroPython 固件、TF 卡启动正常，"
+            "并检查 USB 数据线；部分板卡需要同时连接两根 USB 线"
+        )
     return f"未检测到 {label} 常见 USB 串口，请确认开发板已刷入 MicroPython 且 USB 数据线可传输"
 
 
 def _looks_like_usb_device_port(port: str | None) -> bool:
     text = str(port or "").lower()
     return any(
-        token in text for token in ("ttyacm", "ttyusb", "usbmodem", "usbserial", "/cu.usb", "com")
+        token in text
+        for token in ("ttyacm", "ttyusb", "usbmodem", "usbserial", "/cu.usb", "com")
     )
 
 
@@ -138,7 +138,10 @@ def _autodetect_micropython_board(
         "port": first.get("port"),
         "info": info,
         "candidate_ports": [board.get("port") for board in boards if board.get("port")],
-        "message": f"已发现 {len(boards)} 个 MicroPython 设备，但暂时无法识别具体板型；请改用 /connect PICO_W 或 /connect ESP32",
+        "message": (
+            f"已发现 {len(boards)} 个 MicroPython 设备，但暂时无法识别具体板型；"
+            "请改用 /connect PICO_W、/connect ESP32 或 /connect CANMV_K230"
+        ),
     }
 
 
@@ -246,6 +249,8 @@ def micropython_hardware_status(*, console: Any = None) -> dict[str, Any]:
         "candidate_ports": preferred_ports[:5] or ports[:5],
         "all_detected_ports": ports[:8],
         "source_file": "main.py",
+        "device_root": device_root_for_target(chip),
+        "device_main_path": device_main_path_for_target(chip),
         "deploy_transport": "raw_repl_over_usb_serial",
     }
 
@@ -333,19 +338,16 @@ def micropython_flash(
             else latest_workspace_main_path(ctx.chip)
         )
         if not source_path.exists():
-            return {
-                "success": False,
-                "platform": platform,
-                "message": f"源文件不存在: {source_path}",
-            }
+            return {"success": False, "platform": platform, "message": f"源文件不存在: {source_path}"}
         code = source_path.read_text(encoding="utf-8")
 
     disconnect_serial(ctx)
     ctx.serial_connected = False
+    device_main_path = device_main_path_for_target(ctx.chip)
 
     result = upload_text_file(
         port=resolved_port,
-        device_path="main.py",
+        device_path=device_main_path,
         content=code,
         baud=baud,
         console=console,
@@ -363,9 +365,7 @@ def micropython_flash(
 
     reconnect = _reconnect_monitor(resolved_port, baud, console=console)
     boot_output = result.get("boot_output", "")
-    traceback_present = (
-        "Traceback (most recent call last)" in boot_output or "Traceback:" in boot_output
-    )
+    traceback_present = "Traceback (most recent call last)" in boot_output or "Traceback:" in boot_output
     ctx.hw_connected = True
     return {
         "success": True,
@@ -374,7 +374,8 @@ def micropython_flash(
         "serial_connected": reconnect.get("success", False),
         "boot_output": boot_output,
         "traceback": traceback_present,
-        "message": f"已部署 main.py 到 {resolved_port}",
+        "device_main_path": device_main_path,
+        "message": f"已部署 {device_main_path} 到 {resolved_port}",
     }
 
 
@@ -416,13 +417,7 @@ def micropython_auto_sync_cycle(
         record_success_memory=record_success_memory,
         log_error=log_error,
     )
-    steps.append(
-        {
-            "step": "compile",
-            "success": compile_result.get("success", False),
-            "msg": compile_result.get("message", ""),
-        }
-    )
+    steps.append({"step": "compile", "success": compile_result.get("success", False), "msg": compile_result.get("message", "")})
     if not compile_result.get("success"):
         return {
             "success": False,
@@ -438,13 +433,7 @@ def micropython_auto_sync_cycle(
     ports = detect_serial_ports(verbose=False)
     if not ports and not getattr(getattr(ctx, "serial", None), "port", None):
         if request:
-            save_project(
-                code,
-                {"bin_path": None, "bin_size": len(code.encode("utf-8"))},
-                request,
-                chip=ctx.chip,
-                console=console,
-            )
+            save_project(code, {"bin_path": None, "bin_size": len(code.encode("utf-8"))}, request, chip=ctx.chip, console=console)
         return {
             "success": True,
             "attempt": attempt,
@@ -454,13 +443,7 @@ def micropython_auto_sync_cycle(
         }
 
     flash_result = micropython_flash(code=code, baud=baud, console=console)
-    steps.append(
-        {
-            "step": "deploy",
-            "success": flash_result.get("success", False),
-            "msg": flash_result.get("message", ""),
-        }
-    )
+    steps.append({"step": "deploy", "success": flash_result.get("success", False), "msg": flash_result.get("message", "")})
     if not flash_result.get("success"):
         return {
             "success": False,
@@ -546,7 +529,8 @@ def micropython_list_files_tool(
     resolved_port = _serial_port_for_ctx(port)
     if not resolved_port:
         return {"success": False, "platform": platform, "message": _micropython_port_help(ctx.chip)}
-    return list_remote_files(port=resolved_port, path=path, baud=baud, console=console)
+    target_path = device_root_for_target(ctx.chip) if path == "." and platform == "canmv" else path
+    return list_remote_files(port=resolved_port, path=target_path, baud=baud, console=console)
 
 
 __all__ = [

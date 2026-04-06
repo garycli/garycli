@@ -75,6 +75,14 @@ from core.esp_tools import (
     esp_hardware_status as _esp_hardware_status_impl,
     esp_list_files_tool as _esp_list_files_impl,
 )
+from core.canmv_tools import (
+    canmv_auto_sync_cycle as _canmv_auto_sync_cycle_impl,
+    canmv_compile as _canmv_compile_impl,
+    canmv_connect as _canmv_connect_impl,
+    canmv_flash as _canmv_flash_impl,
+    canmv_hardware_status as _canmv_hardware_status_impl,
+    canmv_list_files_tool as _canmv_list_files_impl,
+)
 from core.project_store import (
     latest_workspace_main_path,
     list_projects as _list_projects_impl,
@@ -594,12 +602,84 @@ def esp_list_files(path: str = ".", port: str = None, baud: int = None) -> dict:
     )
 
 
-def _micropython_connect_for_target(
-    chip: str, port: str | None = None, baud: int | None = None
-) -> dict:
+def canmv_connect(chip: str = None, port: str = None, baud: int = None) -> dict:
+    """Connect a CanMV K230 / K230D board over USB serial."""
+
+    return _canmv_connect_impl(
+        chip,
+        port=port,
+        baud=baud or SERIAL_BAUD,
+        console=CONSOLE,
+    )
+
+
+def canmv_hardware_status() -> dict:
+    """Return CanMV K230 + MicroPython runtime status."""
+
+    return _canmv_hardware_status_impl(console=CONSOLE)
+
+
+def canmv_compile(code: str, chip: str = None) -> dict:
+    """Validate and cache CanMV K230 MicroPython source."""
+
+    return _canmv_compile_impl(
+        code,
+        chip=chip,
+        console=CONSOLE,
+        record_success_memory=_record_success_memory,
+        log_error=telegram_log,
+    )
+
+
+def canmv_flash(file_path: str = None, port: str = None, baud: int = None) -> dict:
+    """Deploy `main.py` to the connected CanMV K230 MicroPython board."""
+
+    if file_path and str(file_path).lower().endswith(".bin"):
+        return {
+            "success": False,
+            "platform": "canmv",
+            "message": "CanMV K230 MicroPython 部署的是 .py 源文件，不是 .bin 固件",
+        }
+    return _canmv_flash_impl(
+        file_path=file_path,
+        port=port,
+        baud=baud or SERIAL_BAUD,
+        console=CONSOLE,
+        capture_timeout=POST_FLASH_DELAY + 2.5,
+    )
+
+
+def canmv_auto_sync_cycle(code: str, request: str = "") -> dict:
+    """Validate, deploy, and observe a CanMV K230 MicroPython program."""
+
+    return _canmv_auto_sync_cycle_impl(
+        code,
+        request=request,
+        baud=SERIAL_BAUD,
+        console=CONSOLE,
+        max_attempts=MAX_DEBUG_ATTEMPTS,
+        record_success_memory=_record_success_memory,
+        log_error=telegram_log,
+    )
+
+
+def canmv_list_files(path: str = ".", port: str = None, baud: int = None) -> dict:
+    """List files on the connected CanMV K230 board."""
+
+    return _canmv_list_files_impl(
+        path=path,
+        port=port,
+        baud=baud or SERIAL_BAUD,
+        console=CONSOLE,
+    )
+
+
+def _micropython_connect_for_target(chip: str, port: str | None = None, baud: int | None = None) -> dict:
     platform = detect_target_platform(chip)
     if platform == "rp2040":
         return rp2040_connect(chip, port=port, baud=baud)
+    if platform == "canmv":
+        return canmv_connect(chip, port=port, baud=baud)
     return esp_connect(chip, port=port, baud=baud)
 
 
@@ -607,6 +687,8 @@ def _micropython_hardware_status_for_target(chip: str) -> dict:
     platform = detect_target_platform(chip)
     if platform == "rp2040":
         return rp2040_hardware_status()
+    if platform == "canmv":
+        return canmv_hardware_status()
     return esp_hardware_status()
 
 
@@ -614,6 +696,8 @@ def _micropython_compile_for_target(code: str, chip: str) -> dict:
     platform = detect_target_platform(chip)
     if platform == "rp2040":
         return rp2040_compile(code, chip=chip)
+    if platform == "canmv":
+        return canmv_compile(code, chip=chip)
     return esp_compile(code, chip=chip)
 
 
@@ -627,6 +711,8 @@ def _micropython_flash_for_target(
     platform = detect_target_platform(chip)
     if platform == "rp2040":
         return rp2040_flash(file_path=file_path, port=port, baud=baud)
+    if platform == "canmv":
+        return canmv_flash(file_path=file_path, port=port, baud=baud)
     return esp_flash(file_path=file_path, port=port, baud=baud)
 
 
@@ -634,6 +720,8 @@ def _micropython_auto_sync_for_target(code: str, chip: str, request: str = "") -
     platform = detect_target_platform(chip)
     if platform == "rp2040":
         return rp2040_auto_sync_cycle(code, request=request)
+    if platform == "canmv":
+        return canmv_auto_sync_cycle(code, request=request)
     return esp_auto_sync_cycle(code, request=request)
 
 
@@ -768,10 +856,10 @@ def stm32_set_chip(chip: str) -> dict:
     if previous_platform != current_platform:
         ctx.compiler = None
         ctx.last_bin_path = None
-        if current_platform in {"rp2040", "esp"}:
+        if is_micropython_target(ctx.chip):
             disconnect_swd(ctx)
             ctx.bridge = None
-    if current_platform in {"rp2040", "esp"}:
+    if is_micropython_target(ctx.chip):
         return {
             "success": True,
             "chip": ctx.chip,
@@ -846,9 +934,7 @@ def stm32_compile_rtos(code: str, chip: str = None) -> dict:
     target_chip = _current_target(chip)
     ctx.chip = target_chip
     if is_micropython_target(target_chip):
-        return _micropython_not_supported(
-            "stm32_compile_rtos", "请改用对应的 MicroPython compile 或 auto_sync_cycle 工具"
-        )
+        return _micropython_not_supported("stm32_compile_rtos", "请改用对应的 MicroPython compile 或 auto_sync_cycle 工具")
     compiler = _get_compiler()
     if chip:
         compiler.set_chip(target_chip)
@@ -903,9 +989,7 @@ def stm32_recompile(mode: str = "auto") -> dict:
     code = source_path.read_text(encoding="utf-8")
     if source_path.suffix == ".py" or is_micropython_target(ctx.chip):
         if mode == "rtos":
-            return _micropython_not_supported(
-                "stm32_recompile(mode='rtos')", "MicroPython 目标不支持 FreeRTOS 编译"
-            )
+            return _micropython_not_supported("stm32_recompile(mode='rtos')", "MicroPython 目标不支持 FreeRTOS 编译")
         target_chip = ctx.chip if is_micropython_target(ctx.chip) else "ESP32"
         return _micropython_compile_for_target(code, target_chip)
     if mode == "auto":
@@ -1125,9 +1209,7 @@ def stm32_rtos_check_code(code: str) -> dict:
     检查 SysTick 冲突、HAL_Delay 陷阱、缺少 hook 函数、栈大小、ISR 安全等。
     """
     if is_micropython_target(_current_target()):
-        return _micropython_not_supported(
-            "stm32_rtos_check_code", "MicroPython 目标不使用 FreeRTOS C 工程"
-        )
+        return _micropython_not_supported("stm32_rtos_check_code", "MicroPython 目标不使用 FreeRTOS C 工程")
     import re
 
     errors = []
@@ -1275,9 +1357,7 @@ def stm32_rtos_task_stats() -> dict:
     需要先编译（有 ELF 文件）并连接硬件。
     """
     if is_micropython_target(_current_target()):
-        return _micropython_not_supported(
-            "stm32_rtos_task_stats", "MicroPython 目标没有这套 FreeRTOS 任务统计接口"
-        )
+        return _micropython_not_supported("stm32_rtos_task_stats", "MicroPython 目标没有这套 FreeRTOS 任务统计接口")
     if not get_context().hw_connected:
         return {"success": False, "message": "硬件未连接"}
 
@@ -2185,6 +2265,13 @@ bind_tool_implementations(
         "esp_flash": esp_flash,
         "esp_auto_sync_cycle": esp_auto_sync_cycle,
         "esp_list_files": esp_list_files,
+        # CanMV / MicroPython
+        "canmv_connect": canmv_connect,
+        "canmv_hardware_status": canmv_hardware_status,
+        "canmv_compile": canmv_compile,
+        "canmv_flash": canmv_flash,
+        "canmv_auto_sync_cycle": canmv_auto_sync_cycle,
+        "canmv_list_files": canmv_list_files,
         "gary_save_member_memory": gary_save_member_memory,
         "gary_delete_member_memory": gary_delete_member_memory,
         # 通用
@@ -2387,7 +2474,7 @@ class STM32Agent:
                     continue
 
                 pending = self._partial_think_tag_suffix(source, (close_tag,))
-                chunk = source[: -len(pending)] if pending else source
+                chunk = source[:-len(pending)] if pending else source
                 if chunk:
                     segments.append(("think", chunk))
                 state["pending"] = pending
@@ -2410,7 +2497,7 @@ class STM32Agent:
                 continue
 
             pending = self._partial_think_tag_suffix(source, (open_tag, close_tag))
-            chunk = source[: -len(pending)] if pending else source
+            chunk = source[:-len(pending)] if pending else source
             if chunk:
                 segments.append(("content", chunk))
             state["pending"] = pending
@@ -2429,9 +2516,7 @@ class STM32Agent:
         kind = "think" if state.get("inside_think", False) else "content"
         return [(kind, pending)]
 
-    def _request_final_reply_after_tools(
-        self, stream_to_console: bool = True
-    ) -> dict[str, Any] | None:
+    def _request_final_reply_after_tools(self, stream_to_console: bool = True) -> dict[str, Any] | None:
         """部分模型在工具执行后会停在空回复，这里补一次只求最终答复的请求。"""
         if stream_to_console:
             CONSOLE.print(
@@ -2644,9 +2729,7 @@ class STM32Agent:
 
                     # 文本内容
                     if delta.content:
-                        for kind, piece in self._extract_think_segments(
-                            delta.content, think_tag_state
-                        ):
+                        for kind, piece in self._extract_think_segments(delta.content, think_tag_state):
                             if not piece:
                                 continue
                             if kind == "think":
@@ -2995,9 +3078,7 @@ def _print_startup_checks() -> None:
         try:
             import pyocd as _pyocd  # type: ignore
 
-            CONSOLE.print(
-                f"[dim]  pyocd: {_pyocd.__version__} ({_cli_text('可选，调试时备用', 'optional fallback for low-level debug')})[/]"
-            )
+            CONSOLE.print(f"[dim]  pyocd: {_pyocd.__version__} ({_cli_text('可选，调试时备用', 'optional fallback for low-level debug')})[/]")
         except ImportError:
             CONSOLE.print(
                 f"[dim]  pyocd: {_cli_text('未安装（MicroPython 目标不强依赖）', 'not installed (not required for MicroPython targets)')}[/]"

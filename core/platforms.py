@@ -49,6 +49,18 @@ ESP_TARGET_CHOICES = (
     "ESP12E",
     "ESP12F",
 )
+CANMV_TARGET_CHOICES = (
+    "CANMV_K230",
+    "CANMV-K230",
+    "K230",
+    "K230_CANMV",
+    "K230-CANMV",
+    "CANMV_K230D",
+    "CANMV-K230D",
+    "K230D",
+    "K230D_CANMV",
+    "K230D-CANMV",
+)
 
 
 def normalize_target_name(value: str | None) -> str:
@@ -87,6 +99,13 @@ def detect_target_platform(chip: str | None) -> str:
         or name.startswith("ESP12")
     ):
         return "esp"
+    if (
+        name in CANMV_TARGET_CHOICES
+        or "K230" in name
+        or name.startswith("CANMV_K230")
+        or name.startswith("CANMV_K230D")
+    ):
+        return "canmv"
     if name.startswith("STM32"):
         return "stm32"
     return "unknown"
@@ -107,7 +126,13 @@ def is_esp_target(chip: str | None) -> bool:
 def is_micropython_target(chip: str | None) -> bool:
     """Return whether the selected target uses the serial MicroPython workflow."""
 
-    return detect_target_platform(chip) in {"rp2040", "esp"}
+    return detect_target_platform(chip) in {"rp2040", "esp", "canmv"}
+
+
+def is_canmv_target(chip: str | None) -> bool:
+    """Return whether the selected target uses the CanMV K230 workflow."""
+
+    return detect_target_platform(chip) == "canmv"
 
 
 def is_generic_micropython_name(chip: str | None) -> bool:
@@ -153,6 +178,8 @@ def canonical_target_name(chip: str | None) -> str:
         if name == "ESP8266":
             return "ESP8266"
         return "ESP32"
+    if platform == "canmv":
+        return "CANMV_K230D" if "K230D" in name else "CANMV_K230"
     return name or "STM32F103C8T6"
 
 
@@ -186,11 +213,12 @@ def canonical_target_name_from_micropython_info(info: dict[str, str] | None) -> 
         ("ESP32", ("esp32", "lolin32", "nodemcu-32s", "wroom32")),
     )
     for chip_name, patterns in esp_patterns:
-        if any(
-            pattern in text or pattern.replace("-", "").replace(" ", "") in compact
-            for pattern in patterns
-        ):
+        if any(pattern in text or pattern.replace("-", "").replace(" ", "") in compact for pattern in patterns):
             return chip_name
+    if "k230d" in compact:
+        return "CANMV_K230D"
+    if "k230" in compact and ("canmv" in compact or str(data.get("platform") or "").strip().lower() == "rt-smart"):
+        return "CANMV_K230"
     return None
 
 
@@ -200,10 +228,26 @@ def source_filename_for_target(chip: str | None) -> str:
     return "main.py" if is_micropython_target(chip) else "main.c"
 
 
+def device_root_for_target(chip: str | None) -> str:
+    """Return the preferred writable device root for the selected target."""
+
+    return "/sdcard" if is_canmv_target(chip) else "."
+
+
+def device_main_path_for_target(chip: str | None) -> str:
+    """Return the on-device path used for the deployed startup script."""
+
+    if is_canmv_target(chip):
+        return "/sdcard/main.py"
+    return "main.py"
+
+
 def target_runtime_label(chip: str | None) -> str:
     """Return a short runtime label for UI and tool status."""
 
     platform = detect_target_platform(chip)
+    if platform == "canmv":
+        return "CanMV MicroPython"
     if platform in {"rp2040", "esp"}:
         return "MicroPython"
     if platform == "stm32":
@@ -212,13 +256,17 @@ def target_runtime_label(chip: str | None) -> str:
 
 
 __all__ = [
+    "CANMV_TARGET_CHOICES",
     "MICROPYTHON_TARGET_CHOICES",
     "ESP_TARGET_CHOICES",
     "RP2040_TARGET_CHOICES",
     "canonical_target_name_from_micropython_info",
     "canonical_target_name",
+    "device_main_path_for_target",
+    "device_root_for_target",
     "detect_target_platform",
     "is_generic_micropython_name",
+    "is_canmv_target",
     "is_esp_target",
     "is_micropython_target",
     "is_rp2040_target",
