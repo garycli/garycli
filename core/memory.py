@@ -1,4 +1,4 @@
-"""Disk-backed member memory helpers for Gary."""
+"""Disk-backed member memory helpers for gary."""
 
 from __future__ import annotations
 
@@ -9,8 +9,8 @@ from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
 MEMBER_MD_PATH = Path(__file__).resolve().parent.parent / "member.md"
-MEMBER_PROMPT_CHAR_LIMIT = 12000
-MEMBER_PROMPT_MAX_DYNAMIC = 24
+MEMBER_PROMPT_CHAR_LIMIT = 6000
+MEMBER_PROMPT_MAX_DYNAMIC = 12
 MEMBER_MAX_FILE_CHARS = 40000
 MEMBER_MAX_DYNAMIC_ENTRIES = 120
 _MEMBER_LOCK = threading.RLock()
@@ -19,11 +19,11 @@ _MEMBER_LOCK = threading.RLock()
 def _default_member_content() -> str:
     """Return the default member memory template."""
 
-    return """# Gary Member Memory
+    return """# gary Memory
 
 ## Focus
 - 这里只记录高价值、可复用、能提高成功率的经验。
-- 自动写入：关闭。由 Gary 自主决定何时写入或删除经验。
+- 自动写入：关闭。由 `gary` 自主决定何时写入或删除经验。
 - 主动写入：遇到关键初始化顺序、硬件坑、寄存器判定经验、稳定模板时，调用 `gary_save_member_memory`。
 - 主动删除：发现错误、过时、无用经验时，调用 `gary_delete_member_memory`。
 - 经验必须短、具体、可执行，不要粘贴大段原始日志。
@@ -204,7 +204,7 @@ def gary_save_member_memory(
     tags: list[str] | None = None,
     importance: str = "high",
 ) -> dict[str, Any]:
-    """Write a high-value reusable experience into Gary's member memory."""
+    """Write a high-value reusable experience into gary's member memory."""
 
     return _append_member_memory(
         title=title,
@@ -253,10 +253,7 @@ def gary_delete_member_memory(
             }
 
         if max_matches > 0 and len(matched) > max_matches:
-            titles = [
-                entry.splitlines()[0].removeprefix("### ").strip()
-                for entry in matched[:max_matches]
-            ]
+            titles = [entry.splitlines()[0].removeprefix("### ").strip() for entry in matched[:max_matches]]
             return {
                 "success": False,
                 "path": str(path),
@@ -349,7 +346,7 @@ def _record_success_memory(
     chip: str = "",
     log_error: Callable[[str], None] | None = None,
 ) -> None:
-    """Compatibility no-op: member entries must be written explicitly by Gary."""
+    """Compatibility no-op: member entries must be written explicitly by gary."""
 
     del event_type, code, result, request, steps, chip, log_error
     return None

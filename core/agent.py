@@ -18,6 +18,7 @@ import compiler as _compiler_module
 from ai.client import (
     _ai_is_configured,
     _write_cli_language_config,
+    estimate_request_tokens,
     get_ai_client,
     reload_ai_config,
     stream_chat,
@@ -131,7 +132,7 @@ from integrations.telegram import (
     telegram_log,
 )
 from prompts.debug import get_debug_prompt
-from prompts.member import get_member_prompt_section
+from prompts.member import get_member_prompt_section_state
 from prompts.system import (
     WEB_RESEARCH_HINT_HEADER,
     build_system_prompt,
@@ -287,7 +288,8 @@ def _ensure_cli_telegram_daemon() -> Optional[dict]:
 # ─────────────────────────────────────────────────────────────
 THEME = "cyan"
 MAX_CONTEXT_TOKENS = 128000
-MAX_TOOL_RESULT_LEN = 8000
+MAX_TOOL_RESULT_LEN = 4000
+TRUNCATED_TOOL_RESULT_NOTICE = "[结果已截断，完整内容请查看工具输出日志]"
 
 # ─────────────────────────────────────────────────────────────
 # 寄存器地址表（按系列）
@@ -683,9 +685,7 @@ def canmv_list_files(path: str = ".", port: str = None, baud: int = None) -> dic
     )
 
 
-def _micropython_connect_for_target(
-    chip: str, port: str | None = None, baud: int | None = None
-) -> dict:
+def _micropython_connect_for_target(chip: str, port: str | None = None, baud: int | None = None) -> dict:
     platform = detect_target_platform(chip)
     if platform == "rp2040":
         return rp2040_connect(chip, port=port, baud=baud)
@@ -945,9 +945,7 @@ def stm32_compile_rtos(code: str, chip: str = None) -> dict:
     target_chip = _current_target(chip)
     ctx.chip = target_chip
     if is_micropython_target(target_chip):
-        return _micropython_not_supported(
-            "stm32_compile_rtos", "请改用对应的 MicroPython compile 或 auto_sync_cycle 工具"
-        )
+        return _micropython_not_supported("stm32_compile_rtos", "请改用对应的 MicroPython compile 或 auto_sync_cycle 工具")
     compiler = _get_compiler()
     if chip:
         compiler.set_chip(target_chip)
@@ -1002,9 +1000,7 @@ def stm32_recompile(mode: str = "auto") -> dict:
     code = source_path.read_text(encoding="utf-8")
     if source_path.suffix == ".py" or is_micropython_target(ctx.chip):
         if mode == "rtos":
-            return _micropython_not_supported(
-                "stm32_recompile(mode='rtos')", "MicroPython 目标不支持 FreeRTOS 编译"
-            )
+            return _micropython_not_supported("stm32_recompile(mode='rtos')", "MicroPython 目标不支持 FreeRTOS 编译")
         target_chip = ctx.chip if is_micropython_target(ctx.chip) else "ESP32"
         return _micropython_compile_for_target(code, target_chip)
     if mode == "auto":
@@ -1224,9 +1220,7 @@ def stm32_rtos_check_code(code: str) -> dict:
     检查 SysTick 冲突、HAL_Delay 陷阱、缺少 hook 函数、栈大小、ISR 安全等。
     """
     if is_micropython_target(_current_target()):
-        return _micropython_not_supported(
-            "stm32_rtos_check_code", "MicroPython 目标不使用 FreeRTOS C 工程"
-        )
+        return _micropython_not_supported("stm32_rtos_check_code", "MicroPython 目标不使用 FreeRTOS C 工程")
     import re
 
     errors = []
@@ -1374,9 +1368,7 @@ def stm32_rtos_task_stats() -> dict:
     需要先编译（有 ELF 文件）并连接硬件。
     """
     if is_micropython_target(_current_target()):
-        return _micropython_not_supported(
-            "stm32_rtos_task_stats", "MicroPython 目标没有这套 FreeRTOS 任务统计接口"
-        )
+        return _micropython_not_supported("stm32_rtos_task_stats", "MicroPython 目标没有这套 FreeRTOS 任务统计接口")
     if not get_context().hw_connected:
         return {"success": False, "message": "硬件未连接"}
 
@@ -2349,6 +2341,13 @@ def configure_ai_cli(agent: "STM32Agent | None" = None):
 class STM32Agent:
     def __init__(self, interactive: bool = True):
         self.interactive = interactive
+        self.thinking_log: List[Dict[str, Any]] = []
+        self._static_prompt_cache = ""
+        self._static_prompt_signature: tuple[Any, ...] | None = None
+        self._dynamic_prompt_cache = ""
+        self._dynamic_prompt_signature: tuple[Any, ...] | None = None
+        self._system_prompt_cache = ""
+        self._system_prompt_signature: tuple[Any, ...] | None = None
         self.messages: List[Dict] = [{"role": "system", "content": self._compose_system_prompt()}]
         self._pending_system_hint = ""
         self.client = get_ai_client(timeout=180.0)
@@ -2363,26 +2362,48 @@ class STM32Agent:
         self.client = get_ai_client(timeout=180.0)
 
     def _compose_system_prompt(self) -> str:
-        """Compose the runtime system prompt from modular prompt providers."""
+        """Compose the runtime system prompt from cached static/dynamic fragments."""
 
         ctx = get_context()
-        prompt = build_system_prompt(ctx.chip, ctx.cli_language, ctx.hw_connected)
-        member_prompt = get_member_prompt_section(ctx.chip)
-        if member_prompt:
-            prompt += "\n\n" + member_prompt
-        for error_type in ("compile_error", "hardfault", "i2c_failure"):
-            debug_prompt = get_debug_prompt(
-                error_type,
-                {"chip": ctx.chip, "hardware_connected": ctx.hw_connected},
-            )
-            if debug_prompt:
-                prompt += "\n\n" + debug_prompt
-        skill_prompt = _get_manager().get_all_prompt_additions()
-        if skill_prompt:
-            prompt += "\n" + skill_prompt.lstrip("\n")
-        return prompt
+        skill_prompt = _get_manager().get_all_prompt_additions() or ""
+        static_signature = (
+            ctx.chip,
+            ctx.cli_language,
+            bool(ctx.hw_connected),
+            skill_prompt,
+        )
+        if static_signature != self._static_prompt_signature:
+            prompt = build_system_prompt(ctx.chip, ctx.cli_language, ctx.hw_connected)
+            for error_type in ("compile_error", "hardfault", "i2c_failure"):
+                debug_prompt = get_debug_prompt(
+                    error_type,
+                    {"chip": ctx.chip, "hardware_connected": ctx.hw_connected},
+                )
+                if debug_prompt:
+                    prompt += "\n\n" + debug_prompt
+            if skill_prompt:
+                prompt += "\n" + skill_prompt.lstrip("\n")
+            self._static_prompt_cache = prompt
+            self._static_prompt_signature = static_signature
+
+        member_prompt, member_hash = get_member_prompt_section_state(ctx.chip)
+        dynamic_signature = (ctx.chip, member_hash)
+        if dynamic_signature != self._dynamic_prompt_signature:
+            self._dynamic_prompt_cache = member_prompt
+            self._dynamic_prompt_signature = dynamic_signature
+
+        system_signature = (self._static_prompt_signature, self._dynamic_prompt_signature)
+        if system_signature != self._system_prompt_signature:
+            prompt = self._static_prompt_cache
+            if self._dynamic_prompt_cache:
+                prompt += "\n\n" + self._dynamic_prompt_cache
+            self._system_prompt_cache = prompt
+            self._system_prompt_signature = system_signature
+
+        return self._system_prompt_cache
 
     def reset_conversation(self):
+        self.thinking_log = []
         self.messages = [{"role": "system", "content": self._compose_system_prompt()}]
 
     def refresh_system_prompt(self):
@@ -2428,21 +2449,61 @@ class STM32Agent:
         return {"success": True, "language": ctx.cli_language, "saved": saved}
 
     # ── Token 估算 ──────────────────────────────────────────
-    # 替换原来的 _tokens 和 _truncate 方法
     def _tokens(self) -> int:
-        return sum(len(str(m.get("content", ""))) // 3 for m in self.messages)
+        ctx = get_context()
+        estimate = estimate_request_tokens(
+            messages=self._messages_for_api(),
+            tools=TOOL_SCHEMAS,
+            tool_choice="auto",
+            model=AI_MODEL,
+            temperature=AI_TEMPERATURE,
+            enable_thinking=bool(getattr(ctx, "thinking_enabled", False)),
+        )
+        return int(estimate.get("total_tokens") or 0)
+
+    def _record_thinking_trace(
+        self,
+        *,
+        stage: str,
+        thinking: str = "",
+        provider_blocks: Any = None,
+    ) -> None:
+        """Store thinking/debug traces outside of model-visible conversation history."""
+
+        text = str(thinking or "").strip()
+        blocks = provider_blocks if provider_blocks else None
+        if not text and not blocks:
+            return
+        if not hasattr(self, "thinking_log") or self.thinking_log is None:
+            self.thinking_log = []
+        entry: dict[str, Any] = {
+            "stage": stage,
+            "time": datetime.now().isoformat(timespec="seconds"),
+        }
+        if text:
+            entry["thinking"] = text
+        if blocks:
+            entry["provider_blocks"] = blocks
+        self.thinking_log.append(entry)
+        if len(self.thinking_log) > 200:
+            self.thinking_log = self.thinking_log[-200:]
 
     def _truncate_result(self, s: str, tool_name: str = "") -> str:
         """针对不同工具结果使用不同截断策略"""
         if len(s) <= MAX_TOOL_RESULT_LEN:
             return s
-        half = MAX_TOOL_RESULT_LEN // 2
+        separator = f"\n{TRUNCATED_TOOL_RESULT_NOTICE}\n"
+        available = MAX_TOOL_RESULT_LEN - len(separator)
+        if available <= 0:
+            return TRUNCATED_TOOL_RESULT_NOTICE[:MAX_TOOL_RESULT_LEN]
         # 编译/串口结果：错误在末尾，保留末尾更多
         if tool_name in ("stm32_compile", "stm32_serial_read", "stm32_auto_flash_cycle"):
-            head = MAX_TOOL_RESULT_LEN // 4
-            tail = MAX_TOOL_RESULT_LEN - head
-            return s[:head] + f"\n...[截断 {len(s)-MAX_TOOL_RESULT_LEN} 字符]...\n" + s[-tail:]
-        return s[:half] + f"\n...[截断 {len(s)-MAX_TOOL_RESULT_LEN} 字符]...\n" + s[-half:]
+            head = max(1, available // 4)
+            tail = max(0, available - head)
+            return s[:head] + separator + (s[-tail:] if tail else "")
+        head = max(1, available // 2)
+        tail = max(0, available - head)
+        return s[:head] + separator + (s[-tail:] if tail else "")
 
     def _truncate_history(self):
         """滑动窗口：保留 system prompt + 最近消息，总字符不超限"""
@@ -2463,8 +2524,8 @@ class STM32Agent:
     # 原来是直接传 self.messages，改为过滤后传
     def _messages_for_api(self) -> list:
         """发送给 API 前处理消息格式：
-        - 若对话中出现过 reasoning_content（thinking 模式），则所有 assistant 消息都必须带该字段
-        - 否则过滤掉该字段（避免不支持的 API 报错）
+        - 不把 thinking / reasoning 内容回灌到历史，避免后续轮次重复消耗 token
+        - 仅保留对 provider 有效的普通内容与 tool_calls
         """
         sanitized_messages: list[dict[str, Any]] = []
         system_parts: list[str] = []
@@ -2485,23 +2546,14 @@ class STM32Agent:
         if system_parts:
             sanitized_messages.insert(0, {"role": "system", "content": "\n\n".join(system_parts)})
 
-        # 检测当前会话是否启用了 thinking 模式
-        has_thinking = any(
-            "reasoning_content" in m for m in sanitized_messages if m.get("role") == "assistant"
-        )
-
         result = []
         for m in sanitized_messages:
-            if m.get("role") == "assistant" and has_thinking:
-                # thinking 模式：确保每条 assistant 消息都有 reasoning_content
-                clean = dict(m)
-                if "reasoning_content" not in clean:
-                    clean["reasoning_content"] = ""
-                result.append(clean)
-            else:
-                # 非 thinking 模式：过滤掉该字段
-                clean = {k: v for k, v in m.items() if k != "reasoning_content"}
-                result.append(clean)
+            clean = {
+                k: v
+                for k, v in m.items()
+                if k not in {"reasoning_content", "anthropic_thinking_blocks"}
+            }
+            result.append(clean)
         return result
 
     @staticmethod
@@ -2541,7 +2593,7 @@ class STM32Agent:
                     continue
 
                 pending = self._partial_think_tag_suffix(source, (close_tag,))
-                chunk = source[: -len(pending)] if pending else source
+                chunk = source[:-len(pending)] if pending else source
                 if chunk:
                     segments.append(("think", chunk))
                 state["pending"] = pending
@@ -2564,7 +2616,7 @@ class STM32Agent:
                 continue
 
             pending = self._partial_think_tag_suffix(source, (open_tag, close_tag))
-            chunk = source[: -len(pending)] if pending else source
+            chunk = source[:-len(pending)] if pending else source
             if chunk:
                 segments.append(("content", chunk))
             state["pending"] = pending
@@ -2583,9 +2635,7 @@ class STM32Agent:
         kind = "think" if state.get("inside_think", False) else "content"
         return [(kind, pending)]
 
-    def _request_final_reply_after_tools(
-        self, stream_to_console: bool = True
-    ) -> dict[str, Any] | None:
+    def _request_final_reply_after_tools(self, stream_to_console: bool = True) -> dict[str, Any] | None:
         """部分模型在工具执行后会停在空回复，这里补一次只求最终答复的请求。"""
         if stream_to_console:
             CONSOLE.print(
@@ -2593,6 +2643,7 @@ class STM32Agent:
             )
         telegram_log("chat final_reply_request start")
         try:
+            ctx = get_context()
             stream = stream_chat(
                 client=self.client,
                 messages=self._messages_for_api()
@@ -2607,6 +2658,7 @@ class STM32Agent:
                 ],
                 model=AI_MODEL,
                 temperature=AI_TEMPERATURE,
+                enable_thinking=bool(getattr(ctx, "thinking_enabled", False)),
             )
         except Exception as e:
             if stream_to_console:
@@ -2692,12 +2744,12 @@ class STM32Agent:
         telegram_log(f"chat final_reply_request done len={len(content.strip())}")
         if not content.strip():
             return None
-        assistant_msg: dict[str, Any] = {"role": "assistant", "content": content.strip()}
-        if thinking:
-            assistant_msg["reasoning_content"] = thinking
-        if anthropic_thinking_blocks:
-            assistant_msg["anthropic_thinking_blocks"] = anthropic_thinking_blocks
-        return assistant_msg
+        self._record_thinking_trace(
+            stage="final_reply",
+            thinking=thinking,
+            provider_blocks=anthropic_thinking_blocks,
+        )
+        return {"role": "assistant", "content": content.strip()}
 
     def _summarize_tool_result(self, tool_name: str, result_obj, preview: str) -> str:
         text = (preview or "").replace("\n", " ").strip()
@@ -2757,6 +2809,7 @@ class STM32Agent:
         while True:
             # API 调用
             try:
+                ctx = get_context()
                 stream = stream_chat(
                     client=self.client,
                     messages=self._messages_for_api(),
@@ -2764,6 +2817,7 @@ class STM32Agent:
                     tools=TOOL_SCHEMAS,
                     tool_choice="auto",
                     temperature=AI_TEMPERATURE,
+                    enable_thinking=bool(getattr(ctx, "thinking_enabled", False)),
                 )
             except Exception as e:
                 if stream_to_console:
@@ -2799,9 +2853,7 @@ class STM32Agent:
 
                     # 文本内容
                     if delta.content:
-                        for kind, piece in self._extract_think_segments(
-                            delta.content, think_tag_state
-                        ):
+                        for kind, piece in self._extract_think_segments(delta.content, think_tag_state):
                             if not piece:
                                 continue
                             if kind == "think":
@@ -2905,11 +2957,12 @@ class STM32Agent:
             # 无工具调用 → 结束
             if not tool_calls_raw:
                 if content.strip():
+                    self._record_thinking_trace(
+                        stage="assistant_reply",
+                        thinking=thinking,
+                        provider_blocks=anthropic_thinking_blocks,
+                    )
                     assistant_msg = {"role": "assistant", "content": content or ""}
-                    if thinking:  # 如果有思考内容，带上它
-                        assistant_msg["reasoning_content"] = thinking
-                    if anthropic_thinking_blocks:
-                        assistant_msg["anthropic_thinking_blocks"] = anthropic_thinking_blocks
                     self.messages.append(assistant_msg)
                     reply_parts.append(content.strip())
                     break
@@ -2925,11 +2978,12 @@ class STM32Agent:
                     self.messages.append({"role": "assistant", "content": fallback_reply})
                     reply_parts.append(fallback_reply)
                     break
+                self._record_thinking_trace(
+                    stage="assistant_empty_reply",
+                    thinking=thinking,
+                    provider_blocks=anthropic_thinking_blocks,
+                )
                 assistant_msg = {"role": "assistant", "content": content or ""}
-                if thinking:  # 如果有思考内容，带上它
-                    assistant_msg["reasoning_content"] = thinking
-                if anthropic_thinking_blocks:
-                    assistant_msg["anthropic_thinking_blocks"] = anthropic_thinking_blocks
                 self.messages.append(assistant_msg)
                 break
 
@@ -2952,11 +3006,12 @@ class STM32Agent:
                 "content": content or "",
                 "tool_calls": tool_calls_list,
             }
-            if thinking:  # 关键修复：把之前收集的 thinking 塞进来
-                assistant_tool_msg["reasoning_content"] = thinking
-            if anthropic_thinking_blocks:
-                assistant_tool_msg["anthropic_thinking_blocks"] = anthropic_thinking_blocks
 
+            self._record_thinking_trace(
+                stage="assistant_tool_call",
+                thinking=thinking,
+                provider_blocks=anthropic_thinking_blocks,
+            )
             self.messages.append(assistant_tool_msg)
             used_tools = True
 
@@ -3012,6 +3067,7 @@ class STM32Agent:
 
             self.messages.extend(tool_results)
             self.refresh_system_prompt()
+            self._truncate_history()
             # 继续循环，把工具结果发回 AI
 
             if content.strip():
@@ -3150,9 +3206,7 @@ def _print_startup_checks() -> None:
         try:
             import pyocd as _pyocd  # type: ignore
 
-            CONSOLE.print(
-                f"[dim]  pyocd: {_pyocd.__version__} ({_cli_text('可选，调试时备用', 'optional fallback for low-level debug')})[/]"
-            )
+            CONSOLE.print(f"[dim]  pyocd: {_pyocd.__version__} ({_cli_text('可选，调试时备用', 'optional fallback for low-level debug')})[/]")
         except ImportError:
             CONSOLE.print(
                 f"[dim]  pyocd: {_cli_text('未安装（MicroPython 目标不强依赖）', 'not installed (not required for MicroPython targets)')}[/]"
@@ -3248,6 +3302,7 @@ def run(args: argparse.Namespace) -> None:
     command = str(getattr(args, "command", "") or "").lower()
     command_args = list(getattr(args, "command_args", []) or [])
     telegram_arg = str(getattr(args, "telegram", "") or "").strip()
+    ctx.thinking_enabled = bool(getattr(args, "thinking", False))
 
     if command == "telegram":
         handle_telegram_command(" ".join(command_args), source="cli")

@@ -24,6 +24,7 @@ class HardwareContext:
     debug_attempt: int = 0
     cli_language: str = getattr(_cfg, "CLI_LANGUAGE", "zh")
     telegram_cli_autostart_done: bool = False
+    thinking_enabled: bool = False
 
 
 _CONTEXT = HardwareContext()

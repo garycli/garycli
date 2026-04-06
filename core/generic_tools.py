@@ -83,10 +83,7 @@ def str_replace_edit(file_path: str, old_str: str, new_str: str) -> dict:
 def list_directory(path: str = ".") -> dict:
     try:
         target = Path(path).expanduser().resolve()
-        items = [
-            {"name": item.name, "type": "dir" if item.is_dir() else "file"}
-            for item in target.iterdir()
-        ]
+        items = [{"name": item.name, "type": "dir" if item.is_dir() else "file"} for item in target.iterdir()]
         return {
             "success": True,
             "path": str(target),
@@ -314,7 +311,8 @@ def _search_via_searx(query: str, limit: int = 5) -> dict:
         return {
             "error": (
                 f"搜索失败：无法连接本地 SearXNG（{base_url}）。"
-                "请先启动本地实例，或运行 `python setup.py --searxng` 完成一键安装。"
+                "请先启动本地实例，或运行 `python setup.py --searxng`"
+                " / `python setup.py --searxng-native` 完成一键安装。"
                 f" 原始错误: {exc}"
             )
         }
@@ -445,9 +443,7 @@ def grep_search(
                     line_end = len(file_content)
                 line_content = file_content[line_start:line_end].strip()
                 file_matches.append(f"Line {line_num}: {line_content[:100]}")
-            results.append(
-                f"File: {file_path.relative_to(search_path)}\n" + "\n".join(file_matches)
-            )
+            results.append(f"File: {file_path.relative_to(search_path)}\n" + "\n".join(file_matches))
             count += 1
             if count >= max_results:
                 break
@@ -557,17 +553,13 @@ def edit_file_lines(
                 return {"error": "replace 需要 new_content"}
             if not new_content.endswith("\n"):
                 new_content += "\n"
-            new_lines = (
-                lines[:start_index] + new_content.splitlines(keepends=True) + lines[end_index:]
-            )
+            new_lines = lines[:start_index] + new_content.splitlines(keepends=True) + lines[end_index:]
         elif operation == "insert":
             if new_content is None:
                 return {"error": "insert 需要 new_content"}
             if not new_content.endswith("\n"):
                 new_content += "\n"
-            new_lines = (
-                lines[:start_index] + new_content.splitlines(keepends=True) + lines[start_index:]
-            )
+            new_lines = lines[:start_index] + new_content.splitlines(keepends=True) + lines[start_index:]
         elif operation == "delete":
             new_lines = lines[:start_index] + lines[end_index:]
         else:
@@ -650,14 +642,10 @@ def run_python_code(code: str) -> dict:
     import tempfile
 
     try:
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".py", delete=False, encoding="utf-8"
-        ) as handle:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False, encoding="utf-8") as handle:
             handle.write(code)
             tmp_path = handle.name
-        result = subprocess.run(
-            [sys.executable, tmp_path], capture_output=True, text=True, timeout=30
-        )
+        result = subprocess.run([sys.executable, tmp_path], capture_output=True, text=True, timeout=30)
         try:
             Path(tmp_path).unlink()
         except Exception:
