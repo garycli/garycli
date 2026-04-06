@@ -52,6 +52,7 @@ import platform
 import shutil
 import argparse
 import stat
+import sysconfig
 from pathlib import Path
 from typing import Optional, List
 from urllib.parse import urlparse
@@ -157,9 +158,12 @@ BUILD_DIR = WORKSPACE / "build"
 PROJECTS_DIR = WORKSPACE / "projects"
 SERVICES_DIR = WORKSPACE / "services"
 SEARXNG_DIR = SERVICES_DIR / "searxng"
+VENV_DIR = SCRIPT_DIR / ".venv"
 AGENT_SCRIPT = SCRIPT_DIR / "stm32_agent.py"
 
-PIP = [sys.executable, "-m", "pip"]
+ACTIVE_PYTHON = Path(sys.executable).resolve()
+ACTIVE_PYTHON_LABEL = "current"
+PIP = [str(ACTIVE_PYTHON), "-m", "pip"]
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 网络环境检测与镜像加速
@@ -294,6 +298,65 @@ def _which(name: str) -> Optional[str]:
     return shutil.which(name)
 
 
+def _python_cmd(*args: str, python: Path | str | None = None) -> list[str]:
+    target = Path(python or ACTIVE_PYTHON).expanduser()
+    return [str(target), *args]
+
+
+def _active_python_path() -> Path:
+    return Path(ACTIVE_PYTHON).expanduser().resolve()
+
+
+def _set_active_python(python_path: Path | str, label: str) -> Path:
+    global ACTIVE_PYTHON, ACTIVE_PYTHON_LABEL, PIP
+
+    resolved = Path(python_path).expanduser().resolve()
+    ACTIVE_PYTHON = resolved
+    ACTIVE_PYTHON_LABEL = label
+    PIP = [str(resolved), "-m", "pip"]
+    return resolved
+
+
+def _venv_python_path(venv_dir: Path | None = None) -> Path:
+    root = Path(venv_dir or VENV_DIR)
+    return root / ("Scripts/python.exe" if IS_WIN else "bin/python")
+
+
+def _inside_virtualenv() -> bool:
+    base_prefix = getattr(sys, "base_prefix", sys.prefix)
+    return bool(os.environ.get("VIRTUAL_ENV")) or sys.prefix != base_prefix
+
+
+def _externally_managed_marker() -> Path | None:
+    stdlib = sysconfig.get_path("stdlib")
+    if not stdlib:
+        return None
+    return Path(stdlib) / "EXTERNALLY-MANAGED"
+
+
+def _is_externally_managed_python() -> bool:
+    if _inside_virtualenv():
+        return False
+    marker = _externally_managed_marker()
+    return bool(marker and marker.exists())
+
+
+def _python_module_available(module: str, python: Path | str | None = None) -> bool:
+    code = "import importlib,sys; importlib.import_module(sys.argv[1])"
+    result = _run(_python_cmd("-c", code, module, python=python), timeout=30)
+    return result.returncode == 0
+
+
+def _python_module_version(module: str, python: Path | str | None = None) -> str:
+    code = (
+        "import importlib,sys;"
+        "mod=importlib.import_module(sys.argv[1]);"
+        "print(getattr(mod,'__version__',''))"
+    )
+    result = _run(_python_cmd("-c", code, module, python=python), timeout=30)
+    return result.stdout.strip() if result.returncode == 0 else ""
+
+
 def _distro() -> tuple:
     try:
         d = {}
@@ -421,12 +484,7 @@ _AI_PRESETS = [
         "gemini-2.5-flash",
         "gemini",
     ),
-    (
-        "通义千问 (阿里云)",
-        "https://dashscope.aliyuncs.com/compatible-mode/v1",
-        "qwen-plus",
-        "openai",
-    ),
+    ("通义千问 (阿里云)", "https://dashscope.aliyuncs.com/compatible-mode/v1", "qwen-plus", "openai"),
     ("智谱 GLM", "https://open.bigmodel.cn/api/paas/v4/", "glm-4-flash", "openai"),
     ("Ollama (本地无需Key)", "http://127.0.0.1:11434/v1", "qwen2.5-coder:14b", "openai"),
     ("自定义 / Other", "", "", ""),
@@ -602,11 +660,7 @@ def configure_ai(auto: bool):
     default_model = (
         preset_model
         if preset_model
-        else (
-            current_model_for_style
-            if current_model_for_style
-            else default_models.get(api_style, "gpt-4o")
-        )
+        else (current_model_for_style if current_model_for_style else default_models.get(api_style, "gpt-4o"))
     )
     hint = f" [{_c('36', default_model)}]"
 
@@ -763,6 +817,53 @@ def check_python():
         err(f"需要 Python >= 3.8，当前 {v.major}.{v.minor}")
         sys.exit(1)
     ok(f"Python {v.major}.{v.minor}.{v.micro}  ({sys.executable})")
+
+
+def ensure_python_runtime(auto: bool, allow_create: bool = True) -> Path:
+    header("Step 1b  Python 包安装环境")
+
+    if _inside_virtualenv():
+        active = _set_active_python(sys.executable, "venv")
+        ok(f"当前已在虚拟环境中: {active}")
+        return active
+
+    venv_python = _venv_python_path()
+    if venv_python.exists():
+        active = _set_active_python(venv_python, "project_venv")
+        ok(f"复用项目虚拟环境: {active}")
+        return active
+
+    if not _is_externally_managed_python():
+        active = _set_active_python(sys.executable, "system")
+        ok(f"当前解释器可直接安装 Python 包: {active}")
+        return active
+
+    warn("检测到 PEP 668 externally-managed-environment")
+    marker = _externally_managed_marker()
+    if marker:
+        info(f"系统 Python 受发行版管理: {marker}")
+
+    if not allow_create:
+        info(f"安装阶段会自动创建项目虚拟环境: {VENV_DIR}")
+        info("这样可以避免使用 --break-system-packages 污染系统 Python")
+        return _set_active_python(sys.executable, "system_managed")
+
+    info(f"自动创建项目虚拟环境: {VENV_DIR}")
+    result = _run([sys.executable, "-m", "venv", str(VENV_DIR)], capture=False, timeout=300)
+    if result.returncode != 0:
+        err("创建项目虚拟环境失败，无法继续安装 Python 依赖")
+        if IS_LINUX:
+            info("Debian / Ubuntu 可先安装: sudo apt install python3-venv python3-full")
+        sys.exit(1)
+
+    venv_python = _venv_python_path()
+    if not venv_python.exists():
+        err(f"虚拟环境已创建，但未找到解释器: {venv_python}")
+        sys.exit(1)
+
+    active = _set_active_python(venv_python, "project_venv")
+    ok(f"后续 Python 依赖将安装到项目虚拟环境: {active}")
+    return active
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1025,6 +1126,7 @@ PYTHON_PKGS = [
 
 def install_python_packages(auto: bool):
     header("Step 3  Python 依赖包")
+    info(f"目标 Python 环境: {_active_python_path()} [{ACTIVE_PYTHON_LABEL}]")
 
     mirror_args = _pip_mirror_args()
     if mirror_args:
@@ -1035,9 +1137,12 @@ def install_python_packages(auto: bool):
     missing_req, missing_opt = [], []
     for imp, pkg, required in PYTHON_PKGS:
         try:
-            __import__(imp)
+            available = _python_module_available(imp)
+        except Exception:
+            available = False
+        if available:
             ok(f"{pkg}")
-        except ImportError:
+        else:
             (missing_req if required else missing_opt).append(pkg)
             warn(f"{pkg}  {'[必须]' if required else '[可选]'}")
     to_install = missing_req + missing_opt
@@ -1132,9 +1237,7 @@ def setup_local_searxng(auto: bool):
         info("如需联网搜索，请先安装 Docker / Podman 后执行：python setup.py --searxng")
         return
 
-    if not (
-        auto or ask("安装并启动本地 SearXNG（browser_search / web_search 需要）？", default="n")
-    ):
+    if not (auto or ask("安装并启动本地 SearXNG（browser_search / web_search 需要）？", default="n")):
         info("已跳过，本地网页搜索工具将在 SearXNG 启动后可用")
         return
 
@@ -1430,7 +1533,7 @@ def setup_udev(auto: bool):
 
 def _pyocd_installed_targets() -> str:
     """返回已安装目标列表（小写），失败返回空字符串"""
-    r = _run([sys.executable, "-m", "pyocd", "list", "--targets"], timeout=30)
+    r = _run(_python_cmd("-m", "pyocd", "list", "--targets"), timeout=30)
     return r.stdout.lower() if r.returncode == 0 else ""
 
 
@@ -1456,11 +1559,10 @@ def _build_pack_list() -> list:
 
 def setup_pyocd(auto: bool):
     header("Step 7  pyocd 芯片支持包（可选）")
-    try:
-        import pyocd
-
-        ok(f"pyocd {pyocd.__version__}")
-    except ImportError:
+    version = _python_module_version("pyocd")
+    if version:
+        ok(f"pyocd {version}")
+    else:
         warn("pyocd 未安装，跳过（请先完成 Step 3）")
         return
 
@@ -1482,7 +1584,7 @@ def setup_pyocd(auto: bool):
         return
 
     info("更新 pack 索引...")
-    r = _run([sys.executable, "-m", "pyocd", "pack", "update"], capture=False, timeout=120)
+    r = _run(_python_cmd("-m", "pyocd", "pack", "update"), capture=False, timeout=120)
     if r.returncode != 0:
         warn("pack 索引更新失败，尝试继续安装...")
 
@@ -1490,7 +1592,7 @@ def setup_pyocd(auto: bool):
     for install_chip, label in missing:
         info(f"安装 {label}...")
         r = _run(
-            [sys.executable, "-m", "pyocd", "pack", "install", install_chip],
+            _python_cmd("-m", "pyocd", "pack", "install", install_chip),
             capture=False,
             timeout=180,
         )
@@ -1626,7 +1728,7 @@ def install_gary_command(auto: bool):
 def _install_gary_unix(auto: bool):
     install_dir = Path.home() / ".local" / "bin"
     gary_path = install_dir / "gary"
-    expected_content = _GARY_SH.format(agent_script=str(AGENT_SCRIPT), python=sys.executable)
+    expected_content = _GARY_SH.format(agent_script=str(AGENT_SCRIPT), python=_active_python_path())
 
     if gary_path.exists():
         existing = gary_path.read_text(encoding="utf-8", errors="ignore")
@@ -1650,7 +1752,7 @@ def _install_gary_unix(auto: bool):
 def _install_gary_win(auto: bool):
     install_dir = _resolve_win_install_dir()
     gary_bat = install_dir / "gary.bat"
-    expected_content = _GARY_BAT.format(agent_script=str(AGENT_SCRIPT), python=sys.executable)
+    expected_content = _GARY_BAT.format(agent_script=str(AGENT_SCRIPT), python=_active_python_path())
 
     if gary_bat.exists():
         existing = gary_bat.read_text(encoding="utf-8", errors="ignore")
@@ -1662,7 +1764,7 @@ def _install_gary_win(auto: bool):
 
     if not (auto or ask(f"安装 gary.bat 到 {install_dir}？")):
         info(f"手动安装：将以下内容保存为 {install_dir}\\gary.bat")
-        info(f'  "{sys.executable}" "{AGENT_SCRIPT}" %*')
+        info(f'  "{_active_python_path()}" "{AGENT_SCRIPT}" %*')
         return
 
     try:
@@ -1675,7 +1777,9 @@ def _install_gary_win(auto: bool):
         err(f"  目标路径: {gary_bat}")
         info("请手动在 PowerShell 中执行：")
         info(f'  New-Item -Path "{install_dir}" -ItemType Directory -Force')
-        info(f'  Set-Content "{gary_bat}" \'@echo off\\n"{sys.executable}" "{AGENT_SCRIPT}" %*\'')
+        info(
+            f'  Set-Content "{gary_bat}" \'@echo off\\n"{_active_python_path()}" "{AGENT_SCRIPT}" %*\''
+        )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1684,6 +1788,7 @@ def _install_gary_win(auto: bool):
 def verify():
     header("验证  环境总览")
     status = {}
+    ok(f"活动 Python: {_active_python_path()} [{ACTIVE_PYTHON_LABEL}]")
 
     # AI
     cur_key, cur_url, cur_model, cur_style = _read_current_ai_config()
@@ -1708,11 +1813,10 @@ def verify():
     # Python 包
     pkg_ok = {}
     for imp, pkg, required in PYTHON_PKGS:
-        try:
-            __import__(imp)
+        if _python_module_available(imp):
             ok(f"Python: {pkg}")
             pkg_ok[pkg] = True
-        except Exception:
+        else:
             (warn if not required else err)(f"Python: {pkg}  {'[必须]' if required else '[可选]'}")
             pkg_ok[pkg] = False
     status["python"] = all(pkg_ok.get(pkg, True) for _, pkg, req in PYTHON_PKGS if req)
@@ -1824,6 +1928,7 @@ def main():
         _detect_china_network()
 
         if args.check:
+            ensure_python_runtime(auto=False, allow_create=False)
             verify()
             return
 
@@ -1848,6 +1953,7 @@ def main():
             return
 
         check_python()
+        ensure_python_runtime(auto=args.auto, allow_create=True)
         configure_ai(auto=args.auto)
         configure_chip(auto=args.auto)
         install_arm_gcc(auto=args.auto)
