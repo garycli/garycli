@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 import subprocess
 import sys
+import urllib.error
 from pathlib import Path
 
 
@@ -44,6 +45,43 @@ def test_searxng_url_defaults_to_loopback(monkeypatch):
     monkeypatch.delenv("GARY_SEARXNG_URL", raising=False)
 
     assert module._searxng_url() == "http://127.0.0.1:8080"
+
+
+def test_searxng_image_defaults_to_docker_hub(monkeypatch):
+    """The default SearXNG image should come from Docker Hub."""
+
+    module = _load_setup_module(monkeypatch)
+    monkeypatch.delenv("GARY_SEARXNG_IMAGE", raising=False)
+
+    assert module._searxng_image() == "searxng/searxng:latest"
+
+
+def test_searxng_healthcheck_uses_homepage_not_json(monkeypatch):
+    """Healthcheck should accept HTML-only SearXNG defaults."""
+
+    module = _load_setup_module(monkeypatch)
+    captured = {}
+
+    class _DummyHandle:
+        status = 200
+
+        def read(self, size=-1):
+            return b"<html><title>SearXNG</title></html>"
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    def _fake_urlopen(req, timeout=5):
+        captured["url"] = req.full_url
+        return _DummyHandle()
+
+    monkeypatch.setattr("urllib.request.urlopen", _fake_urlopen)
+
+    assert module._searxng_healthcheck("http://127.0.0.1:8080") is True
+    assert captured["url"] == "http://127.0.0.1:8080/"
 
 
 def test_searxng_host_port_uses_env_override(monkeypatch):
@@ -131,3 +169,56 @@ def test_ensure_python_runtime_creates_project_venv_for_pep668(monkeypatch, tmp_
     assert selected == venv_python.resolve()
     assert module.PIP[0] == str(venv_python.resolve())
     assert module.ACTIVE_PYTHON_LABEL == "project_venv"
+
+
+def test_setup_local_searxng_is_skipped_in_default_flow(monkeypatch):
+    """Regular setup should not prompt for or pull SearXNG unless explicitly requested."""
+
+    module = _load_setup_module(monkeypatch)
+    asked = {"value": False}
+
+    def _fail_if_asked(*args, **kwargs):
+        asked["value"] = True
+        raise AssertionError("setup_local_searxng should not ask in default flow")
+
+    monkeypatch.setattr(module, "ask", _fail_if_asked)
+
+    module.setup_local_searxng(auto=True, explicit=False)
+
+    assert asked["value"] is False
+
+
+def test_main_default_flow_calls_setup_local_searxng(monkeypatch):
+    """The normal interactive installer path should still offer the SearXNG step."""
+
+    module = _load_setup_module(monkeypatch)
+    monkeypatch.setattr(module.sys, "argv", ["setup.py"])
+
+    called = {"value": False, "auto": None, "explicit": None}
+
+    def _mark_called(*args, **kwargs):
+        called["value"] = True
+        called["auto"] = kwargs.get("auto")
+        called["explicit"] = kwargs.get("explicit")
+
+    monkeypatch.setattr(module, "_detect_china_network", lambda: False)
+    monkeypatch.setattr(module, "check_python", lambda: None)
+    monkeypatch.setattr(module, "ensure_python_runtime", lambda auto, allow_create=True: None)
+    monkeypatch.setattr(module, "configure_ai", lambda auto: None)
+    monkeypatch.setattr(module, "configure_chip", lambda auto: None)
+    monkeypatch.setattr(module, "install_arm_gcc", lambda auto: None)
+    monkeypatch.setattr(module, "install_python_packages", lambda auto: None)
+    monkeypatch.setattr(module, "create_workspace", lambda: None)
+    monkeypatch.setattr(module, "setup_local_searxng", _mark_called)
+    monkeypatch.setattr(module, "download_hal", lambda auto, families=None: None)
+    monkeypatch.setattr(module, "download_freertos", lambda auto: None)
+    monkeypatch.setattr(module, "setup_udev", lambda auto: None)
+    monkeypatch.setattr(module, "setup_pyocd", lambda auto: None)
+    monkeypatch.setattr(module, "install_gary_command", lambda auto: None)
+    monkeypatch.setattr(module, "verify", lambda: None)
+
+    module.main()
+
+    assert called["value"] is True
+    assert called["auto"] is False
+    assert called["explicit"] is False
