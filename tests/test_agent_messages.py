@@ -161,9 +161,7 @@ def test_context_usage_reports_remaining_percent(monkeypatch):
 def test_context_usage_starts_full_before_first_user_turn(monkeypatch):
     """The initial status should show a full remaining budget before any chat turns."""
 
-    monkeypatch.setattr(
-        "core.agent.estimate_request_tokens", lambda **kwargs: {"total_tokens": 12000}
-    )
+    monkeypatch.setattr("core.agent.estimate_request_tokens", lambda **kwargs: {"total_tokens": 12000})
     monkeypatch.setattr("core.agent.get_context", lambda: SimpleNamespace(thinking_enabled=False))
     monkeypatch.setattr("core.agent.TOOL_SCHEMAS", [])
     monkeypatch.setattr("core.agent.AI_MODEL", "gpt-4o")
@@ -204,10 +202,7 @@ def test_context_usage_uses_selected_tool_subset(monkeypatch):
         return {"total_tokens": 123}
 
     monkeypatch.setattr("core.agent.estimate_request_tokens", fake_estimate_request_tokens)
-    monkeypatch.setattr(
-        "core.agent.get_context",
-        lambda: SimpleNamespace(chip="STM32F103C8T6", thinking_enabled=False),
-    )
+    monkeypatch.setattr("core.agent.get_context", lambda: SimpleNamespace(chip="STM32F103C8T6", thinking_enabled=False))
     monkeypatch.setattr("core.agent.AI_MODEL", "gpt-4o")
     monkeypatch.setattr("core.agent.AI_TEMPERATURE", 1)
 
@@ -244,9 +239,7 @@ def test_compose_system_prompt_caches_static_and_dynamic_parts(monkeypatch):
     monkeypatch.setattr("core.agent.get_context", lambda: ctx)
     monkeypatch.setattr(
         "core.agent.build_system_prompt",
-        lambda chip, language, hw_connected: build_calls.__setitem__(
-            "system", build_calls["system"] + 1
-        )
+        lambda chip, language, hw_connected: build_calls.__setitem__("system", build_calls["system"] + 1)
         or "static-base",
     )
     monkeypatch.setattr(
@@ -260,7 +253,7 @@ def test_compose_system_prompt_caches_static_and_dynamic_parts(monkeypatch):
     )
     monkeypatch.setattr(
         "core.agent._get_manager",
-        lambda: SimpleNamespace(get_all_prompt_additions=lambda: ""),
+        lambda: SimpleNamespace(get_prompt_additions_for_tools=lambda tool_names: ""),
     )
 
     def _member_state(chip):
@@ -281,6 +274,49 @@ def test_compose_system_prompt_caches_static_and_dynamic_parts(monkeypatch):
     assert prompt3 != prompt2
     assert "member-v1" in prompt1
     assert "member-v2" in prompt3
+
+
+def test_compose_system_prompt_injects_skill_prompt_only_for_selected_tools(monkeypatch):
+    """Skill prompt additions should only appear when the current tool subset matches that skill."""
+
+    agent = object.__new__(STM32Agent)
+    agent._static_prompt_cache = ""
+    agent._static_prompt_signature = None
+    agent._skill_prompt_cache = ""
+    agent._skill_prompt_signature = None
+    agent._dynamic_prompt_cache = ""
+    agent._dynamic_prompt_signature = None
+    agent._system_prompt_cache = ""
+    agent._system_prompt_signature = None
+    agent._tool_schema_cache = []
+
+    ctx = SimpleNamespace(chip="STM32F103C8T6", cli_language="zh", hw_connected=False)
+
+    monkeypatch.setattr("core.agent.get_context", lambda: ctx)
+    monkeypatch.setattr("core.agent.build_system_prompt", lambda chip, language, hw_connected: "static-base")
+    monkeypatch.setattr("core.agent.get_debug_prompt", lambda error_type, context: "")
+    monkeypatch.setattr("core.agent.get_member_prompt_section_state", lambda chip: ("", "member-hash"))
+    monkeypatch.setattr(
+        "core.agent._get_manager",
+        lambda: SimpleNamespace(
+            get_prompt_additions_for_tools=lambda tool_names: "skill-body"
+            if "motor_pid_tool" in tool_names
+            else ""
+        ),
+    )
+
+    prompt_without_skill = agent._compose_system_prompt()
+    agent._tool_schema_cache = [
+        {"type": "function", "function": {"name": "motor_pid_tool"}},
+        {"type": "function", "function": {"name": "read_file"}},
+    ]
+    prompt_with_skill = agent._compose_system_prompt()
+    agent._tool_schema_cache = []
+    prompt_cleared = agent._compose_system_prompt()
+
+    assert "skill-body" not in prompt_without_skill
+    assert "skill-body" in prompt_with_skill
+    assert "skill-body" not in prompt_cleared
 
 
 def test_truncate_result_uses_shorter_limit_and_notice():
