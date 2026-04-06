@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from core.micropython_tools import micropython_connect, micropython_flash, micropython_list_files_tool
+from core.micropython_tools import (
+    micropython_connect,
+    micropython_flash,
+    micropython_list_files_tool,
+)
 from core.state import get_context
 
 
