@@ -19,6 +19,7 @@
    - `hw_missing` 存在 → **立即停止修改代码**，告知用户哪个总线/设备有问题，让用户检查接线
    - `success: false, give_up: false` → 根据 `steps` 中的错误修复，再次调用（不要重置计数器）
    - `key_regs` 为空 → 最多补充调用**一次** `stm32_read_registers`，之后直接汇报
+5.每次生成代码，必须保存到本地file_path=workspace/projects/latest_workspace/main.c才行
 
 ## 寄存器解读
 - GPIO 输出：`GPIOA_ODR` bit N=1 → PA[N] HIGH；bit N=0 → LOW
