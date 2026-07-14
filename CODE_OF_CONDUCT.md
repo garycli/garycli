@@ -46,8 +46,8 @@ This Code of Conduct applies across all project spaces, including:
 
 If you witness or experience behavior that violates this Code of Conduct, please contact the maintainers:
 
-- **GitHub**: Reach out to [@PrettyMyGirlZyy4Embedded](https://github.com/PrettyMyGirlZyy4Embedded) directly
-- **Private channel**: For privacy-sensitive or serious harassment situations, use the [Security Advisory](https://github.com/PrettyMyGirlZyy4Embedded/garycli/security/advisories/new) to report privately
+- **GitHub**: Reach out to [@garycli](https://github.com/garycli) directly
+- **Private channel**: For privacy-sensitive or serious harassment situations, use the [Security Advisory](https://github.com/garycli/garycli/security/advisories/new) to report privately
 
 All reports will be taken seriously and handled confidentially. Maintainers will respond with actions proportional to the severity of the incident:
 
@@ -68,4 +68,4 @@ This Code of Conduct is adapted from the [Contributor Covenant v2.1](https://www
 
 **🗡️ A healthy community is the foundation of a great tool.**
 
-[Back to Home](https://github.com/PrettyMyGirlZyy4Embedded/garycli) · [Website](https://www.garycli.com)
+[Back to Home](https://github.com/garycli/garycli) · [Website](https://www.garycli.com)

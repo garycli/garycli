@@ -3,11 +3,11 @@
 # 🗡️ GARY CLI: The Spear Carrier
 
 **Piercing the Silicon with AI.**
-*面向 STM32、RP2040 / Pico、ESP32 / ESP8266 等板卡的 AI 原生命令行开发与调试智能体*
+*面向 STM32、RP2040 / Pico、ESP32 / ESP8266、CanMV K230 等板卡的 AI 原生命令行开发与调试智能体*
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Python](https://img.shields.io/badge/Python-3.8+-green.svg)](https://www.python.org/)
-[![Boards](https://img.shields.io/badge/Boards-STM32%20%7C%20RP2040%20%7C%20ESP32%20%7C%20ESP8266-blue.svg)](#supported-chips)
+[![Python](https://img.shields.io/badge/Python-3.10+-green.svg)](https://www.python.org/)
+[![Boards](https://img.shields.io/badge/Boards-STM32%20%7C%20RP2040%20%7C%20ESP%20%7C%20CanMV_K230-blue.svg)](#supported-chips)
 [![Website](https://img.shields.io/badge/Website-garycli.com-success)](https://www.garycli.com)
 
 <br>
@@ -21,7 +21,7 @@
    ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝
 ```
 
-**用自然语言对话，让 AI 直接参与 STM32、RP2040 / Pico、ESP32 / ESP8266 等板卡的开发、部署与调试。**
+**用自然语言对话，让 AI 直接参与 STM32、RP2040 / Pico、ESP32 / ESP8266、CanMV K230 等板卡的开发、部署与调试。**
 
 <p align="center">
   <a href="./README.md"><b>English</b></a>
@@ -31,8 +31,9 @@
 
 </div>
 
-
 ## 🚀 快速开始
+
+需要 Python 3.10 或更高版本。
 
 ### 一键安装
 
@@ -61,7 +62,7 @@ irm https://www.garycli.com/install.ps1 | iex
 
 ```bash
 # 1. 克隆仓库
-git clone https://github.com/PrettyMyGirlZyy4Embedded/garycli.git
+git clone https://github.com/garycli/garycli.git
 cd garycli
 
 # 2. 下载安装资源
@@ -228,12 +229,12 @@ Gary 不绑定单一 AI 服务。你可以自由切换后端：
 | DeepSeek        | deepseek-chat     | 性价比高      |
 | Kimi / Moonshot | kimi-k2.5         | 中文能力强     |
 | OpenAI          | gpt-4o            | 综合表现强     |
-| Google Gemini   | gemini-2.0-flash  | 响应快       |
+| Google Gemini   | gemini-2.5-flash  | 响应快       |
 | 通义千问            | qwen-plus         | 阿里云       |
 | 智谱 GLM          | glm-4-flash       | 易接入       |
 | Ollama          | qwen2.5-coder:14b | 本地离线，完全私有 |
 
-### 🧩 技能系统（Skills）
+### 🧩 可扩展 Skill 包
 
 Gary 支持可插拔技能包，用于扩展能力边界。
 
@@ -268,10 +269,10 @@ Gary 支持可插拔技能包，用于扩展能力边界。
 gary do "写一个 WS2812 灯带驱动，控制 8 颗 LED 跑彩虹效果"
 
 # 生成 + 编译 + 连接硬件
-gary do "PA0 LED 闪烁，500ms 间隔" --connect
+gary --connect --do "PA0 LED 闪烁，500ms 间隔"
 
 # 指定芯片型号
-gary do "读取 ADC 电压，串口打印" --chip STM32F407VET6 --connect
+gary --chip STM32F407VET6 --connect --do "读取 ADC 电压，串口打印"
 ```
 
 ### 模式二：交互式对话（`gary`）
@@ -322,7 +323,7 @@ Gary > 把 I2C 地址从 0x3C 改成 0x3D
 | --------------------------- | ------------- |
 | `gary`                      | 启动交互式对话界面     |
 | `gary do "任务描述"`            | 单次任务模式        |
-| `gary do "任务" --connect`    | 单次任务 + 自动连接硬件 |
+| `gary --connect --do "任务"` | 单次任务 + 自动连接硬件 |
 | `gary --chip STM32F407VET6` | 指定芯片型号        |
 | `gary --connect`            | 启动并连接硬件       |
 | `gary config`               | 配置 AI 后端      |
@@ -337,17 +338,21 @@ Gary > 把 I2C 地址从 0x3C 改成 0x3D
 | `/serial [端口] [波特率]`       | 连接串口           |
 | `/serial list`             | 列出可用串口         |
 | `/chip [型号]`               | 查看或切换芯片        |
-| `/flash [swd\|uart\|auto]` | 设置烧录方式         |
-| `/flash status`            | 查看烧录工具状态       |
+| `/flash [bin]`             | 部署最近产物或指定固件   |
 | `/probes`                  | 列出调试探针         |
 | `/status`                  | 查看完整硬件状态       |
 | `/config`                  | 重新配置 AI 后端     |
 | `/projects`                | 查看历史项目         |
+| `/member [path\|reload]`   | 预览、定位或重载经验库   |
+| `/language [en\|zh]`       | 切换 CLI 语言       |
+| `/enable_thinking`         | 开启当前会话推理输出    |
+| `/disable_thinking`        | 关闭当前会话推理输出    |
+| `/telegram <子命令>`         | 管理 Telegram 集成  |
 | `/skill list`              | 查看已安装技能        |
 | `/skill install <来源>`      | 安装技能包          |
 | `/skill create <名称>`       | 创建技能模板         |
 | `/clear`                   | 清空对话历史         |
-| `/exit`                    | 退出             |
+| `/exit` 或 `/quit`          | 退出             |
 
 ---
 
@@ -526,8 +531,9 @@ TOOLS_MAP = {
 | **RP2040** | RP2040, Pico, Pico W | MicroPython `main.py` 语法检查、USB 串口 raw REPL 同步、启动日志 / Traceback 调试 |
 | **ESP32 系列** | ESP32, ESP32-S2, ESP32-S3, ESP32-C3, ESP32-C6, LOLIN32, NodeMCU-32S | MicroPython `main.py` 语法检查、USB 串口 raw REPL 同步、启动日志 / Traceback 调试 |
 | **ESP8266 系列** | ESP8266, NodeMCU, D1 Mini, ESP-01 | MicroPython `main.py` 语法检查、USB 串口 raw REPL 同步、启动日志 / Traceback 调试 |
+| **CanMV K230 系列** | CanMV K230, K230D | MicroPython 语法检查、通过 raw REPL 部署到 `/sdcard`、板端文件检查及运行日志调试 |
 
-> 其中 STM32 走 HAL / GCC / SWD 工作流；RP2040 与 ESP 系列走 MicroPython `main.py` + USB 串口工作流。
+> STM32 使用 HAL / GCC / SWD 工作流；RP2040、ESP 与 CanMV 使用通过 USB 串口管理的 MicroPython 部署工作流。
 
 ---
 
@@ -584,20 +590,20 @@ Gary > OLED 显示中文“你好世界”，字体 16x16
 
 ```text
 garycli/
-├── stm32_agent.py          # 主程序：TUI + AI 对话 + 工具调度
-├── compiler.py             # GCC 交叉编译封装
-├── config.py               # 配置文件与路径管理
-├── setup.py                # 安装与初始化脚本
-├── stm32_extra_tools.py    # 扩展工具集
-├── gary_skills.py          # 技能系统管理器
-├── requirements.txt        # Python 依赖
-├── install.sh              # Linux / macOS / WSL 安装脚本
-├── install.ps1             # Windows 安装脚本
-└── ~/.gary/                # 用户数据目录
-    ├── skills/             # 已安装技能
-    ├── projects/           # 历史项目存档
-    ├── templates/          # 模板库
-    └── member.md           # 经验库 / 记忆
+├── stm32_agent.py          # CLI 入口
+├── ai/                     # AI 服务商与工具注册表
+├── compiler/               # 编译核心与芯片系列模块
+├── core/                   # Agent、平台、记忆与项目管理
+├── hardware/               # SWD、UART ISP、串口与 MicroPython 传输
+├── prompts/                # 系统和平台提示词模板
+├── tui/                    # 交互命令与终端界面
+├── skills/                 # 仓库内置 Skill 源码
+├── config.py               # 运行路径与默认配置
+├── setup.py                # 安装与资源初始化
+├── stm32_extra_tools.py    # STM32 扩展工具
+├── gary_skills.py          # Skill 管理器
+├── member.md               # 项目经验库
+└── workspace/              # 生成的构建与项目缓存
 ```
 
 ---
@@ -689,7 +695,7 @@ newgrp dialout
 <details>
 <summary><b>Q: 支持 Arduino / ESP32 吗？</b></summary>
 
-支持。当前已经支持 STM32、RP2040 / Pico / Pico W，以及 ESP32 / ESP8266 系列板卡。
+支持 ESP32 / ESP8266 的 MicroPython 工作流；目前尚未支持 Arduino 框架。
 
 </details>
 
@@ -708,6 +714,7 @@ newgrp dialout
 * [ ] VS Code 扩展
 * [x] RP2040 / Pico / Pico W 支持
 * [x] ESP32 / ESP8266 MicroPython 支持
+* [x] CanMV K230 / K230D MicroPython 支持
 
 ---
 
@@ -716,7 +723,7 @@ newgrp dialout
 欢迎 Issue 和 PR。尤其欢迎以下方向：
 
 * 新的 Skill 包
-* 更多 STM32 / RP2040 / ESP 板卡与模板支持
+* 更多 STM32 / RP2040 / ESP / CanMV 板卡与模板支持
 * 文档改进与翻译
 * 故障复现与修复
 * 示例工程与演示视频
@@ -735,15 +742,11 @@ newgrp dialout
 
 # 4. 提交 PR
 ```
+
 ## Star History
 
-<a href="https://www.star-history.com/?repos=garycli%2Fgarycli&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=garycli/garycli&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=garycli/garycli&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=garycli/garycli&type=date&legend=top-left" />
- </picture>
-</a>
+[查看仓库 Star History](https://www.star-history.com/?repos=garycli%2Fgarycli&type=date&legend=top-left)。
+
 ---
 
 ## 📜 协议
@@ -756,6 +759,6 @@ newgrp dialout
 
 **🗡️ Just Gary Do It.**
 
-[官网](https://www.garycli.com) · [GitHub](https://github.com/PrettyMyGirlZyy4Embedded/garycli) · [提交 Issue](https://github.com/PrettyMyGirlZyy4Embedded/garycli/issues)
+[官网](https://www.garycli.com) · [GitHub](https://github.com/garycli/garycli) · [提交 Issue](https://github.com/garycli/garycli/issues)
 
 </div>

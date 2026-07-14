@@ -24,7 +24,7 @@ We recommend always running the latest version.
 If you discover a security issue, please report it privately through one of these channels:
 
 - **GitHub Private Security Advisory** (recommended):  
-  Go to [Security → Report a vulnerability](https://github.com/PrettyMyGirlZyy4Embedded/garycli/security/advisories/new)
+  Go to [Security → Report a vulnerability](https://github.com/garycli/garycli/security/advisories/new)
 - **Email**: Contact the maintainer directly if contact details are listed in the README or `member.md`
 
 Please include as much of the following as possible:
@@ -79,9 +79,9 @@ If you are running Gary in a restricted environment (e.g. a shared server or CI 
 Gary provides one-liner install scripts via `curl | bash` and `irm | iex`. These patterns require you to trust the script content:
 
 - You can inspect the script before running:
-  - Linux / macOS: https://www.garycli.com/install.sh
-  - Windows: https://www.garycli.com/install.ps1
-- Alternatively, use the [manual installation](https://github.com/PrettyMyGirlZyy4Embedded/garycli#manual-installation) method for full control over what gets executed
+  - Linux / macOS: <https://www.garycli.com/install.sh>
+  - Windows: <https://www.garycli.com/install.ps1>
+- Alternatively, use the [manual installation](https://github.com/garycli/garycli#manual-installation) method for full control over what gets executed
 
 ### 🔌 Hardware Access Permissions
 
@@ -114,4 +114,4 @@ Thank you to everyone who helps keep Gary secure.
 
 ---
 
-[Back to Home](https://github.com/PrettyMyGirlZyy4Embedded/garycli) · [Report a Vulnerability](https://github.com/PrettyMyGirlZyy4Embedded/garycli/security/advisories/new) · [Website](https://www.garycli.com)
+[Back to Home](https://github.com/garycli/garycli) · [Report a Vulnerability](https://github.com/garycli/garycli/security/advisories/new) · [Website](https://www.garycli.com)

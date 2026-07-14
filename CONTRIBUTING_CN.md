@@ -1,5 +1,7 @@
 # 🗡️ 贡献指南 · Contributing Guide
+
 [🇬🇧 English](CONTRIBUTING.md)
+
 > 感谢你愿意为 **Gary CLI** 做出贡献！  
 > 无论是修 Bug、扩展芯片支持、贡献 Skill 包，还是改善文档，你的每一次提交都会让更多嵌入式开发者受益。
 
@@ -41,13 +43,12 @@
 git clone https://github.com/<你的用户名>/garycli.git
 cd garycli
 
-# 2. 创建虚拟环境（推荐）
+# 2. 创建 Python 3.10+ 虚拟环境（推荐）
 python3 -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
-# 3. 安装依赖（开发模式）
+# 3. 安装依赖
 pip install -r requirements.txt
-pip install -e .
 
 # 4. 安装交叉编译工具链（用于测试代码生成 + 编译流程）
 # Ubuntu / Debian:
@@ -66,25 +67,26 @@ python3 stm32_agent.py --doctor
 
 ## 项目结构说明
 
-```
+```text
 garycli/
-├── stm32_agent.py        # 主程序：TUI + AI 对话 + 工具调度
-├── compiler.py           # GCC 交叉编译封装
-├── config.py             # 配置文件与路径管理
-├── setup.py              # 安装与初始化脚本
-├── stm32_extra_tools.py  # 内置工具集合（I2C 扫描、PWM 计算等）
-├── gary_skills.py        # Skill 系统管理器
-├── requirements.txt      # Python 依赖
-├── install.sh            # Linux / macOS 安装脚本
-├── install.ps1           # Windows 安装脚本
-└── ~/.gary/              # 用户数据目录（运行时生成）
-    ├── skills/           # 已安装的 Skill 包
-    ├── projects/         # 历史项目存档
-    ├── templates/        # 模板库
-    └── member.md         # 知识 / 记忆库
+├── stm32_agent.py        # CLI 入口
+├── ai/                   # AI 服务商、工具 schema 与调度
+├── compiler/             # 编译核心、注册表与芯片系列模块
+│   └── chips/
+├── core/                 # Agent、平台工具、记忆与项目管理
+├── hardware/             # SWD、UART ISP、串口与 MicroPython 传输
+├── prompts/              # 系统和平台提示词模板
+├── tui/                  # 交互命令与终端界面
+├── skills/               # 仓库内置 Skill 源码
+├── config.py             # 运行路径与默认配置
+├── setup.py              # 安装与资源初始化
+├── stm32_extra_tools.py  # STM32 扩展工具
+├── gary_skills.py        # Skill 管理器
+├── member.md             # 项目经验库
+└── workspace/            # 运行时生成的构建与项目缓存
 ```
 
-如果你要新增功能，请根据其性质放到对应模块中，而不是统一堆在 `stm32_agent.py` 里。
+新增功能时请放到对应包中，不要堆到仅作为入口的 `stm32_agent.py`。
 
 ---
 
@@ -92,7 +94,7 @@ garycli/
 
 ### 🐛 报告 Bug
 
-在 [Issues](https://github.com/PrettyMyGirlZyy4Embedded/garycli/issues) 中新建 Issue，请包含：
+在 [Issues](https://github.com/garycli/garycli/issues) 中新建 Issue，请包含：
 
 - **Gary 版本** / Python 版本 / 操作系统
 - **芯片型号**（如 STM32F103C8T6）
@@ -117,15 +119,15 @@ garycli/
 1. **先开 Issue 讨论**（对于非 trivial 的改动），避免白费功夫
 2. 在自己的 fork 上新建分支：
 
-```bash
-git checkout -b fix/i2c-scan-crash
-# 或
-git checkout -b feat/stm32g0-support
-```
+   ```bash
+   git checkout -b fix/i2c-scan-crash
+   # 或
+   git checkout -b feat/stm32g0-support
+   ```
 
 3. 编写代码，确保：
-   - 不破坏现有的三种 AI 后端调用方式（Function Calling 格式）
-   - 新增工具需在 `stm32_extra_tools.py` 中注册，并补充 schema
+   - 工具调用在已支持的各类 AI 服务商下保持一致
+   - 新工具在对应模块注册，并通过 `ai/tools.py` 暴露工具 schema
    - 硬件相关代码优先通过 `gary doctor` 的诊断项验证
 4. 提交 PR，填写模板
 
@@ -137,7 +139,7 @@ Skill 是 Gary 最重要的扩展机制，欢迎贡献新的 Skill！
 
 #### Skill 标准目录结构
 
-```
+```text
 my_skill/
 ├── skill.json         # Skill 元信息
 ├── tools.py           # Python 工具函数
@@ -216,13 +218,15 @@ TOOLS_MAP = {
 
 ### 📟 扩展芯片支持
 
-目前 Gary 主要支持 STM32F0 / F1 / F3 / F4 系列。如果你想添加新系列（如 STM32G0、STM32H7），需要：
+对于 STM32 HAL 工程，Gary 目前主要支持 STM32F0 / F1 / F3 / F4 系列。如果你想添加新系列（如 STM32G0、STM32H7），需要：
 
 1. 在 `setup.py` 中添加对应 HAL / CMSIS 资源的下载逻辑
-2. 在 `compiler.py` 中补充该系列的编译参数（MCU flag、链接脚本等）
-3. 在 `stm32_agent.py` 的芯片识别逻辑中注册新系列
-4. 至少提供一个可编译通过的基础 `main.c` 模板
-5. 在 PR 中说明你实际测试过的具体型号和开发板
+2. 在对应的 `compiler/chips/` 模块中补充编译参数、源码和链接配置
+3. 在 `core/platforms.py` 中注册目标识别与规范名称
+4. 通过 `ai/tools.py` 暴露新增工具与 schema
+5. 在 `prompts/templates/` 中添加或更新对应提示词
+6. 至少提供一份可通过验证或完整编译的基础程序
+7. 在 PR 中说明实际测试过的具体型号和开发板
 
 ---
 
@@ -265,6 +269,9 @@ black .
 
 # 风格检查
 flake8 . --max-line-length=100 --exclude=.venv
+
+# 测试
+pytest -q
 ```
 
 主要约定：
@@ -281,7 +288,7 @@ flake8 . --max-line-length=100 --exclude=.venv
 
 使用如下格式（参考 [Conventional Commits](https://www.conventionalcommits.org/)）：
 
-```
+```text
 <类型>(<范围>): <简短描述>
 
 [可选正文：详细说明变更原因和内容]
@@ -304,7 +311,7 @@ flake8 . --max-line-length=100 --exclude=.venv
 
 **示例：**
 
-```
+```text
 feat(compiler): 添加 STM32G0 系列编译参数支持
 
 支持 STM32G030/G031/G071 等常用型号，
@@ -313,7 +320,7 @@ feat(compiler): 添加 STM32G0 系列编译参数支持
 Closes #42
 ```
 
-```
+```text
 skill: 新增 uart_protocol_analyzer Skill
 
 支持对 UART 抓包数据进行协议分析，
@@ -334,11 +341,11 @@ skill: 新增 uart_protocol_analyzer Skill
 维护者会尽力在 7 天内响应。若超时未回复，欢迎在 PR 下留言 ping 一下。
 
 **Q：我想重构某个核心模块，需要注意什么？**  
-请先开 Issue 描述重构方案，讨论对齐后再动手。核心模块（如 `stm32_agent.py` 的 AI 调度循环）的重构需要保证对三种烧录方式（SWD / UART ISP / 无硬件）的行为一致性。
+请先开 Issue 描述重构方案，讨论对齐后再动手。核心模块（尤其是 `core/agent.py` 的 AI 调度循环）重构后，必须保证 SWD、UART ISP、MicroPython 串口及无硬件工作流行为一致。
 
 ---
 
 > **🗡️ Just Gary Do It.**  
 > 每一行代码、每一个 Skill、每一条文档，都是对 STM32 开发者社区的礼物。
 
-[返回主页](https://github.com/PrettyMyGirlZyy4Embedded/garycli) · [提交 Issue](https://github.com/PrettyMyGirlZyy4Embedded/garycli/issues) · [官网](https://www.garycli.com)
+[返回主页](https://github.com/garycli/garycli) · [提交 Issue](https://github.com/garycli/garycli/issues) · [官网](https://www.garycli.com)

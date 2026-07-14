@@ -9,9 +9,25 @@ All notable changes to Gary CLI are documented here. Format follows [Keep a Chan
 ## [Unreleased]
 
 ### Added
-- `CONTRIBUTING.md` / `CONTRIBUTING_EN.md` — 贡献指南（中英双语）
-- `SECURITY.md` / `SECURITY_EN.md` — 安全政策（中英双语）
-- `CODE_OF_CONDUCT.md` / `CODE_OF_CONDUCT_EN.md` — 行为准则（中英双语）
+
+- CanMV K230 / K230D MicroPython workflow
+- RP2040 / Pico and ESP32 / ESP8266 MicroPython workflows
+- Modular `ai/`, `compiler/`, `core/`, `hardware/`, `prompts/`, and `tui/` packages
+
+### Changed
+
+- Expanded provider support to OpenAI-compatible, Anthropic Messages, and Gemini SDK interfaces
+- Reworked project caching and incremental repair around `workspace/projects/latest_workspace`
+
+---
+
+## [0.2.0] - 2026-03-23
+
+### Added
+
+- `CONTRIBUTING.md` / `CONTRIBUTING_CN.md` — 贡献指南（中英双语）
+- `SECURITY.md` / `SECURITY_CN.md` — 安全政策（中英双语）
+- `CODE_OF_CONDUCT.md` / `CODE_OF_CONDUCT_CN.md` — 行为准则（中英双语）
 - `CHANGELOG.md` — 变更日志
 - GitHub Actions CI：lint / test / release 自动化工作流
 - GitHub Issue 模板：Bug report / Feature request / Skill submission
@@ -20,9 +36,10 @@ All notable changes to Gary CLI are documented here. Format follows [Keep a Chan
 
 ---
 
-## [0.1.0] - 2025-03
+## [0.1.0-alpha] - 2026-03-19
 
 ### Added
+
 - 🗣️ 自然语言 → 可编译 STM32 HAL 代码生成
 - 🔄 自动闭环调试（生成 → 编译 → 烧录 → 串口验证 → 寄存器读取 → 修复 → 重烧）
 - ⚡ SWD（默认）+ UART ISP（可选）双烧录策略
@@ -40,5 +57,6 @@ All notable changes to Gary CLI are documented here. Format follows [Keep a Chan
 
 ---
 
-[Unreleased]: https://github.com/PrettyMyGirlZyy4Embedded/garycli/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/PrettyMyGirlZyy4Embedded/garycli/releases/tag/v0.1.0
+[Unreleased]: https://github.com/garycli/garycli/compare/V0.2.0...HEAD
+[0.2.0]: https://github.com/garycli/garycli/compare/v0.1.0-alpha...V0.2.0
+[0.1.0-alpha]: https://github.com/garycli/garycli/releases/tag/v0.1.0-alpha

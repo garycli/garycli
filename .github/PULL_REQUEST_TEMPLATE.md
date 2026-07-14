@@ -1,8 +1,8 @@
-## 变更说明 / Description
+# 变更说明 / Description
 
 > 简要描述这个 PR 做了什么 / Briefly describe what this PR does
 
-### 变更类型 / Type of Change
+## 变更类型 / Type of Change
 
 - [ ] 🐛 Bug 修复 / Bug fix
 - [ ] ✨ 新功能 / New feature
@@ -30,10 +30,11 @@ Closes #
 ```bash
 # 例如 / e.g.
 gary doctor
-gary do "PA0 LED blink 500ms" --chip STM32F103C8T6
+gary --chip STM32F103C8T6 --do "PA0 LED blink 500ms"
 ```
 
 **测试环境 / Test Environment:**
+
 - OS:
 - Python:
 - 芯片 / Chip（如涉及硬件 / if hardware-related）:
@@ -44,8 +45,8 @@ gary do "PA0 LED blink 500ms" --chip STM32F103C8T6
 ## 提交前检查 / Pre-merge Checklist
 
 - [ ] 代码通过 `black` 格式化，`flake8` 无报错
-- [ ] 新功能 / 新工具已在对应模块注册（如 `stm32_extra_tools.py`）
-- [ ] 不破坏三种烧录模式（SWD / UART ISP / 无硬件）的行为一致性
+- [ ] 新功能 / 新工具已在对应模块注册，并在 `ai/tools.py` 暴露 schema
+- [ ] 不破坏 SWD、UART ISP、MicroPython 串口和无硬件工作流的行为一致性
 - [ ] 如涉及 Skill，`skill.json` 中 `author` 字段已填写
 - [ ] 文档已同步更新（如有必要）
 - [ ] CHANGELOG.md 已更新（如有必要）

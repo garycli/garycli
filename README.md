@@ -3,11 +3,11 @@
 # 🗡️ GARY CLI: The Spear Carrier
 
 **Piercing the Silicon with AI.**
-*An AI-native command-line development and debugging agent for STM32, RP2040 / Pico, and ESP32 / ESP8266 boards*
+*An AI-native command-line development and debugging agent for STM32, RP2040 / Pico, ESP32 / ESP8266, and CanMV K230 boards*
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Python](https://img.shields.io/badge/Python-3.8+-green.svg)](https://www.python.org/)
-[![Boards](https://img.shields.io/badge/Boards-STM32%20%7C%20RP2040%20%7C%20ESP32%20%7C%20ESP8266-blue.svg)](#supported-chips)
+[![Python](https://img.shields.io/badge/Python-3.10+-green.svg)](https://www.python.org/)
+[![Boards](https://img.shields.io/badge/Boards-STM32%20%7C%20RP2040%20%7C%20ESP%20%7C%20CanMV_K230-blue.svg)](#supported-chips)
 [![Website](https://img.shields.io/badge/Website-garycli.com-success)](https://www.garycli.com)
 
 <br>
@@ -21,7 +21,7 @@
    ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝
 ```
 
-**Talk to it in natural language, and let AI directly participate in development, deployment, and debugging for STM32, RP2040 / Pico, and ESP32 / ESP8266 boards.**
+**Talk to it in natural language, and let AI directly participate in development, deployment, and debugging for STM32, RP2040 / Pico, ESP32 / ESP8266, and CanMV K230 boards.**
 
 <p align="center">
   <a href="./README_CN.md"><b>中文</b></a>
@@ -30,70 +30,6 @@
 [Quick Start](#-quick-start) · [Core Features](#-core-features) · [Usage Guide](#-usage-guide) · [Command Reference](#-command-reference) · [Skill System](#-skill-system-skills) · [FAQ](#-faq)
 
 </div>
-
-### Manual installation
-
-```bash
-# 1. Clone the repository
-git clone https://github.com/garycli/garycli.git
-cd garycli
-
-# 2. Run environment install
-python3 setup.py --auto
-
-# 3. Run environment diagnostics
-python3 stm32_agent.py --doctor
-```
-
-### First-time configuration
-
-```bash
-gary config
-```
-
-Follow the prompts to configure:
-
-* API Key
-* Base URL
-* Model
-* Default chip model
-* Default serial parameters (optional)
-
-### Environment diagnostics
-
-```bash
-gary doctor
-```
-
-Example output:
-
-```text
-■ AI Interface
-  ✓ API Key   sk-abc...xyz
-  ✓ Base URL  https://api.deepseek.com/v1
-  ✓ Model     deepseek-chat
-  ✓ API connectivity  OK
-
-■ Compilation Toolchain
-  ✓ arm-none-eabi-gcc  arm-none-eabi-gcc (15.1.0)
-  ✓ HAL resources      STM32F0xx, STM32F1xx, STM32F3xx, STM32F4xx
-  ✓ CMSIS Core
-
-■ Python Dependencies
-  ✓ openai
-  ✓ rich
-  ✓ prompt_toolkit
-  ✓ pyserial      (optional)
-  ✓ pyocd         (optional)
-  ✓ stm32loader   (optional)
-
-■ Hardware Probes
-  ✓ ST-Link V2
-  ✓ Serial port /dev/ttyUSB0
-
-✅ All core components are ready. Gary is good to go.
-```
-
 
 ---
 
@@ -203,12 +139,12 @@ Gary is not tied to a single AI provider. You can switch backends freely:
 | DeepSeek        | deepseek-chat     | Cost-effective               |
 | Kimi / Moonshot | kimi-k2.5         | Strong Chinese capability    |
 | OpenAI          | gpt-4o            | Strong overall performance   |
-| Google Gemini   | gemini-2.0-flash  | Fast response                |
+| Google Gemini   | gemini-2.5-flash  | Fast response                |
 | Tongyi Qianwen  | qwen-plus         | Alibaba Cloud                |
 | Zhipu GLM       | glm-4-flash       | Easy to integrate            |
 | Ollama          | qwen2.5-coder:14b | Local offline, fully private |
 
-### 🧩 Skill System (Skills)
+### 🧩 Extensible Skill Packs
 
 Gary supports pluggable skill packs to extend its capabilities.
 
@@ -234,6 +170,8 @@ Once installed, skills can be hot-loaded without restarting.
 
 ## 🚀 Quick Start
 
+Requires Python 3.10 or newer.
+
 ### One-line install
 
 **Linux / macOS / WSL:**
@@ -256,6 +194,35 @@ The install script will attempt to complete:
 * Python dependency installation
 * Serial and debug tool installation
 * CLI launcher command setup
+
+### Manual installation
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/garycli/garycli.git
+cd garycli
+
+# 2. Install the environment and resources
+python3 setup.py --auto
+
+# 3. Run environment diagnostics
+python3 stm32_agent.py --doctor
+```
+
+### First-time configuration
+
+```bash
+gary config
+```
+
+Follow the prompts to configure the API key, base URL, model, default target, and optional serial settings.
+
+### Environment diagnostics
+
+```bash
+gary doctor
+```
+
 ---
 
 ## 📖 Usage Guide
@@ -269,10 +236,10 @@ Best for quickly validating a single requirement:
 gary do "Write a WS2812 driver for 8 LEDs with a rainbow animation"
 
 # Generate + compile + connect to hardware
-gary do "Blink an LED on PA0 with a 500ms interval" --connect
+gary --connect --do "Blink an LED on PA0 with a 500ms interval"
 
 # Specify chip model
-gary do "Read ADC voltage and print it over UART" --chip STM32F407VET6 --connect
+gary --chip STM32F407VET6 --connect --do "Read ADC voltage and print it over UART"
 ```
 
 ### Mode 2: Interactive conversation (`gary`)
@@ -323,7 +290,7 @@ This works well for continuous iteration on the same project.
 | ---------------------------- | ------------------------------------- |
 | `gary`                       | Launch interactive conversation mode  |
 | `gary do "task description"` | One-shot task mode                    |
-| `gary do "task" --connect`   | One-shot task + auto-connect hardware |
+| `gary --connect --do "task"` | One-shot task + auto-connect hardware |
 | `gary --chip STM32F407VET6`  | Specify chip model                    |
 | `gary --connect`             | Launch and connect hardware           |
 | `gary config`                | Configure AI backend                  |
@@ -338,17 +305,21 @@ This works well for continuous iteration on the same project.
 | `/serial [port] [baudrate]` | Connect serial port                             |
 | `/serial list`              | List available serial ports                     |
 | `/chip [model]`             | Show or switch chip model                       |
-| `/flash [swd\|uart\|auto]`  | Set flashing method                             |
-| `/flash status`             | Show flashing tool status                       |
+| `/flash [bin]`              | Deploy the latest artifact or a specified binary |
 | `/probes`                   | List debug probes                               |
 | `/status`                   | Show full hardware status                       |
 | `/config`                   | Reconfigure AI backend                          |
 | `/projects`                 | Show project history                            |
+| `/member [path\|reload]`    | Preview, locate, or reload `member.md`           |
+| `/language [en\|zh]`        | Switch CLI language                             |
+| `/enable_thinking`          | Enable reasoning output for this session        |
+| `/disable_thinking`         | Disable reasoning output for this session       |
+| `/telegram <subcommand>`    | Manage the Telegram integration                 |
 | `/skill list`               | List installed skills                           |
 | `/skill install <source>`   | Install a skill pack                            |
 | `/skill create <name>`      | Create a skill template                         |
 | `/clear`                    | Clear conversation history                      |
-| `/exit`                     | Exit                                            |
+| `/exit` or `/quit`          | Exit                                            |
 
 ---
 
@@ -527,8 +498,9 @@ Gary currently supports the following boards and workflows:
 | **RP2040** | RP2040, Pico, Pico W | MicroPython `main.py` syntax validation, USB serial raw REPL sync, boot-log / traceback debugging |
 | **ESP32 family** | ESP32, ESP32-S2, ESP32-S3, ESP32-C3, ESP32-C6, LOLIN32, NodeMCU-32S | MicroPython `main.py` syntax validation, USB serial raw REPL sync, boot-log / traceback debugging |
 | **ESP8266 family** | ESP8266, NodeMCU, D1 Mini, ESP-01 | MicroPython `main.py` syntax validation, USB serial raw REPL sync, boot-log / traceback debugging |
+| **CanMV K230 family** | CanMV K230, K230D | MicroPython validation, `/sdcard` deployment over raw REPL, file inspection, and runtime-log debugging |
 
-> STM32 uses the HAL / GCC / SWD workflow, while RP2040 and ESP targets use the MicroPython `main.py` + USB serial workflow.
+> STM32 uses the HAL / GCC / SWD workflow, while RP2040, ESP, and CanMV targets use managed MicroPython deployment over USB serial.
 
 ---
 
@@ -585,20 +557,20 @@ This layout is closer to the repository’s current structure:
 
 ```text
 garycli/
-├── stm32_agent.py          # Main program: TUI + AI dialogue + tool orchestration
-├── compiler.py             # GCC cross-compilation wrapper
-├── config.py               # Config files and path management
-├── setup.py                # Installation and initialization script
-├── stm32_extra_tools.py    # Extra tool collection
-├── gary_skills.py          # Skill system manager
-├── requirements.txt        # Python dependencies
-├── install.sh              # Linux / macOS / WSL install script
-├── install.ps1             # Windows install script
-└── ~/.gary/                # User data directory
-    ├── skills/             # Installed skills
-    ├── projects/           # Historical project archives
-    ├── templates/          # Template library
-    └── member.md           # Knowledge / memory base
+├── stm32_agent.py          # CLI entry point
+├── ai/                     # Provider clients and tool registry
+├── compiler/               # Compiler core and chip-family modules
+├── core/                   # Agent runtime, platforms, memory, and projects
+├── hardware/               # SWD, UART ISP, serial, and MicroPython transport
+├── prompts/                # System and platform templates
+├── tui/                    # Interactive commands and terminal UI
+├── skills/                 # Bundled Skill source packages
+├── config.py               # Runtime paths and defaults
+├── setup.py                # Installation and resource setup
+├── stm32_extra_tools.py    # Additional STM32 tools
+├── gary_skills.py          # Skill manager
+├── member.md               # Project memory base
+└── workspace/              # Generated builds and project cache
 ```
 
 ---
@@ -690,7 +662,7 @@ Yes. Run `gary config` and select Ollama. Models with more stable function-calli
 <details>
 <summary><b>Q: Does it support Arduino or ESP32?</b></summary>
 
-Yes. Gary now supports STM32, RP2040 / Pico / Pico W, and ESP32 / ESP8266 boards.
+ESP32 / ESP8266 MicroPython is supported. The Arduino framework is not currently a supported workflow.
 
 </details>
 
@@ -709,6 +681,7 @@ Yes. Gary now supports STM32, RP2040 / Pico / Pico W, and ESP32 / ESP8266 boards
 * [ ] VS Code extension
 * [x] RP2040 / Pico / Pico W support
 * [x] ESP32 / ESP8266 MicroPython support
+* [x] CanMV K230 / K230D MicroPython support
 
 ---
 
@@ -717,7 +690,7 @@ Yes. Gary now supports STM32, RP2040 / Pico / Pico W, and ESP32 / ESP8266 boards
 Issues and PRs are welcome. Contributions are especially appreciated in these areas:
 
 * New Skill packs
-* More STM32 / RP2040 / ESP board and template support
+* More STM32 / RP2040 / ESP / CanMV board and template support
 * Documentation improvements and translations
 * Fault reproduction and fixes
 * Example projects and demo videos
@@ -736,15 +709,11 @@ Issues and PRs are welcome. Contributions are especially appreciated in these ar
 
 # 4. Submit a PR
 ```
+
 ## Star History
 
-<a href="https://www.star-history.com/?repos=garycli%2Fgarycli&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=garycli/garycli&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=garycli/garycli&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=garycli/garycli&type=date&legend=top-left" />
- </picture>
-</a>
+[View the repository's Star History](https://www.star-history.com/?repos=garycli%2Fgarycli&type=date&legend=top-left).
+
 ---
 
 ## 📜 License
@@ -757,6 +726,6 @@ This project is released under the [Apache-2.0 License](https://opensource.org/l
 
 **🗡️ Just Gary Do It.**
 
-[Website](https://www.garycli.com) · [GitHub](https://github.com/PrettyMyGirlZyy4Embedded/garycli) · [Submit an Issue](https://github.com/PrettyMyGirlZyy4Embedded/garycli/issues)
+[Website](https://www.garycli.com) · [GitHub](https://github.com/garycli/garycli) · [Submit an Issue](https://github.com/garycli/garycli/issues)
 
 </div>

@@ -1,14 +1,17 @@
-# Oled 8080 Elite
+# 正点原子 STM32F103 精英板 OLED 8080 Skill
 
-Gary Dev Agent Skill.
+为正点原子 STM32F103 精英板生成 OLED 8080 并口驱动、位图代码或完整演示程序。
 
 ## 安装
-```
-/skill install C:\Users\19899\.gary\skills\oled_8080_elite
+
+在 Gary 交互模式中，从仓库根目录运行：
+
+```text
+/skill install ./skills/oled_8080_elite
 ```
 
-## 工具列表
-- `oled_8080_elite_hello` — 示例
+## 工具
 
-## 开发
-编辑 `tools.py` 添加工具函数，同步更新 `schemas.json` 和 `TOOLS_MAP`。
+- `oled_8080_elite_get_driver_code`：生成 OLED 初始化、文字显示和几何绘图驱动
+- `oled_8080_elite_draw_bitmap`：生成预定义或自定义位图绘制代码
+- `oled_8080_elite_get_full_main`：生成 `string`、`geometry`、`bitmap` 或 `clear` 完整演示
