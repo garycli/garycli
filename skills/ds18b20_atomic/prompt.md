@@ -19,10 +19,12 @@
 获取DS18B20驱动代码核心片段。
 
 **参数：**
+
 - `port`: GPIO端口（默认`GPIOG`）
 - `pin`: 引脚号（默认`11`）
 
 **示例：**
+
 ```python
 # 获取PG11的DS18B20驱动
 ds18b20_atomic_get_driver_code(port="GPIOG", pin=11)
@@ -36,11 +38,13 @@ ds18b20_atomic_get_driver_code(port="GPIOA", pin=0)
 获取完整可编译的main.c（含DS18B20 + OLED/UART显示）。
 
 **参数：**
+
 - `port`: GPIO端口
 - `pin`: 引脚号
 - `display`: 显示方式 (`oled`/`uart`/`none`)
 
 **示例：**
+
 ```python
 # OLED显示版本（正点原子精英板）
 ds18b20_atomic_get_full_main(port="GPIOG", pin=11, display="oled")
@@ -81,6 +85,7 @@ uint8_t decimal = temp % 10;   /* 小数部分 */
 ## 时序说明
 
 DS18B20使用严格的单总线时序：
+
 - **复位脉冲**: 主机拉低480μs，等待设备应答
 - **写0**: 拉低60μs
 - **写1**: 拉低15μs后释放

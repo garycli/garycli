@@ -32,10 +32,12 @@
 获取DHT11驱动代码核心片段，可嵌入到main.c中使用。
 
 **参数：**
+
 - `port`: GPIO端口（默认GPIOG）
 - `pin`: 引脚号（默认9）
 
 **示例：**
+
 ```python
 # 获取默认PG9的DHT11驱动
 dht11_discovery_get_driver_code()
@@ -49,11 +51,13 @@ dht11_discovery_get_driver_code(port="GPIOA", pin=0)
 获取完整可编译的main.c（含DHT11 + OLED/UART显示）。
 
 **参数：**
+
 - `port`: GPIO端口（默认GPIOG）
 - `pin`: 引脚号（默认9）
 - `display`: 显示方式 (`oled`/`uart`/`none`)
 
 **示例：**
+
 ```python
 # OLED显示版本（默认）
 dht11_discovery_get_full_main()

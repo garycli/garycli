@@ -5,6 +5,7 @@
 正点原子STM32F407ZG探索版OLED 8080并口驱动，支持DS18B20温度传感器读取和显示。
 
 **特性：**
+
 - 8080并口通信，刷新速度快
 - 支持DS18B20单总线温度传感器
 - OLED_ShowTemp自动清除残留字符（解决温度跳动问题）
@@ -13,6 +14,7 @@
 ## 硬件连接（STM32F407ZG探索版）
 
 ### OLED 8080并口
+
 | OLED引脚 | STM32引脚 | 说明 |
 |---------|----------|------|
 | CS      | PB7      | 片选 |
@@ -27,6 +29,7 @@
 | D7      | PE6      | 数据线 |
 
 ### DS18B20传感器（U19接口）
+
 | DS18B20引脚 | 连接 |
 |-------------|------|
 | VCC         | 3.3V |
@@ -42,6 +45,7 @@
 获取OLED驱动代码核心片段（初始化、显示函数）。
 
 **示例：**
+
 ```python
 oled_8080_discovery_get_driver_code()
 ```
@@ -51,10 +55,12 @@ oled_8080_discovery_get_driver_code()
 获取DS18B20驱动代码。
 
 **参数：**
+
 - `port`: GPIO端口（默认GPIOG）
 - `pin`: 引脚号（默认9）
 
 **示例：**
+
 ```python
 oled_8080_discovery_get_ds18b20_code(port="GPIOG", pin=9)
 ```
@@ -64,9 +70,11 @@ oled_8080_discovery_get_ds18b20_code(port="GPIOG", pin=9)
 获取完整可编译的main.c（DS18B20 + OLED显示）。
 
 **参数：**
+
 - `display`: 显示方式 (`oled`/`uart`/`none`，默认`oled`)
 
 **示例：**
+
 ```python
 oled_8080_discovery_get_full_main(display="oled")
 ```

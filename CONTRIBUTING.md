@@ -1,4 +1,5 @@
 # 🗡️ Contributing Guide
+
 [🇨🇳 中文版](CONTRIBUTING_CN.md)
 
 > Thank you for your interest in contributing to **Gary CLI**!  
@@ -42,13 +43,12 @@ This project is built on an open, friendly, and inclusive community. Please:
 git clone https://github.com/<your-username>/garycli.git
 cd garycli
 
-# 2. Create a virtual environment (recommended)
+# 2. Create a Python 3.10+ virtual environment (recommended)
 python3 -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
-# 3. Install dependencies in editable mode
+# 3. Install dependencies
 pip install -r requirements.txt
-pip install -e .
 
 # 4. Install the cross-compiler toolchain (needed to test code gen + compile flow)
 # Ubuntu / Debian:
@@ -67,25 +67,26 @@ python3 stm32_agent.py --doctor
 
 ## Project Structure
 
-```
+```text
 garycli/
-├── stm32_agent.py        # Main program: TUI + AI dialogue + tool orchestration
-├── compiler.py           # GCC cross-compilation wrapper
-├── config.py             # Config files and path management
-├── setup.py              # Installation and initialization script
-├── stm32_extra_tools.py  # Built-in tool collection (I2C scan, PWM calc, etc.)
-├── gary_skills.py        # Skill system manager
-├── requirements.txt      # Python dependencies
-├── install.sh            # Linux / macOS install script
-├── install.ps1           # Windows install script
-└── ~/.gary/              # User data directory (generated at runtime)
-    ├── skills/           # Installed Skill packs
-    ├── projects/         # Historical project archives
-    ├── templates/        # Template library
-    └── member.md         # Knowledge / memory base
+├── stm32_agent.py        # CLI entry point
+├── ai/                   # Provider clients, tool schemas, and dispatch
+├── compiler/             # Compiler core, registry, and chip-family modules
+│   └── chips/
+├── core/                 # Agent runtime, platform tools, memory, and projects
+├── hardware/             # SWD, UART ISP, serial, and MicroPython transport
+├── prompts/              # System and platform prompt templates
+├── tui/                  # Interactive commands and terminal UI
+├── skills/               # Bundled Skill source packages
+├── config.py             # Runtime paths and defaults
+├── setup.py              # Installation and resource setup
+├── stm32_extra_tools.py  # Additional STM32 tools
+├── gary_skills.py        # Skill manager
+├── member.md             # Project memory base
+└── workspace/            # Generated build and project cache (runtime)
 ```
 
-When adding new functionality, place it in the appropriate module rather than piling everything into `stm32_agent.py`.
+When adding functionality, place it in the relevant package instead of the thin `stm32_agent.py` entry point.
 
 ---
 
@@ -93,7 +94,7 @@ When adding new functionality, place it in the appropriate module rather than pi
 
 ### 🐛 Reporting Bugs
 
-Open a new Issue on the [Issues](https://github.com/PrettyMyGirlZyy4Embedded/garycli/issues) page. Please include:
+Open a new Issue on the [Issues](https://github.com/garycli/garycli/issues) page. Please include:
 
 - **Gary version** / Python version / OS
 - **Chip model** (e.g. STM32F103C8T6)
@@ -118,15 +119,15 @@ Submit via Issues with the prefix `[Feature]` in the title. Please describe:
 1. **Open an Issue first** for anything non-trivial — this avoids wasted effort
 2. Create a branch on your fork:
 
-```bash
-git checkout -b fix/i2c-scan-crash
-# or
-git checkout -b feat/stm32g0-support
-```
+   ```bash
+   git checkout -b fix/i2c-scan-crash
+   # or
+   git checkout -b feat/stm32g0-support
+   ```
 
 3. Write your code, making sure:
-   - Existing Function Calling behavior across all three AI backends is not broken
-   - New tools are registered in `stm32_extra_tools.py` with their corresponding schema
+   - Existing tool-calling behavior remains consistent across supported providers
+   - New tools are registered in the relevant module and exposed through `ai/tools.py` with a schema
    - Hardware-related code is validated against the `gary doctor` diagnostic checks
 4. Submit a PR using the template
 
@@ -138,7 +139,7 @@ Skills are Gary's primary extension mechanism — new Skill contributions are es
 
 #### Standard Skill Directory Layout
 
-```
+```text
 my_skill/
 ├── skill.json         # Skill metadata
 ├── tools.py           # Python tool functions
@@ -224,13 +225,15 @@ When the user wants to do X, call my_tool_function with the relevant parameters.
 
 ### 📟 Adding Chip Support
 
-Gary currently focuses on the STM32F0 / F1 / F3 / F4 families. To add support for a new series (e.g. STM32G0, STM32H7):
+For STM32 HAL projects, Gary currently focuses on the STM32F0 / F1 / F3 / F4 families. To add support for a new series (e.g. STM32G0, STM32H7):
 
 1. Add HAL / CMSIS resource download logic for the new family in `setup.py`
-2. Add the corresponding compile flags (MCU flag, linker script, etc.) in `compiler.py`
-3. Register the new family in the chip detection logic in `stm32_agent.py`
-4. Provide at least one baseline `main.c` template that compiles cleanly
-5. In the PR, state which specific chip models and dev boards you actually tested on
+2. Add compile flags, sources, and linker settings in the appropriate `compiler/chips/` module
+3. Register target detection and canonical naming in `core/platforms.py`
+4. Expose any new tools and schemas through `ai/tools.py`
+5. Add or update the matching prompt template under `prompts/templates/`
+6. Provide at least one baseline program that validates or compiles cleanly
+7. In the PR, state which specific chips and development boards you tested
 
 ---
 
@@ -273,6 +276,9 @@ black .
 
 # Lint check
 flake8 . --max-line-length=100 --exclude=.venv
+
+# Test
+pytest -q
 ```
 
 Key conventions:
@@ -289,7 +295,7 @@ Key conventions:
 
 Follow the [Conventional Commits](https://www.conventionalcommits.org/) format:
 
-```
+```text
 <type>(<scope>): <short description>
 
 [optional body: explain why and what changed in more detail]
@@ -312,7 +318,7 @@ Follow the [Conventional Commits](https://www.conventionalcommits.org/) format:
 
 **Examples:**
 
-```
+```text
 feat(compiler): add STM32G0 series compile flags
 
 Adds support for STM32G030/G031/G071 and similar variants,
@@ -321,7 +327,7 @@ including HAL download logic and linker script configuration.
 Closes #42
 ```
 
-```
+```text
 skill: add uart_protocol_analyzer Skill
 
 Analyzes captured UART traffic and identifies framing patterns
@@ -342,7 +348,7 @@ Yes, but please clearly state this in both `skill.json`'s `description` field an
 Maintainers aim to respond within 7 days. If you haven't heard back, feel free to leave a comment to ping.
 
 **Q: I want to refactor a core module — what should I keep in mind?**  
-Open an Issue first to discuss the approach. Refactors to core modules (especially the AI dispatch loop in `stm32_agent.py`) must preserve consistent behavior across all three flashing modes: SWD, UART ISP, and no-hardware mode.
+Open an Issue first to discuss the approach. Refactors to core modules—especially the AI dispatch loop in `core/agent.py`—must preserve consistent behavior across SWD, UART ISP, MicroPython serial, and no-hardware workflows.
 
 **Q: What AI backends should I test against?**  
 At minimum, test with one Function Calling-capable backend (e.g. deepseek-chat or gpt-4o). If your change touches backend-agnostic logic, a single backend is sufficient; if it touches provider-specific handling, test the affected providers.
@@ -352,4 +358,4 @@ At minimum, test with one Function Calling-capable backend (e.g. deepseek-chat o
 > **🗡️ Just Gary Do It.**  
 > Every line of code, every Skill pack, every documentation fix — it's a gift to the STM32 developer community.
 
-[Back to Home](https://github.com/PrettyMyGirlZyy4Embedded/garycli) · [Open an Issue](https://github.com/PrettyMyGirlZyy4Embedded/garycli/issues) · [Website](https://www.garycli.com)
+[Back to Home](https://github.com/garycli/garycli) · [Open an Issue](https://github.com/garycli/garycli/issues) · [Website](https://www.garycli.com)
