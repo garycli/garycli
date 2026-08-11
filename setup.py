@@ -47,6 +47,7 @@ if len(_sys.argv) > 1 and _sys.argv[1] in _FORBIDDEN_ARGS:
 # ─────────────────────────────────────────────────────────────────────────────
 
 import os
+import ntpath
 import sys
 import subprocess
 import platform
@@ -374,7 +375,7 @@ def _distro() -> tuple:
 def _download(url: str, dest: Path, label: str = "", retries: int = 3) -> bool:
     """
     下载文件到 dest。
-    自动根据网络环境将 URL 转换为镜像地址（_mirror_url），
+    自动根据网络环境将下载 URL 转换为镜像地址（_mirror_url），
     若镜像下载失败则自动回退到原始地址重试。
     """
     import urllib.request
@@ -415,7 +416,7 @@ def _download(url: str, dest: Path, label: str = "", retries: int = 3) -> bool:
                                 )
                 if tag_label:
                     print()
-                return True  # 下载成功
+                return True
             except Exception as e:
                 if tag_label:
                     print()
@@ -424,7 +425,6 @@ def _download(url: str, dest: Path, label: str = "", retries: int = 3) -> bool:
                     warn(f"下载失败（第 {attempt}/{retries} 次），重试中... [{tag_label}]: {e}")
                 else:
                     warn(f"地址 {tag} 下载失败（已重试 {retries} 次）[{label}]: {e}")
-        # 当前 URL 全部重试失败，尝试下一个地址（若有）
 
     err(f"所有下载地址均失败: {label}")
     return False
@@ -712,7 +712,6 @@ def configure_ai(auto: bool):
 # STEP 0b: 目标芯片配置
 # ─────────────────────────────────────────────────────────────────────────────
 
-# (显示名, pyocd pack 代表芯片, 系列描述)
 _CHIP_PRESETS = [
     ("STM32F103C8", "stm32f103c8", "Blue Pill / 蓝板"),
     ("STM32F411CEU", "stm32f411ce", "Black Pill / 黑板"),
@@ -723,7 +722,6 @@ _CHIP_PRESETS = [
     ("自定义", "", "手动输入"),
 ]
 
-# 芯片系列 → pyocd pack 代表芯片（用于 pack install 和已装检测）
 _FAMILY_PACK_TARGET = {
     "f0": "stm32f030c8",
     "f1": "stm32f103c8",
@@ -733,7 +731,6 @@ _FAMILY_PACK_TARGET = {
 
 
 def _detect_chip_family(chip: str) -> str:
-    """从芯片型号推断系列，例如 STM32F411CEU6 → f4"""
     import re as _re
 
     m = _re.search(r"stm32(f\d)", chip.lower())
@@ -976,7 +973,6 @@ def _arm_gcc_linux(auto: bool):
 def _arm_gcc_mac(auto: bool):
     if _which("brew"):
         if auto or ask("使用 Homebrew 安装 arm-none-eabi-gcc？"):
-            # 国内网络给 Homebrew 设置镜像环境变量
             brew_env = os.environ.copy()
             if _detect_china_network():
                 brew_env["HOMEBREW_BREW_GIT_REMOTE"] = (
@@ -1071,7 +1067,6 @@ def _arm_gcc_download(auto: bool):
     tmp = Path(tempfile.mkdtemp())
     fmt = "zip" if url.endswith(".zip") else "tar.xz"
     archive = tmp / f"arm-toolchain.{fmt}"
-    # ARM 官网 URL 不走 GitHub 代理，直接下载（_download 内部对非 github.com 地址不转换）
     if not _download(url, archive, "arm-gnu-toolchain"):
         return
     info(f"解压到 {install_dir} ...")
@@ -1955,16 +1950,11 @@ def setup_udev(auto: bool):
 
 
 def _pyocd_installed_targets() -> str:
-    """返回已安装目标列表（小写），失败返回空字符串"""
     r = _run(_python_cmd("-m", "pyocd", "list", "--targets"), timeout=30)
     return r.stdout.lower() if r.returncode == 0 else ""
 
 
 def _build_pack_list() -> list:
-    """
-    根据 DEFAULT_CHIP 决定需要安装的 pack 列表。
-    返回 [(check_target, install_chip, label), ...]
-    """
     chip = _read_default_chip()
     family = _detect_chip_family(chip) if chip else ""
     pack_target = _FAMILY_PACK_TARGET.get(family)
@@ -2127,14 +2117,101 @@ def _resolve_win_install_dir() -> Path:
     return _default_win_install_dir()
 
 
+def _normalize_win_path_entry(value: str | Path) -> str:
+    """Normalize a Windows PATH entry for case-insensitive comparisons."""
+    text = str(value).strip().strip('\"')
+    if not text:
+        return ""
+    return ntpath.normcase(ntpath.normpath(text))
+
+
+def _win_path_contains(path_value: str, install_dir: Path) -> bool:
+    target = _normalize_win_path_entry(install_dir)
+    if not target:
+        return False
+    return any(
+        _normalize_win_path_entry(entry) == target
+        for entry in path_value.split(";")
+        if entry.strip()
+    )
+
+
+def _get_win_user_path() -> tuple[str, int]:
+    import winreg
+
+    with winreg.CreateKeyEx(
+        winreg.HKEY_CURRENT_USER,
+        r"Environment",
+        0,
+        winreg.KEY_READ | winreg.KEY_SET_VALUE,
+    ) as key:
+        try:
+            value, value_type = winreg.QueryValueEx(key, "Path")
+        except FileNotFoundError:
+            return "", winreg.REG_EXPAND_SZ
+    return str(value or ""), value_type
+
+
+def _set_win_user_path(value: str, value_type: int):
+    import winreg
+
+    if value_type not in (winreg.REG_SZ, winreg.REG_EXPAND_SZ):
+        value_type = winreg.REG_EXPAND_SZ
+    with winreg.CreateKeyEx(
+        winreg.HKEY_CURRENT_USER,
+        r"Environment",
+        0,
+        winreg.KEY_READ | winreg.KEY_SET_VALUE,
+    ) as key:
+        winreg.SetValueEx(key, "Path", 0, value_type, value)
+
+
+def _broadcast_windows_environment_change():
+    """Tell Explorer and terminal launchers that the environment changed."""
+    try:
+        import ctypes
+
+        result = ctypes.c_ulong()
+        ctypes.windll.user32.SendMessageTimeoutW(
+            0xFFFF,
+            0x001A,
+            0,
+            "Environment",
+            0x0002,
+            5000,
+            ctypes.byref(result),
+        )
+    except Exception:
+        pass
+
+
 def _check_win_path(install_dir: Path):
-    """检查 install_dir 是否在 PATH 中，不在则提示用户手动添加"""
+    """Ensure the Gary command directory is persisted in the Windows user PATH."""
+    install_text = str(install_dir)
+
+    try:
+        user_path, value_type = _get_win_user_path()
+        if not _win_path_contains(user_path, install_dir):
+            prefix = user_path.rstrip(";")
+            new_user_path = f"{prefix};{install_text}" if prefix else install_text
+            _set_win_user_path(new_user_path, value_type)
+            ok(f"已永久添加到用户 PATH: {install_dir}")
+            _broadcast_windows_environment_change()
+    except Exception as exc:
+        warn(f"无法自动写入用户 PATH: {exc}")
+        escaped_dir = install_text.replace("'", "''")
+        info("  请在 PowerShell 中执行以下命令永久添加到用户 PATH：")
+        info(
+            "  $p=[Environment]::GetEnvironmentVariable('Path','User'); "
+            f"[Environment]::SetEnvironmentVariable('Path', "
+            f"(($p.TrimEnd(';') + ';{escaped_dir}').TrimStart(';')), 'User')"
+        )
+
     path_env = os.environ.get("PATH", "")
-    if str(install_dir).lower() in path_env.lower():
-        return
-    warn(f"  {install_dir} 不在 PATH 中")
-    info("  请将该目录添加到系统 PATH，或在 PowerShell 中执行：")
-    info(f'  $env:PATH += ";{install_dir}"')
+    if not _win_path_contains(path_env, install_dir):
+        os.environ["PATH"] = (
+            f"{path_env};{install_text}" if path_env else install_text
+        )
 
 
 def install_gary_command(auto: bool):
@@ -2215,7 +2292,6 @@ def verify():
     status = {}
     ok(f"活动 Python: {_active_python_path()} [{ACTIVE_PYTHON_LABEL}]")
 
-    # AI
     cur_key, cur_url, cur_model, cur_style = _read_current_ai_config()
     placeholder = ("YOUR_API_KEY", "sk-YOUR")
     ai_ok = bool(cur_key and not any(cur_key.startswith(p) for p in placeholder))
@@ -2226,7 +2302,6 @@ def verify():
         err("AI 接口: 未配置 API Key -> 请运行 python setup.py 重新配置")
     status["ai"] = ai_ok
 
-    # GCC
     ver = _gcc_ver()
     if ver:
         ok(f"arm-none-eabi-gcc  {ver[:70]}")
@@ -2235,7 +2310,6 @@ def verify():
         err("arm-none-eabi-gcc  未找到")
         status["gcc"] = False
 
-    # Python 包
     pkg_ok = {}
     for imp, pkg, required in PYTHON_PKGS:
         if _python_module_available(imp):
@@ -2246,7 +2320,6 @@ def verify():
             pkg_ok[pkg] = False
     status["python"] = all(pkg_ok.get(pkg, True) for _, pkg, req in PYTHON_PKGS if req)
 
-    # HAL
     hal_any = False
     for fam in HAL_REPOS:
         hal_h = HAL_DIR / "Inc" / f"stm32{fam}xx_hal.h"
@@ -2264,12 +2337,10 @@ def verify():
     (ok if cmsis_ok else warn)(f"ARM CMSIS Core  {'OK' if cmsis_ok else '未找到'}")
     status["hal"] = hal_any and cmsis_ok
 
-    # 网络模式
     if _IS_CHINA_NETWORK is not None:
         mode_str = _c("33", "国内镜像模式") if _IS_CHINA_NETWORK else _c("32", "直连模式")
         ok(f"网络环境: {mode_str}")
 
-    # gary 命令
     gary_bin = shutil.which("gary")
     if gary_bin:
         ok(f"gary 命令  {gary_bin}")
@@ -2278,7 +2349,6 @@ def verify():
         warn("gary 命令  未在 PATH 中（可能需要重新打开终端）")
         status["gary"] = False
 
-    # 本地 SearXNG
     searx_url = _searxng_url()
     if _searxng_healthcheck(searx_url):
         ok(f"本地 SearXNG  {searx_url}")
@@ -2354,7 +2424,6 @@ def main():
     )
 
     try:
-        # ── 网络环境检测（最先执行，结果全局缓存供后续步骤复用）──────────────
         _detect_china_network()
 
         if args.check:

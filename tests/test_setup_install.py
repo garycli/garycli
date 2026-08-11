@@ -38,6 +38,51 @@ def test_default_win_install_dir_uses_existing_scripts_dir(monkeypatch):
     assert module._default_win_install_dir() == Path("/tmp/gary-venv/Scripts")
 
 
+def test_check_win_path_persists_user_path_even_if_process_path_is_temporary(monkeypatch):
+    """Issue #7: a temporary PowerShell PATH entry must still be persisted."""
+
+    module = _load_setup_module(monkeypatch)
+    install_dir = Path(r"C:\Users\think\AppData\Local\Programs\Python\Scripts")
+    monkeypatch.setenv("PATH", rf"C:\Windows\System32;{install_dir}")
+    monkeypatch.setattr(
+        module,
+        "_get_win_user_path",
+        lambda: (r"C:\Windows\System32", 2),
+    )
+
+    written = {}
+    monkeypatch.setattr(
+        module,
+        "_set_win_user_path",
+        lambda value, value_type: written.update(value=value, value_type=value_type),
+    )
+    monkeypatch.setattr(module, "_broadcast_windows_environment_change", lambda: None)
+
+    module._check_win_path(install_dir)
+
+    assert written["value"].split(";")[-1] == str(install_dir)
+    assert written["value_type"] == 2
+
+
+def test_check_win_path_does_not_duplicate_persistent_user_path(monkeypatch):
+    module = _load_setup_module(monkeypatch)
+    install_dir = Path(r"C:\Users\think\Gary\Scripts")
+    existing = rf"C:\Windows\System32;{install_dir}" + "\\"
+    monkeypatch.setenv("PATH", r"C:\Windows\System32")
+    monkeypatch.setattr(module, "_get_win_user_path", lambda: (existing, 2))
+
+    writes = []
+    monkeypatch.setattr(
+        module, "_set_win_user_path", lambda value, value_type: writes.append(value)
+    )
+    monkeypatch.setattr(module, "_broadcast_windows_environment_change", lambda: None)
+
+    module._check_win_path(install_dir)
+
+    assert writes == []
+    assert module._win_path_contains(module.os.environ["PATH"], install_dir)
+
+
 def test_searxng_url_defaults_to_loopback(monkeypatch):
     """The local search backend should default to loopback without extra config."""
 
