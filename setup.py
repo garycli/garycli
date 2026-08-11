@@ -2119,7 +2119,7 @@ def _resolve_win_install_dir() -> Path:
 
 def _normalize_win_path_entry(value: str | Path) -> str:
     """Normalize a Windows PATH entry for case-insensitive comparisons."""
-    text = str(value).strip().strip('\"')
+    text = str(value).strip().strip('"')
     if not text:
         return ""
     return ntpath.normcase(ntpath.normpath(text))
@@ -2209,9 +2209,7 @@ def _check_win_path(install_dir: Path):
 
     path_env = os.environ.get("PATH", "")
     if not _win_path_contains(path_env, install_dir):
-        os.environ["PATH"] = (
-            f"{path_env};{install_text}" if path_env else install_text
-        )
+        os.environ["PATH"] = f"{path_env};{install_text}" if path_env else install_text
 
 
 def install_gary_command(auto: bool):
