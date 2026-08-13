@@ -19,23 +19,25 @@ def _load_setup_module(monkeypatch):
     return module
 
 
-def test_resolve_win_install_dir_falls_back_when_helper_missing(monkeypatch):
+def test_resolve_win_install_dir_falls_back_when_helper_missing(monkeypatch, tmp_path):
     """Missing _get_win_install_dir should not break Windows install."""
 
     module = _load_setup_module(monkeypatch)
+    fake_python = tmp_path / "gary-venv" / "Scripts" / "python.exe"
     monkeypatch.delitem(module.__dict__, "_get_win_install_dir", raising=False)
-    monkeypatch.setattr(module.sys, "executable", str(Path("/tmp/gary-venv/Scripts/python.exe")))
+    monkeypatch.setattr(module.sys, "executable", str(fake_python))
 
-    assert module._resolve_win_install_dir() == Path("/tmp/gary-venv/Scripts")
+    assert module._resolve_win_install_dir() == fake_python.parent.resolve()
 
 
-def test_default_win_install_dir_uses_existing_scripts_dir(monkeypatch):
+def test_default_win_install_dir_uses_existing_scripts_dir(monkeypatch, tmp_path):
     """If python.exe already lives in Scripts, do not append another Scripts."""
 
     module = _load_setup_module(monkeypatch)
-    monkeypatch.setattr(module.sys, "executable", str(Path("/tmp/gary-venv/Scripts/python.exe")))
+    fake_python = tmp_path / "gary-venv" / "Scripts" / "python.exe"
+    monkeypatch.setattr(module.sys, "executable", str(fake_python))
 
-    assert module._default_win_install_dir() == Path("/tmp/gary-venv/Scripts")
+    assert module._default_win_install_dir() == fake_python.parent.resolve()
 
 
 def test_check_win_path_persists_user_path_even_if_process_path_is_temporary(monkeypatch):
@@ -194,10 +196,11 @@ def test_ensure_python_runtime_prefers_existing_project_venv(monkeypatch, tmp_pa
     """An existing project .venv should be reused before the system interpreter."""
 
     module = _load_setup_module(monkeypatch)
-    venv_python = tmp_path / ".venv" / "bin" / "python"
+    venv_dir = tmp_path / ".venv"
+    monkeypatch.setattr(module, "VENV_DIR", venv_dir)
+    venv_python = module._venv_python_path(venv_dir)
     venv_python.parent.mkdir(parents=True, exist_ok=True)
     venv_python.write_text("#!/usr/bin/env python3\n", encoding="utf-8")
-    monkeypatch.setattr(module, "VENV_DIR", tmp_path / ".venv")
     monkeypatch.setattr(module, "_inside_virtualenv", lambda: False)
 
     selected = module.ensure_python_runtime(auto=False, allow_create=False)
@@ -212,7 +215,8 @@ def test_ensure_python_runtime_creates_project_venv_for_pep668(monkeypatch, tmp_
 
     module = _load_setup_module(monkeypatch)
     venv_dir = tmp_path / ".venv"
-    venv_python = venv_dir / "bin" / "python"
+    monkeypatch.setattr(module, "VENV_DIR", venv_dir)
+    venv_python = module._venv_python_path(venv_dir)
     marker = tmp_path / "EXTERNALLY-MANAGED"
     marker.write_text("managed", encoding="utf-8")
 
@@ -222,7 +226,6 @@ def test_ensure_python_runtime_creates_project_venv_for_pep668(monkeypatch, tmp_
             venv_python.write_text("#!/usr/bin/env python3\n", encoding="utf-8")
         return subprocess.CompletedProcess(cmd, 0, "", "")
 
-    monkeypatch.setattr(module, "VENV_DIR", venv_dir)
     monkeypatch.setattr(module, "_inside_virtualenv", lambda: False)
     monkeypatch.setattr(module, "_externally_managed_marker", lambda: marker)
     monkeypatch.setattr(module, "_run", _fake_run)
@@ -257,6 +260,9 @@ def test_setup_local_searxng_offers_native_fallback_without_container_runtime(mo
     module = _load_setup_module(monkeypatch)
     called = {"value": False, "auto": None, "explicit": None}
 
+    monkeypatch.setattr(module, "IS_WIN", False)
+    monkeypatch.setattr(module, "IS_LINUX", True)
+    monkeypatch.setattr(module, "IS_MAC", False)
     monkeypatch.setattr(module, "_searxng_healthcheck", lambda base_url=None: False)
     monkeypatch.setattr(module, "_container_runtime", lambda: None)
     monkeypatch.setattr(module, "ask", lambda *args, **kwargs: True)
@@ -283,7 +289,9 @@ def test_setup_native_searxng_runs_official_script(monkeypatch, tmp_path):
     commands = []
     health = iter([False, True])
 
+    monkeypatch.setattr(module, "IS_WIN", False)
     monkeypatch.setattr(module, "IS_LINUX", True)
+    monkeypatch.setattr(module, "IS_MAC", False)
     monkeypatch.setattr(module, "SEARXNG_DIR", tmp_path / "services" / "searxng")
     monkeypatch.setattr(module, "SERVICES_DIR", tmp_path / "services")
     monkeypatch.setattr(module, "SEARXNG_NATIVE_REPO_DIR", repo_dir)

@@ -821,8 +821,8 @@ def configure_chip(auto: bool):
 def check_python():
     header("Step 1  Python 版本")
     v = sys.version_info
-    if v < (3, 8):
-        err(f"需要 Python >= 3.8，当前 {v.major}.{v.minor}")
+    if v < (3, 10):
+        err(f"需要 Python >= 3.10，当前 {v.major}.{v.minor}")
         sys.exit(1)
     ok(f"Python {v.major}.{v.minor}.{v.micro}  ({sys.executable})")
 
@@ -2364,7 +2364,8 @@ def verify():
         print()
         print("  使用方式：")
         print(f"    {_c('36', 'gary')}                              启动交互式对话助手")
-        print(f"    {_c('36', 'gary do \"让 PA0 LED 以 500ms 闪烁\"')}  一次性执行任务")
+        example_cmd = 'gary do "让 PA0 LED 以 500ms 闪烁"'
+        print(f"    {_c('36', example_cmd)}  一次性执行任务")
         print(f"    {_c('36', 'gary --connect')}                     连接探针后启动")
         print()
         if not status["gary"]:
