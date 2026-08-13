@@ -21,4 +21,4 @@ install_command = "python setup.py --auto"
 
 [tool.black]
 line-length = 100
-target-version = ["py312"]
+target-version = ["py310"]
