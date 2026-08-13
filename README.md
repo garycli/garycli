@@ -1,724 +1,468 @@
 <div align="center">
 
-# 🗡️ GARY CLI: The Spear Carrier
+# 🗡️ GaryCLI
 
-**Piercing the Silicon with AI.**
-*An AI-native command-line development and debugging agent for STM32, RP2040 / Pico, ESP32 / ESP8266, and CanMV K230 boards*
+### AI-native embedded engineering execution
 
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Python](https://img.shields.io/badge/Python-3.10+-green.svg)](https://www.python.org/)
-[![Boards](https://img.shields.io/badge/Boards-STM32%20%7C%20RP2040%20%7C%20ESP%20%7C%20CanMV_K230-blue.svg)](#supported-chips)
-[![Website](https://img.shields.io/badge/Website-garycli.com-success)](https://www.garycli.com)
+**From a natural-language requirement to code, build, flash, runtime evidence, diagnosis, and repair.**
 
-<br>
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](./LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB.svg)](https://www.python.org/)
+[![Platforms](https://img.shields.io/badge/Targets-STM32%20%7C%20RP2040%20%7C%20ESP%20%7C%20CanMV_K230-0A7EA4.svg)](#-supported-platforms)
+[![Website](https://img.shields.io/badge/Website-garycli.com-111111.svg)](https://www.garycli.com)
 
-```text
-   ██████╗  █████╗ ██████╗ ██╗   ██╗
-  ██╔════╝ ██╔══██╗██╔══██╗╚██╗ ██╔╝
-  ██║  ███╗███████║██████╔╝ ╚████╔╝
-  ██║   ██║██╔══██║██╔══██╗  ╚██╔╝
-  ╚██████╔╝██║  ██║██║  ██║   ██║
-   ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝
-```
+**GaryCLI is not just an AI code generator. It is an embedded engineering agent designed to execute as much of the real development loop as the connected toolchain and hardware can verify.**
 
-**Talk to it in natural language, and let AI directly participate in development, deployment, and debugging for STM32, RP2040 / Pico, ESP32 / ESP8266, and CanMV K230 boards.**
+[Quick Start](#-quick-start) · [Why GaryCLI](#-why-garycli) · [Execution Loop](#-execution-loop) · [Supported Platforms](#-supported-platforms) · [Commands](#-commands) · [Skills](#-skills) · [Contributing](#-contributing)
 
-<p align="center">
-  <a href="./README_CN.md"><b>中文</b></a>
-</p>
-
-[Quick Start](#-quick-start) · [Core Features](#-core-features) · [Usage Guide](#-usage-guide) · [Command Reference](#-command-reference) · [Skill System](#-skill-system-skills) · [FAQ](#-faq)
+[中文 README](./README_CN.md)
 
 </div>
 
 ---
 
-## ⚡ What is Gary?
+## ⚡ Why GaryCLI?
 
-In traditional embedded development, the real time sink is usually not just “writing a few lines of C code,” but this full chain:
+AI coding tools are very good at producing source code. Embedded development has a different definition of “done.” A plausible `main.c` is only the beginning.
 
-**Requirement understanding → Peripheral configuration → Code generation → Cross-compilation → Firmware flashing → Serial verification → Register inspection → Fault fixing → Reflashing**
-
-**Gary (The Spear Carrier)** is not just another chat tool that can only “generate code.”
-It is an **AI execution agent for embedded boards across multiple workflows**: you describe the goal, and it generates code, invokes toolchains, connects to hardware, collects runtime feedback, and keeps fixing issues when the results are verifiable.
+A real embedded task often looks like this:
 
 ```text
-You say:
-  “Help me build an OLED temperature and humidity display using an AHT20 sensor.”
-
-Gary automatically executes:
-  ✓ Generates a complete main.c (HAL + I2C + AHT20 + SSD1306)
-  ✓ Cross-compiles with arm-none-eabi-gcc
-  ✓ Flashes the STM32 via SWD or UART ISP
-  ✓ Monitors serial output to verify that the program really started
-  ✓ Reads registers to inspect peripheral state
-  ✗ Detects no I2C response → analyzes cause → patches code → reflashes
-  ✓ Second run succeeds
+Requirement
+   ↓
+Understand board / chip / pins / peripherals
+   ↓
+Generate or modify project files
+   ↓
+Compile with the real toolchain
+   ↓
+Flash / deploy to the target
+   ↓
+Observe serial logs / registers / runtime state
+   ↓
+Diagnose failures
+   ↓
+Patch → rebuild → reflash → re-check
 ```
 
-In one sentence:
+GaryCLI is built around that loop.
 
-> **Gary is not just trying to “write MCU code for you” — it is trying to complete a real, verifiable embedded-development loop for you.**
+Instead of treating the model as a shell script generator, GaryCLI separates responsibilities:
+
+- **The model reasons** about intent, failures, tradeoffs, and next actions.
+- **Tools execute deterministic engineering operations** such as compilation, flashing, serial monitoring, register access, project inspection, and deployment.
+- **Evidence drives the next step** whenever the connected environment can provide it.
+
+The goal is simple:
+
+> **Move from “AI wrote some embedded code” toward “AI completed a verifiable engineering task.”**
 
 ---
 
-## 🎯 Core Features
+## 🔄 Execution loop
 
-### 🗣️ Natural language → compilable STM32 HAL project code
-
-Describe the target behavior directly, and Gary generates complete STM32 HAL C code that can be cross-compiled.
-
-```bash
-gary do "PA0 has an LED connected. Make a breathing light with 1kHz PWM"
-gary do "Read MPU6050 acceleration data over I2C1 and print it over UART"
-gary do "Configure TIM2 in encoder mode to read motor speed"
-```
-
-Typical use cases:
-
-* GPIO / PWM / ADC / EXTI
-* UART / I2C / SPI / timers
-* OLED / sensors / seven-segment displays / buzzers
-* PID control / encoder feedback / motor control
-* Rapid bare-metal prototyping
-
-### 🔄 Automatic closed-loop debugging
-
-Gary’s priority is not “getting it right on the first try,” but this:
+A typical hardware-connected workflow is:
 
 ```text
-Generate code → Compile → Flash → Verify over serial → Read registers → Analyze issue → Patch code → Recompile and reflash
+Natural-language task
+      │
+      ▼
+Project / code generation
+      │
+      ▼
+Compile ───────────────┐
+      │ success        │ failure
+      ▼                │
+Flash / deploy         └──► Diagnose compiler error ─► Patch
+      │
+      ▼
+Runtime observation
+(serial / logs / registers / traceback)
+      │
+      ├── expected evidence ─► Done
+      │
+      └── mismatch / failure ─► Diagnose ─► Patch ─► Rebuild
 ```
 
-It tries to continue based on real feedback instead of stopping at “you may want to change this.”
+### Evidence matters
 
-Typical diagnostics include:
+GaryCLI distinguishes several levels of evidence:
 
-* **Compilation failures**: reads GCC errors and fixes syntax, symbol, or initialization problems
-* **No program output**: checks startup path, SysTick, clock configuration, and UART init sequence
-* **HardFault**: inspects SCB-related registers to help locate the fault type
-* **I2C failures**: checks device address, bus lockup, init order, NACK/ARLO, and similar conditions
-* **Multiple automatic repair rounds**: if it still cannot fix the issue, it tries to narrow it down clearly to either a **code problem** or a **hardware problem**
+1. **Code-level** — files were generated or modified as intended.
+2. **Build-level** — the real compiler/toolchain accepted the project.
+3. **Deployment-level** — firmware or files were successfully written to the target.
+4. **Runtime-level** — serial output, traceback, register state, or other observable software evidence matches expectations.
+5. **Physical-behavior-level** — a real external effect was measured or observed by connected instrumentation.
 
-### ⚡ Consistent flashing and debugging strategy
+A successful compile or flash does **not** automatically prove that the physical task is correct. Physical verification requires an observable signal, sensor, probe, test fixture, or explicit user confirmation.
 
-Gary uses a clear and consistent hardware strategy:
+---
 
-* **SWD by default**: best for stable flashing, register access, fault analysis, and debug loops
-* **UART ISP optional**: can be used when no debugger is available
-* **Serial monitoring stays separate**: whether you flash over SWD or UART ISP, UART is still used to observe real runtime behavior
+## 🎯 What GaryCLI can do
 
-That means:
-
-* **SWD** handles “flashing + debugging”
-* **UART** handles “logs + runtime verification”
-
-This is more stable than mixing flashing and runtime feedback together, and better matches real embedded workflows.
-
-### 🧰 Built-in tools
-
-| Tool                         | Purpose                                                                           |
-| ---------------------------- | --------------------------------------------------------------------------------- |
-| **PID Auto Tuning**          | Analyzes overshoot, oscillation, and steady-state error, then recommends Kp/Ki/Kd |
-| **I2C Bus Scan**             | Scans device addresses and helps identify common chips                            |
-| **Pin Conflict Detection**   | Detects GPIO mux conflicts, SWD pin misuse, and similar issues                    |
-| **PWM Parameter Calculator** | Computes PSC/ARR automatically and quickly validates target frequencies           |
-| **Servo Calibration**        | Generates angle sweep logic and maps pulse width to angle                         |
-| **Signal Capture Analysis**  | Analyzes ADC/sensor waveform fluctuation, noise, and frequency characteristics    |
-| **Peripheral Smoke Tests**   | One-click minimal test code for GPIO/UART/I2C/SPI/ADC                             |
-| **Flash/RAM Analysis**       | Shows memory usage and warns about capacity issues                                |
-| **Power Estimation**         | Estimates power consumption from enabled peripherals                              |
-| **Font Generator**           | Converts Chinese/English text into OLED bitmap arrays                             |
-
-### 🔌 Bring Your Own Key
-
-Gary is not tied to a single AI provider. You can switch backends freely:
-
-| Provider        | Model             | Notes                        |
-| --------------- | ----------------- | ---------------------------- |
-| DeepSeek        | deepseek-chat     | Cost-effective               |
-| Kimi / Moonshot | kimi-k2.5         | Strong Chinese capability    |
-| OpenAI          | gpt-4o            | Strong overall performance   |
-| Google Gemini   | gemini-2.5-flash  | Fast response                |
-| Tongyi Qianwen  | qwen-plus         | Alibaba Cloud                |
-| Zhipu GLM       | glm-4-flash       | Easy to integrate            |
-| Ollama          | qwen2.5-coder:14b | Local offline, fully private |
-
-### 🧩 Extensible Skill Packs
-
-Gary supports pluggable skill packs to extend its capabilities.
+### Natural language → engineering actions
 
 ```bash
-/skill install pid_tuner.py
-/skill install ~/Downloads/skill.zip
-/skill install https://github.com/xxx/skill.git
-/skill list
-/skill create my_tool "My tool"
-/skill export my_tool
+gary do "PA0 has an LED. Make a 1 kHz PWM breathing-light demo"
+gary do "Read MPU6050 acceleration through I2C and print it over UART"
+gary --connect --do "Flash the current project and diagnose why there is no serial output"
 ```
 
-Each Skill can include:
+Typical task classes include:
 
-* Python tool functions
-* OpenAI Function Calling schemas
-* Prompt instructions
-* Dependency files
+- GPIO, PWM, ADC, EXTI, UART, I2C, SPI, timers
+- OLEDs, sensors, buzzers, displays, encoders, motors
+- Project generation and incremental modification
+- Cross-compilation and build diagnosis
+- Firmware flashing / target deployment
+- Serial monitoring and runtime-log analysis
+- Register-assisted fault analysis on supported STM32 workflows
+- MicroPython deployment and traceback repair on supported boards
 
-Once installed, skills can be hot-loaded without restarting.
+### Closed-loop repair
+
+GaryCLI can continue after failure instead of stopping at a suggestion:
+
+```text
+Build fails
+→ read compiler diagnostics
+→ locate likely source/configuration issue
+→ patch project
+→ rebuild
+
+Program boots but device does not respond
+→ inspect available runtime evidence
+→ check address / init order / pin assumptions / peripheral state
+→ patch
+→ reflash
+→ observe again
+```
+
+### Deterministic tool layer
+
+The project includes tools and workflows for tasks such as:
+
+- compiler and project inspection
+- SWD / UART ISP deployment for supported STM32 targets
+- serial-port discovery and monitoring
+- register and fault-state inspection where available
+- MicroPython raw-REPL synchronization and runtime-log collection
+- I2C scanning and peripheral smoke tests
+- pin-conflict checks
+- PWM parameter calculation
+- Flash / RAM analysis
+- PID-related analysis tools
+- font / bitmap generation
+- extensible Skills
 
 ---
 
 ## 🚀 Quick Start
 
-Requires Python 3.10 or newer.
+GaryCLI requires **Python 3.10+**.
 
 ### One-line install
 
-**Linux / macOS / WSL:**
+Linux / macOS / WSL:
 
 ```bash
 curl -fsSL https://www.garycli.com/install.sh | bash
 ```
 
-**Windows (PowerShell):**
+Windows PowerShell:
 
 ```powershell
 irm https://www.garycli.com/install.ps1 | iex
 ```
 
-The install script will attempt to complete:
-
-* Python environment check
-* arm-none-eabi-gcc installation or detection
-* HAL / CMSIS resource setup
-* Python dependency installation
-* Serial and debug tool installation
-* CLI launcher command setup
-
-### Manual installation
+### Manual install
 
 ```bash
-# 1. Clone the repository
 git clone https://github.com/garycli/garycli.git
 cd garycli
-
-# 2. Install the environment and resources
 python3 setup.py --auto
-
-# 3. Run environment diagnostics
 python3 stm32_agent.py --doctor
 ```
 
-### First-time configuration
+### Configure the AI backend
 
 ```bash
 gary config
 ```
 
-Follow the prompts to configure the API key, base URL, model, default target, and optional serial settings.
+GaryCLI supports multiple backend styles, including OpenAI-compatible APIs, Anthropic Messages-style interfaces, Gemini integrations, and local/model-provider configurations supported by the repository.
 
-### Environment diagnostics
+### Diagnose the local environment
 
 ```bash
 gary doctor
 ```
 
+This checks the configured AI endpoint, compiler resources, Python dependencies, serial/debug tooling, and detected hardware where applicable.
+
 ---
 
-## 📖 Usage Guide
+## 💻 Usage
 
-### Mode 1: One-shot task (`gary do`)
-
-Best for quickly validating a single requirement:
+### One-shot task
 
 ```bash
-# Generate + compile only (no hardware connection)
-gary do "Write a WS2812 driver for 8 LEDs with a rainbow animation"
+gary do "Write a WS2812 rainbow demo for 8 LEDs"
+```
 
-# Generate + compile + connect to hardware
-gary --connect --do "Blink an LED on PA0 with a 500ms interval"
+### Run with hardware connected
 
-# Specify chip model
+```bash
+gary --connect --do "Blink the LED every 500 ms and verify startup over serial"
+```
+
+### Select a chip
+
+```bash
 gary --chip STM32F407VET6 --connect --do "Read ADC voltage and print it over UART"
 ```
 
-### Mode 2: Interactive conversation (`gary`)
-
-Best for iterative, multi-turn development:
+### Interactive mode
 
 ```bash
 gary
 gary --connect
-gary --chip STM32F407VET6
-gary --connect --chip STM32F103C8T6
+gary --chip STM32F103C8T6
 ```
 
-Example:
+Then iterate naturally:
 
 ```text
-Gary > Help me build an OLED clock on I2C1 with SSD1306, showing HH:MM:SS
-
-  🔧 stm32_reset_debug_attempts → counter reset
-  🔧 stm32_hardware_status → chip: STM32F103C8T6, hw_connected: true
-  🔧 stm32_generate_font → generated bitmap for "0123456789:"
-  🔧 stm32_auto_flash_cycle → compile success 8.2KB, flash success
-  Serial output: Gary:BOOT → OLED Init OK → 12:34:56
-
-✓ OLED is now displaying the time correctly
+Gary > Build an SSD1306 clock on I2C1.
+Gary > The display is blank. Diagnose it using the connected hardware evidence.
+Gary > Change the I2C address to 0x3D and try again.
+Gary > Add an AHT20 and show temperature on the second line.
 ```
 
-### Mode 3: Incremental modifications
-
-Gary tries to continue from the current project instead of rewriting everything from scratch each time:
-
-```text
-Gary > The LED is blinking too fast, change it to 1 second
-Gary > Change it to common-anode seven-segment
-Gary > Add a buzzer that sounds on alarm
-Gary > Change the I2C address from 0x3C to 0x3D
-```
-
-This works well for continuous iteration on the same project.
+GaryCLI tries to preserve project context and make incremental changes rather than regenerate everything unnecessarily.
 
 ---
 
-## 📋 Command Reference
+## 📋 Commands
 
 ### Terminal commands
 
-| Command                      | Description                           |
-| ---------------------------- | ------------------------------------- |
-| `gary`                       | Launch interactive conversation mode  |
-| `gary do "task description"` | One-shot task mode                    |
-| `gary --connect --do "task"` | One-shot task + auto-connect hardware |
-| `gary --chip STM32F407VET6`  | Specify chip model                    |
-| `gary --connect`             | Launch and connect hardware           |
-| `gary config`                | Configure AI backend                  |
-| `gary doctor`                | Run environment diagnostics           |
+| Command | Purpose |
+| --- | --- |
+| `gary` | Start interactive mode |
+| `gary do "task"` | Run a one-shot task |
+| `gary --connect --do "task"` | Run a task with hardware connection enabled |
+| `gary --chip <model>` | Select a target chip |
+| `gary --connect` | Start with hardware connection enabled |
+| `gary config` | Configure the AI backend |
+| `gary doctor` | Diagnose the environment |
 
-### Interactive commands (inside `Gary >`)
+### Interactive commands
 
-| Command                     | Description                                     |
-| --------------------------- | ----------------------------------------------- |
-| `/connect [chip]`           | Connect debugger or initialize hardware context |
-| `/disconnect`               | Disconnect hardware                             |
-| `/serial [port] [baudrate]` | Connect serial port                             |
-| `/serial list`              | List available serial ports                     |
-| `/chip [model]`             | Show or switch chip model                       |
-| `/flash [bin]`              | Deploy the latest artifact or a specified binary |
-| `/probes`                   | List debug probes                               |
-| `/status`                   | Show full hardware status                       |
-| `/config`                   | Reconfigure AI backend                          |
-| `/projects`                 | Show project history                            |
-| `/member [path\|reload]`    | Preview, locate, or reload `member.md`           |
-| `/language [en\|zh]`        | Switch CLI language                             |
-| `/enable_thinking`          | Enable reasoning output for this session        |
-| `/disable_thinking`         | Disable reasoning output for this session       |
-| `/telegram <subcommand>`    | Manage the Telegram integration                 |
-| `/skill list`               | List installed skills                           |
-| `/skill install <source>`   | Install a skill pack                            |
-| `/skill create <name>`      | Create a skill template                         |
-| `/clear`                    | Clear conversation history                      |
-| `/exit` or `/quit`          | Exit                                            |
+| Command | Purpose |
+| --- | --- |
+| `/connect [chip]` | Connect a debugger / initialize target context |
+| `/disconnect` | Disconnect hardware |
+| `/serial [port] [baudrate]` | Connect serial monitoring |
+| `/serial list` | List serial ports |
+| `/chip [model]` | Show or switch the target chip |
+| `/flash [bin]` | Deploy the latest or specified artifact |
+| `/probes` | List debug probes |
+| `/status` | Show hardware/runtime status |
+| `/config` | Reconfigure the AI backend |
+| `/projects` | Show project history |
+| `/member [path\|reload]` | Inspect or reload project memory |
+| `/language [en\|zh]` | Switch CLI language |
+| `/skill list` | List installed Skills |
+| `/skill install <source>` | Install a Skill |
+| `/skill create <name>` | Create a Skill template |
+| `/clear` | Clear conversation history |
+| `/exit` / `/quit` | Exit |
 
 ---
 
-## 🔌 Hardware Connection Recommendations
+## 📟 Supported platforms
 
-### Recommended setup: SWD + serial logging
+The public repository currently contains these major workflows:
 
-This is the most stable combination:
+| Platform | Typical targets | Workflow |
+| --- | --- | --- |
+| **STM32F0 / F1 / F3 / F4** | F030F4, F103C8T6, F303RCT6, F407VET6, F411CEU6 | HAL C generation, GCC build, pyOCD/SWD flashing, UART ISP option, register-assisted debugging |
+| **RP2040** | RP2040, Pico, Pico W | MicroPython validation, USB serial/raw REPL sync, boot-log and traceback debugging |
+| **ESP32 family** | ESP32, S2, S3, C3, C6 and common boards | MicroPython validation, raw REPL sync, boot-log and traceback debugging |
+| **ESP8266 family** | ESP8266, NodeMCU, D1 Mini, ESP-01 | MicroPython validation, raw REPL sync, boot-log and traceback debugging |
+| **CanMV K230 family** | CanMV K230, K230D | MicroPython validation, `/sdcard` deployment, file inspection, runtime-log debugging |
 
-* **SWD**: flashing, register inspection, fault debugging
-* **UART**: serial monitoring and startup verification
+Support depth is platform-dependent. A workflow listed here does not imply that every SDK, framework, board revision, debugger, peripheral, or physical verification scenario is supported.
+
+---
+
+## 🔌 STM32 hardware connection
+
+For STM32 closed-loop debugging, the most useful setup is usually **SWD + UART**:
 
 ```text
 ST-Link / J-Link      STM32
-  SWDIO   ─────────── PA13
-  SWCLK   ─────────── PA14
+  SWDIO   ─────────── SWDIO
+  SWCLK   ─────────── SWCLK
   GND     ─────────── GND
-  3.3V    ─────────── 3.3V
+  VTref   ─────────── 3.3V
 
-USB-TTL               STM32
-  TX      ──────────→ PA10
-  RX      ←────────── PA9
+USB-UART              STM32
+  TX      ──────────→ MCU RX
+  RX      ←────────── MCU TX
   GND     ─────────── GND
 ```
 
-### Pure serial setup (no debugger)
+- **SWD** provides flashing, target control, register access, and fault analysis.
+- **UART** provides runtime logs and application-level evidence.
 
-If you do not have an ST-Link, you can also use only a USB-TTL adapter and flash over UART ISP, but capability will be limited:
-
-* Flashing is possible
-* Serial output is visible
-* **Register reads and fault analysis are not as convenient as with SWD**
-
-So SWD is still strongly recommended when available.
+UART ISP can be used on supported STM32 targets when a debugger is unavailable, but it provides less diagnostic visibility than SWD.
 
 ---
 
-## 🧩 Skill System (Skills)
+## 🧩 Skills
 
-Gary supports capability extensions through skill packs. A standard Skill directory looks like this:
-
-```text
-~/.gary/skills/
-├── pid_tuner/
-│   ├── skill.json
-│   ├── tools.py
-│   ├── schemas.json
-│   ├── prompt.md
-│   └── requirements.txt
-├── uart_flash/
-└── _disabled/
-```
-
-### Install a skill
-
-```bash
-/skill install stm32_extra_tools.py
-/skill install ~/Downloads/gary_skill_pid_tuner.zip
-/skill install https://github.com/someone/gary-skill-motor.git
-/skill install ~/my_skills/sensor_kit/
-```
-
-### Manage skills
+Skills extend GaryCLI with additional deterministic tools and instructions.
 
 ```bash
 /skill list
-/skill info pid_tuner
-/skill disable pid_tuner
-/skill enable pid_tuner
-/skill uninstall pid_tuner
+/skill install ~/Downloads/skill.zip
+/skill install https://github.com/example/gary-skill.git
+/skill create motor_driver "Motor control helpers"
 /skill reload
-```
-
-### Build your own Skill
-
-```bash
-# 1. Create a template
-/skill create motor_driver "DC motor PID control tool"
-
-# 2. Edit the generated files
-# ~/.gary/skills/motor_driver/tools.py
-# ~/.gary/skills/motor_driver/schemas.json
-# ~/.gary/skills/motor_driver/prompt.md
-
-# 3. Hot reload
-/skill reload
-
-# 4. Export for sharing
 /skill export motor_driver
 ```
 
-### Skill development spec
+A Skill can contain:
 
-**tools.py**:
-
-```python
-def motor_set_speed(rpm: int) -> dict:
-    """Set motor speed"""
-    return {"success": True, "message": f"Target speed: {rpm} RPM"}
-
-TOOLS_MAP = {
-    "motor_set_speed": motor_set_speed,
-}
+```text
+skill.json
+├── tools.py          # executable tool functions
+├── schemas.json      # function schemas
+├── prompt.md         # task-specific instructions
+└── requirements.txt  # optional dependencies
 ```
 
-**schemas.json**:
-
-```json
-[
-  {
-    "type": "function",
-    "function": {
-      "name": "motor_set_speed",
-      "description": "Set the target speed of a DC motor",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "rpm": {
-            "type": "integer",
-            "description": "Target speed in RPM"
-          }
-        },
-        "required": ["rpm"]
-      }
-    }
-  }
-]
-```
-
-**prompt.md**:
-
-```markdown
-## Motor Control
-When the user wants to control a motor, call motor_set_speed to set the target RPM.
-```
+The design principle is the same as the core project: keep physical/engineering operations in explicit tools and let the model decide when and why to use them.
 
 ---
 
 ## 🏗️ Architecture
 
 ```text
-┌──────────────────────────────────────────────────────┐
-│                    Gary CLI (TUI)                    │
-│              rich + prompt_toolkit                   │
-├──────────────────────────────────────────────────────┤
-│                   AI Conversation Engine             │
-│         Streaming dialogue + Function Calling        │
-│   DeepSeek │ Kimi │ GPT │ Gemini │ Ollama │ ...     │
-├──────────────┬──────────────┬────────────────────────┤
-│  Code Gen     │   Compiler    │   Hardware Backend    │
-│  HAL templates │  GCC Cross   │  ┌─────────────────┐  │
-│  Project reuse │  Compiler    │  │ SWD (default)   │  │
-│  Template base │              │  │ pyocd           │  │
-│                │              │  ├─────────────────┤  │
-│                │              │  │ UART ISP opt.   │  │
-│                │              │  │ stm32loader     │  │
-│                │              │  ├─────────────────┤  │
-│                │              │  │ Serial monitor  │  │
-│                │              │  │ pyserial        │  │
-│                │              │  └─────────────────┘  │
-├──────────────┴──────────────┴────────────────────────┤
-│                   Skill System (Skills)              │
-│   PID tuning │ I2C scan │ PWM tools │ Font gen │ ... │
-└──────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────┐
+│                         GaryCLI                            │
+│                  CLI / interactive TUI                    │
+├────────────────────────────────────────────────────────────┤
+│                   Agent reasoning layer                    │
+│        task planning · diagnosis · tool selection          │
+├───────────────────────┬────────────────────────────────────┤
+│ Project / build layer │ Hardware / runtime layer           │
+│ code · compiler       │ SWD · UART ISP · serial · REPL     │
+│ workspace · repair    │ registers · logs · deployment      │
+├───────────────────────┴────────────────────────────────────┤
+│                         Skills                             │
+│      deterministic engineering tools + schemas            │
+└────────────────────────────────────────────────────────────┘
 ```
 
----
-
-## <a name="supported-chips"></a> 📟 Supported Chips
-
-Gary currently supports the following boards and workflows:
-
-| Platform | Typical chips / boards | Current workflow |
-| -------- | ---------------------- | ---------------- |
-| **STM32F0 / F1 / F3 / F4** | F030F4, F103C8T6, F303RCT6, F407VET6, F411CEU6 | HAL C code generation, GCC compilation, pyOCD / SWD flashing, register-level debugging |
-| **RP2040** | RP2040, Pico, Pico W | MicroPython `main.py` syntax validation, USB serial raw REPL sync, boot-log / traceback debugging |
-| **ESP32 family** | ESP32, ESP32-S2, ESP32-S3, ESP32-C3, ESP32-C6, LOLIN32, NodeMCU-32S | MicroPython `main.py` syntax validation, USB serial raw REPL sync, boot-log / traceback debugging |
-| **ESP8266 family** | ESP8266, NodeMCU, D1 Mini, ESP-01 | MicroPython `main.py` syntax validation, USB serial raw REPL sync, boot-log / traceback debugging |
-| **CanMV K230 family** | CanMV K230, K230D | MicroPython validation, `/sdcard` deployment over raw REPL, file inspection, and runtime-log debugging |
-
-> STM32 uses the HAL / GCC / SWD workflow, while RP2040, ESP, and CanMV targets use managed MicroPython deployment over USB serial.
-
----
-
-## 💡 Practical Examples
-
-### 🔰 LED blink
-
-```text
-Gary > Help me make an LED blink on PA0 with a 500ms interval
-```
-
-### 🔢 Seven-segment display
-
-```text
-Gary > A 4-digit common-anode seven-segment display, PA0-PA7 for segment select, PB0-PB3 for digit select, show a counter
-```
-
-### 📡 Sensor reading
-
-```text
-Gary > Connect an AHT20 temperature and humidity sensor to I2C1 and print temperature and humidity over UART
-Gary > Now add an SSD1306 OLED to display the temperature too
-```
-
-### 🎛️ PID motor speed control
-
-```text
-Gary > DC motor PID speed control: TIM2 CH1 outputs PWM, TIM3 encoder reads feedback, target 500rpm
-```
-
-### 🔍 I2C troubleshooting
-
-```text
-Gary > I connected several I2C devices but I’m not sure about the addresses, help me scan them
-```
-
-### 🎵 Buzzer music
-
-```text
-Gary > A passive buzzer is connected to PA1. Help me play Twinkle Twinkle Little Star
-```
-
-### 🖥️ Chinese text on OLED
-
-```text
-Gary > Display the Chinese text “你好世界” on the OLED with a 16x16 font
-```
-
----
-
-## 📁 Project Structure
-
-This layout is closer to the repository’s current structure:
+Repository layout:
 
 ```text
 garycli/
-├── stm32_agent.py          # CLI entry point
-├── ai/                     # Provider clients and tool registry
-├── compiler/               # Compiler core and chip-family modules
-├── core/                   # Agent runtime, platforms, memory, and projects
-├── hardware/               # SWD, UART ISP, serial, and MicroPython transport
-├── prompts/                # System and platform templates
-├── tui/                    # Interactive commands and terminal UI
-├── skills/                 # Bundled Skill source packages
-├── config.py               # Runtime paths and defaults
-├── setup.py                # Installation and resource setup
-├── stm32_extra_tools.py    # Additional STM32 tools
-├── gary_skills.py          # Skill manager
-├── member.md               # Project memory base
-└── workspace/              # Generated builds and project cache
+├── ai/                 # AI provider clients and tool registry
+├── compiler/           # build/compiler logic
+├── core/               # agent runtime, projects, platform state
+├── hardware/           # SWD, serial, ISP, MicroPython transport
+├── prompts/            # system/platform prompts
+├── tui/                # interactive terminal UI and commands
+├── skills/             # bundled Skill sources
+├── tests/              # automated tests
+├── stm32_agent.py      # CLI entry point
+├── gary_skills.py      # Skill manager
+├── setup.py            # setup and resource bootstrap
+└── config.py           # runtime paths and defaults
 ```
 
 ---
 
-## ❓ FAQ
+## 🧪 Practical examples
 
-### Installation
+```text
+Gary > PA0 is connected to an LED. Make it breathe using PWM.
 
-<details>
-<summary><b>Q: I installed arm-none-eabi-gcc, but it still cannot be found.</b></summary>
+Gary > Read an AHT20 over I2C1 and print temperature/humidity over UART.
 
-Confirm it is in your PATH:
+Gary > The firmware flashes successfully but the serial port is silent. Diagnose it.
 
-```bash
-which arm-none-eabi-gcc
+Gary > Scan the I2C bus and tell me which addresses respond.
+
+Gary > Build a PID motor-speed demo using PWM output and encoder feedback.
+
+Gary > Deploy this MicroPython project to the connected ESP32 and fix any boot traceback.
 ```
 
-If nothing is returned, add it to PATH manually or run `gary doctor` for diagnosis.
+---
 
-</details>
+## ⚠️ Hardware safety and verification
 
-<details>
-<summary><b>Q: HAL resource download failed.</b></summary>
+GaryCLI can execute real commands against connected hardware. Treat generated code and automated actions as engineering output that still requires appropriate review.
 
-```bash
-python3 setup.py --hal
-# Or specify families
-python3 setup.py --hal f1 f4
-```
+Before using it on power electronics, motors, heaters, batteries, actuators, high-current loads, safety-critical equipment, or valuable prototypes:
 
-</details>
-
-<details>
-<summary><b>Q: Serial port permissions or drivers are broken on Windows.</b></summary>
-
-Make sure the CH340 / CP2102 driver is installed and that the corresponding COM port appears in Device Manager.
-
-</details>
-
-<details>
-<summary><b>Q: On Linux, opening the serial port returns Permission denied.</b></summary>
-
-```bash
-sudo usermod -aG dialout $USER
-newgrp dialout
-```
-
-</details>
-
-### Usage
-
-<details>
-<summary><b>Q: UART flashing does not respond.</b></summary>
-
-Check the following:
-
-1. Whether BOOT0 is pulled high for download mode
-2. Whether the board has been reset
-3. Whether TX / RX are cross-connected
-4. Whether the port and baudrate are correct
-
-</details>
-
-<details>
-<summary><b>Q: Compilation fails with undefined reference to _sbrk.</b></summary>
-
-This usually means the code pulls in symbols that depend on heap support, such as `printf`, `sprintf`, or `malloc`. For minimal bare-metal projects, it is better to avoid these directly.
-
-</details>
-
-<details>
-<summary><b>Q: How do I debug a HardFault?</b></summary>
-
-SWD is recommended. Gary can use register information to help classify the issue:
-
-* `PRECISERR`: often caused by accessing a peripheral before it is ready
-* `UNDEFINSTR`: may indicate stack corruption, bad branching, or invalid instructions
-* `IACCVIOL`: may indicate access to an illegal code region
-
-</details>
-
-<details>
-<summary><b>Q: Can I use a local model through Ollama?</b></summary>
-
-Yes. Run `gary config` and select Ollama. Models with more stable function-calling behavior are recommended.
-
-</details>
-
-<details>
-<summary><b>Q: Does it support Arduino or ESP32?</b></summary>
-
-ESP32 / ESP8266 MicroPython is supported. The Arduino framework is not currently a supported workflow.
-
-</details>
+- set conservative current/voltage/speed limits;
+- use independent hardware protection where appropriate;
+- verify pin mappings and power domains;
+- keep a safe recovery / flashing path;
+- do not equate “build succeeded” or “flash succeeded” with physical correctness.
 
 ---
 
 ## 🗺️ Roadmap
 
-* [x] Basic support for STM32F0 / F1 / F3 / F4
-* [x] UART ISP flashing support
-* [x] SWD debugging and register inspection
-* [x] Skill system (Skills)
-* [x] Early template library and experience base
-* [ ] Skill marketplace (browse / install community skills online)
-* [ ] Real-time serial data visualization
-* [ ] STM32CubeMX project import
-* [ ] VS Code extension
-* [x] RP2040 / Pico / Pico W support
-* [x] ESP32 / ESP8266 MicroPython support
-* [x] CanMV K230 / K230D MicroPython support
+Completed in the public repository:
+
+- [x] STM32F0/F1/F3/F4 base workflow
+- [x] SWD flashing and register-assisted debugging
+- [x] UART ISP option
+- [x] Skill system
+- [x] RP2040 / Pico MicroPython workflow
+- [x] ESP32 / ESP8266 MicroPython workflow
+- [x] CanMV K230 / K230D MicroPython workflow
+- [x] Modular AI / compiler / core / hardware / prompt / TUI packages
+
+Directions under continued development:
+
+- [ ] broader native-SDK and chip-family coverage
+- [ ] stronger automated hardware validation
+- [ ] richer serial / signal visualization
+- [ ] improved project import and migration workflows
+- [ ] community Skill discovery and distribution
+- [ ] IDE / GUI integrations
 
 ---
 
 ## 🤝 Contributing
 
-Issues and PRs are welcome. Contributions are especially appreciated in these areas:
+Issues and pull requests are welcome. Useful contribution areas include:
 
-* New Skill packs
-* More STM32 / RP2040 / ESP / CanMV board and template support
-* Documentation improvements and translations
-* Fault reproduction and fixes
-* Example projects and demo videos
+- reproducible hardware/toolchain bugs;
+- new target and board support;
+- deterministic engineering tools and Skills;
+- compiler/deployment diagnostics;
+- tests and CI improvements;
+- documentation, examples, and translations.
 
-### Contributing a Skill
+Please read [CONTRIBUTING.md](./CONTRIBUTING.md), [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md), and [SECURITY.md](./SECURITY.md) before contributing.
 
-```bash
-# 1. Create a template
-/skill create my_awesome_tool "My tool"
-
-# 2. Develop and test
-# Edit ~/.gary/skills/my_awesome_tool/
-
-# 3. Export
-/skill export my_awesome_tool
-
-# 4. Submit a PR
-```
-
-## Star History
-
-[View the repository's Star History](https://www.star-history.com/?repos=garycli%2Fgarycli&type=date&legend=top-left).
+For security-sensitive reports, follow the security policy instead of opening a public issue.
 
 ---
 
 ## 📜 License
 
-This project is released under the [Apache-2.0 License](https://opensource.org/licenses/Apache-2.0).
+GaryCLI is released under the [Apache-2.0 License](./LICENSE).
 
 ---
 
@@ -726,6 +470,6 @@ This project is released under the [Apache-2.0 License](https://opensource.org/l
 
 **🗡️ Just Gary Do It.**
 
-[Website](https://www.garycli.com) · [GitHub](https://github.com/garycli/garycli) · [Submit an Issue](https://github.com/garycli/garycli/issues)
+[Website](https://www.garycli.com) · [Issues](https://github.com/garycli/garycli/issues) · [Contributing](./CONTRIBUTING.md) · [Changelog](./CHANGELOG.md)
 
 </div>
