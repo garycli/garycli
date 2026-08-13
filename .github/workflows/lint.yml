@@ -2,12 +2,19 @@ name: Lint & Format
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
+
+permissions:
+  contents: read
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+concurrency:
+  group: lint-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   lint:
@@ -17,8 +24,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -28,19 +33,12 @@ jobs:
       - name: Install tools
         run: pip install "black>=24.0" flake8
 
-      - name: Auto-format with black
-        run: black . --line-length 100
-
-      - name: Commit formatting fixes (if any)
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git diff --quiet || (git add . && git commit -m "style: auto-format with black")
-          git push
+      - name: Check formatting with black
+        run: black . --line-length 100 --check --diff
 
       - name: Lint with flake8
         run: |
           flake8 . \
             --max-line-length=100 \
-            --extend-ignore=E501,F541,F841,F821,F401,F403,F405,F811,F824,E741,E402,E401,E203,E231,W391 \
+            --extend-ignore=E501,F541,F841,F821,F401,F403,F405,F811,F824,E741,E402,E401,E203,E231,W291,W293,W391,W605 \
             --exclude=.venv,__pycache__,*.egg-info

@@ -13,11 +13,17 @@ All notable changes to Gary CLI are documented here. Format follows [Keep a Chan
 - CanMV K230 / K230D MicroPython workflow
 - RP2040 / Pico and ESP32 / ESP8266 MicroPython workflows
 - Modular `ai/`, `compiler/`, `core/`, `hardware/`, `prompts/`, and `tui/` packages
+- README documentation for evidence levels, hardware-verification boundaries, and the engineering execution loop
 
 ### Changed
 
 - Expanded provider support to OpenAI-compatible, Anthropic Messages, and Gemini SDK interfaces
 - Reworked project caching and incremental repair around `workspace/projects/latest_workspace`
+- Repositioned the English and Chinese READMEs around GaryCLI as an embedded engineering execution agent rather than a code-generation-only assistant
+- Refreshed platform, architecture, command, safety, and contribution documentation
+- Changed lint CI from auto-committing formatting changes to check-only validation
+- Updated test CI to generate and validate the uploaded HTML coverage artifact
+- Hardened the release workflow with explicit release permissions and tag-to-changelog version handling
 
 ---
 
