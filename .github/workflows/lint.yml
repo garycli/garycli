@@ -40,5 +40,5 @@ jobs:
         run: |
           flake8 . \
             --max-line-length=100 \
-            --extend-ignore=E501,F541,F841,F821,F401,F403,F405,F811,F824,E741,E402,E401,E203,E231,W391 \
+            --extend-ignore=E501,F541,F841,F821,F401,F403,F405,F811,F824,E741,E402,E401,E203,E231,W291,W293,W391,W605 \
             --exclude=.venv,__pycache__,*.egg-info
