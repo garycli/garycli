@@ -2,12 +2,19 @@ name: Lint & Format
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
+
+permissions:
+  contents: read
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+concurrency:
+  group: lint-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   lint:
@@ -17,8 +24,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -28,15 +33,8 @@ jobs:
       - name: Install tools
         run: pip install "black>=24.0" flake8
 
-      - name: Auto-format with black
-        run: black . --line-length 100
-
-      - name: Commit formatting fixes (if any)
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git diff --quiet || (git add . && git commit -m "style: auto-format with black")
-          git push
+      - name: Check formatting with black
+        run: black . --line-length 100 --check --diff
 
       - name: Lint with flake8
         run: |
