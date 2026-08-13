@@ -5,6 +5,12 @@ on:
     tags:
       - "v*.*.*"
 
+permissions:
+  contents: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   release:
     name: Create GitHub Release
@@ -12,37 +18,50 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
+          cache: pip
 
       - name: Install dependencies
         run: pip install -r requirements.txt
 
       - name: Extract version from tag
         id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG#v}"
+          echo "TAG=$TAG" >> "$GITHUB_OUTPUT"
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Extract changelog entry
         id: changelog
+        shell: bash
         run: |
-          VERSION=${{ steps.version.outputs.VERSION }}
-          # Extract the section for this version from CHANGELOG.md
-          awk "/^## \[$VERSION\]/{flag=1; next} /^## \[/{flag=0} flag" CHANGELOG.md > release_notes.txt
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          awk "/^## \\[$VERSION\\]/{flag=1; next} /^## \\[/{flag=0} flag" CHANGELOG.md > release_notes.txt
+
+          if [ ! -s release_notes.txt ]; then
+            {
+              echo "Release ${{ steps.version.outputs.TAG }}"
+              echo
+              echo "See CHANGELOG.md for details."
+            } > release_notes.txt
+          fi
+
           cat release_notes.txt
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.version.outputs.VERSION }}
-          name: Gary CLI ${{ steps.version.outputs.VERSION }}
+          tag_name: ${{ steps.version.outputs.TAG }}
+          name: GaryCLI ${{ steps.version.outputs.TAG }}
           body_path: release_notes.txt
           draft: false
-          prerelease: ${{ contains(steps.version.outputs.VERSION, '-') }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          prerelease: ${{ contains(steps.version.outputs.TAG, '-') }}
