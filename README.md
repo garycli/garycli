@@ -2,7 +2,7 @@
 
 # 🗡️ GaryCLI
 
-### AI-native embedded engineering execution
+### AI-native embedded engineering execution system
 
 **From a natural-language requirement to code, build, flash, runtime evidence, diagnosis, and repair.**
 
@@ -13,7 +13,9 @@
 
 **GaryCLI is not just an AI code generator. It is an embedded engineering agent designed to execute as much of the real development loop as the connected toolchain and hardware can verify.**
 
-[Quick Start](#-quick-start) · [Why GaryCLI](#-why-garycli) · [Execution Loop](#-execution-loop) · [Supported Platforms](#-supported-platforms) · [Commands](#-commands) · [Skills](#-skills) · [Contributing](#-contributing)
+**GaryProbe is the companion instrument for the hardware end of that loop.** It connects host tools over USB or BLE to target-facing debug and signal operations, so supported actions and measurements can inform the next engineering step.
+
+[Quick Start](#-quick-start) · [Why GaryCLI](#-why-garycli) · [Execution Loop](#-execution-loop) · [GaryProbe](#-garyprobe-and-physical-evidence) · [Supported Platforms](#-supported-platforms) · [Commands](#-commands) · [Skills](#-skills) · [Contributing](#-contributing)
 
 [中文 README](./README_CN.md)
 
@@ -92,9 +94,19 @@ GaryCLI distinguishes several levels of evidence:
 2. **Build-level** — the real compiler/toolchain accepted the project.
 3. **Deployment-level** — firmware or files were successfully written to the target.
 4. **Runtime-level** — serial output, traceback, register state, or other observable software evidence matches expectations.
-5. **Physical-behavior-level** — a real external effect was measured or observed by connected instrumentation.
+5. **Physical-behavior-level** — a real external effect was measured or observed by connected instrumentation, including GaryProbe when the signal and test setup are supported.
 
-A successful compile or flash does **not** automatically prove that the physical task is correct. Physical verification requires an observable signal, sensor, probe, test fixture, or explicit user confirmation.
+A successful compile or flash does **not** automatically prove that the physical task is correct. Physical verification requires an observable signal, sensor, probe, test fixture, or explicit user confirmation. A measured pin waveform proves what happened at that pin during that test; it does not by itself prove that an LED lit or a motor moved.
+
+## 🔬 GaryProbe and physical evidence
+
+GaryCLI plans, builds, deploys, and diagnoses through explicit engineering tools. GaryProbe supplies a target-facing hardware path: a compatible host can request supported operations over **USB or BLE** and receive device status or captured measurements. This is how board-level observations can become evidence for the next AI-guided action.
+
+- **Target execution:** SWD target access/flashing and PWM or digital signal output, where supported, depend on the target, device firmware, host software, and wiring.
+- **Target observation:** UART data, ADC voltage/waveform samples, and digital-level observations can help distinguish a running program from its actual electrical output where those functions are available.
+- **Evidence boundary:** a capture supports a specific claim under a specific test setup. Unmeasured physical effects still need a sensor, fixture, or direct observation.
+
+The public `gary` commands in this repository document the current SWD/UART/REPL workflows. GaryProbe-to-GaryCLI host integration and repeatable, automated physical checks are still in development; the presence of a GaryProbe does not imply that every command, target, or measurement path is available from this repository.
 
 ---
 
@@ -319,6 +331,8 @@ USB-UART              STM32
 
 UART ISP can be used on supported STM32 targets when a debugger is unavailable, but it provides less diagnostic visibility than SWD.
 
+The wiring above describes the current public CLI workflow. GaryProbe is an additional instrument for compatible target setups; its USB/BLE host path and available operations depend on the matching firmware and host integration described above.
+
 ---
 
 ## 🧩 Skills
@@ -435,7 +449,7 @@ Completed in the public repository:
 Directions under continued development:
 
 - [ ] broader native-SDK and chip-family coverage
-- [ ] stronger automated hardware validation
+- [ ] GaryProbe USB/BLE host integration with GaryCLI tools and repeatable measurement-backed validation
 - [ ] richer serial / signal visualization
 - [ ] improved project import and migration workflows
 - [ ] community Skill discovery and distribution
