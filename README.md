@@ -108,6 +108,8 @@ GaryCLI plans, builds, deploys, and diagnoses through explicit engineering tools
 
 The public `gary` commands in this repository document the current SWD/UART/REPL workflows. GaryProbe-to-GaryCLI host integration and repeatable, automated physical checks are still in development; the presence of a GaryProbe does not imply that every command, target, or measurement path is available from this repository.
 
+For a first-observation checklist, connection precautions, and evidence limits, see [GaryProbe getting started](./docs/GARYPROBE.md#english).
+
 ---
 
 ## 🎯 What GaryCLI can do

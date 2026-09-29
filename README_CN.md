@@ -108,6 +108,8 @@ GaryCLI 通过明确的工程工具规划、构建、部署和诊断。GaryProbe
 
 本公开仓库的 `gary` 命令目前记录的是 SWD / UART / REPL 工作流。GaryProbe 与 GaryCLI 主机工具的集成，以及可重复的自动物理验证仍在开发中；拥有 GaryProbe 不等于这里的所有命令、目标芯片或测量路径均已打通。
 
+首次观测步骤、连接前检查及证据边界，请参阅 [GaryProbe 用户上手文档](./docs/GARYPROBE.md#中文)。
+
 ---
 
 ## 🎯 GaryCLI 能做什么
